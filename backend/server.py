@@ -508,7 +508,8 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
         }})
 
         # Fraud shield: if compute_ms is absurdly fast for workload, flag
-        expected_min_ms = 3 if task["kind"] == "hash" else 2
+        # Browser SubtleCrypto + JS loops legitimately produce: hash ~30-200ms, matrix ~1-15ms
+        expected_min_ms = 15 if task["kind"] == "hash" else 1
         if data.compute_ms < expected_min_ms:
             await db.devices.update_one({"id": data.device_id}, {"$set": {"flagged": True}})
 

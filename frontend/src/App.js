@@ -10,6 +10,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Device from "./pages/Device";
 import Admin from "./pages/Admin";
+import CustomerPortal from "./pages/CustomerPortal";
 import { Toaster } from "./components/ui/sonner";
 
 function App() {
