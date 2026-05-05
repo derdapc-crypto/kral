@@ -339,8 +339,7 @@ async def register(data: RegisterIn, response: Response):
 async def login(data: LoginIn, request: Request, response: Response):
     email = data.email.lower()
     # Use X-Forwarded-For (kubernetes ingress) to identify real client; fall back to peer IP
-    fwd = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-    ip = fwd or (request.client.host if request.client else "unknown")
+    ip = _client_ip(request)
     identifier = f"{ip}:{email}"
 
     # Brute-force lockout
@@ -490,7 +489,7 @@ async def request_task(device_id: str, user: dict = Depends(get_current_user)):
         # No active customer jobs — fall back to baseline mining if enabled
         cfg = await db.config.find_one({"key": "auto_mining"}, {"_id": 0}) or {}
         if not cfg.get("enabled", True):
-            raise HTTPException(status_code=204, detail="No tasks available — baseline mining disabled")
+            raise HTTPException(status_code=503, detail="No tasks available — baseline mining disabled by admin")
         # Baseline = mostly SHA-256 PoW per spec, but rotate to keep workload diverse
         task = generate_task()
 
@@ -850,10 +849,16 @@ async def apk_version():
     }
 
 
+def _client_ip(request: Request) -> str:
+    """Return the real client IP, honoring X-Forwarded-For from the kubernetes ingress."""
+    fwd = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    return fwd or (request.client.host if request.client else "unknown")
+
+
 @api.post("/apk/track-download")
 async def track_apk_download(request: Request):
     """Lightweight rate-limited download counter."""
-    ip = request.client.host if request.client else "unknown"
+    ip = _client_ip(request)
     now = datetime.now(timezone.utc)
     # Simple rate limit: 5 downloads / IP / minute
     recent = await db.apk_downloads.count_documents({
