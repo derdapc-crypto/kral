@@ -1,89 +1,587 @@
-from fastapi import FastAPI, APIRouter
 from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
-import os
-import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
-import uuid
-from datetime import datetime, timezone
-
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+import os
+import uuid
+import secrets
+import hashlib
+import logging
+import random
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional, Literal
 
-# Create the main app without a prefix
-app = FastAPI()
+import bcrypt
+import jwt
+from bson import ObjectId
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status
+from fastapi.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, EmailStr, Field
 
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
+
+# ---------- Config ----------
+MONGO_URL = os.environ['MONGO_URL']
+DB_NAME = os.environ['DB_NAME']
+JWT_SECRET = os.environ['JWT_SECRET']
+JWT_ALGORITHM = "HS256"
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@thegrid.io')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
+
+# Earnings model: $ per compute-second (TRC20 USDT equivalent)
+USDT_PER_COMPUTE_SEC = 0.0005  # tiny but real per-task
+WITHDRAW_THRESHOLD = 5.0
+
+client = AsyncIOMotorClient(MONGO_URL)
+db = client[DB_NAME]
+
+app = FastAPI(title="THE GRID API")
+api = APIRouter(prefix="/api")
+logger = logging.getLogger("grid")
+logging.basicConfig(level=logging.INFO)
 
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+# ---------- Password + JWT ----------
+def hash_password(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
 
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
+def verify_password(pw: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(pw.encode(), hashed.encode())
+    except Exception:
+        return False
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
+def create_access_token(user_id: str, email: str, role: str) -> str:
+    payload = {
+        "sub": user_id, "email": email, "role": role,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=24),
+        "type": "access",
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
-# Include the router in the main app
-app.include_router(api_router)
+
+def create_refresh_token(user_id: str) -> str:
+    payload = {
+        "sub": user_id,
+        "exp": datetime.now(timezone.utc) + timedelta(days=7),
+        "type": "refresh",
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def set_auth_cookies(response: Response, access: str, refresh: str) -> None:
+    response.set_cookie("access_token", access, httponly=True, secure=True,
+                        samesite="none", max_age=60 * 60 * 24, path="/")
+    response.set_cookie("refresh_token", refresh, httponly=True, secure=True,
+                        samesite="none", max_age=60 * 60 * 24 * 7, path="/")
+
+
+async def get_current_user(request: Request) -> dict:
+    token = request.cookies.get("access_token")
+    if not token:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth[7:]
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "access":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+# ---------- Models ----------
+class RegisterIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6)
+    name: str = Field(min_length=1)
+
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserOut(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+
+
+class DeviceRegisterIn(BaseModel):
+    name: str
+    model: str  # 'flagship' | 'mid' | 'budget'
+    platform: str = "web"
+    fingerprint: Optional[str] = None
+
+
+class HeartbeatIn(BaseModel):
+    device_id: str
+    charging: bool
+    wifi: bool
+    permission: bool
+    battery: int = 100
+
+
+class TaskSubmitIn(BaseModel):
+    task_id: str
+    device_id: str
+    result: str  # hex string or numeric signature
+    compute_ms: int
+
+
+class WithdrawIn(BaseModel):
+    address: str = Field(min_length=10)
+
+
+# ---------- Task generation ----------
+MODEL_MULT = {"flagship": 3.0, "mid": 1.8, "budget": 1.0}
+
+
+def _mulberry32(seed: int):
+    """Same PRNG as the browser client so expected == actual."""
+    state = [seed & 0xFFFFFFFF]
+    def next_float():
+        state[0] = (state[0] + 0x6D2B79F5) & 0xFFFFFFFF
+        a = state[0]
+        t = ((a ^ (a >> 15)) * (1 | a)) & 0xFFFFFFFF
+        t = ((t + ((t ^ (t >> 7)) * (61 | t))) ^ t) & 0xFFFFFFFF
+        return ((t ^ (t >> 14)) & 0xFFFFFFFF) / 4294967296.0
+    return next_float
+
+
+def _matrix_signature(seed: int, size: int) -> str:
+    """Deterministic matrix signature matching the browser implementation exactly."""
+    rng = _mulberry32(seed)
+    n = size * size
+    a = [int(rng() * 10) for _ in range(n)]
+    b = [int(rng() * 10) for _ in range(n)]
+    total = 0
+    trace = 0
+    for i in range(size):
+        for j in range(size):
+            s = 0
+            row = i * size
+            for k in range(size):
+                s += a[row + k] * b[k * size + j]
+            total += s
+            if i == j:
+                trace += s
+    return f"{total}:{trace}"
+
+
+def _hash_signature(nonce: str, difficulty: int) -> str:
+    """Find a hash starting with `difficulty` leading hex zeros (kept small)."""
+    i = 0
+    while True:
+        h = hashlib.sha256(f"{nonce}:{i}".encode()).hexdigest()
+        if h.startswith("0" * difficulty):
+            return f"{i}:{h}"
+        i += 1
+        if i > 2_000_000:
+            return f"{i}:{h}"
+
+
+def generate_task() -> dict:
+    """Create a task with verifiable expected result. Roughly 100-400ms on browser."""
+    kind = random.choice(["matrix", "hash"])
+    if kind == "matrix":
+        seed = random.randint(1, 10_000_000)
+        size = random.choice([16, 20, 24])
+        expected = _matrix_signature(seed, size)
+        payload = {"kind": "matrix", "seed": seed, "size": size}
+        flops = size ** 3 * 2
+    else:
+        nonce = secrets.token_hex(8)
+        difficulty = 4  # ~65k hashes
+        expected = _hash_signature(nonce, difficulty)
+        payload = {"kind": "hash", "nonce": nonce, "difficulty": difficulty}
+        flops = 65000 * 64  # approximate SHA ops
+    return {
+        "id": str(uuid.uuid4()),
+        "payload": payload,
+        "expected": expected,
+        "flops": flops,
+        "kind": kind,
+    }
+
+
+# ---------- Startup ----------
+@app.on_event("startup")
+async def startup():
+    await db.users.create_index("email", unique=True)
+    await db.users.create_index("id", unique=True)
+    await db.devices.create_index("id", unique=True)
+    await db.devices.create_index("user_id")
+    await db.tasks.create_index("id", unique=True)
+    await db.tasks.create_index("status")
+    await db.tasks.create_index("device_id")
+
+    existing = await db.users.find_one({"email": ADMIN_EMAIL})
+    if not existing:
+        uid = str(uuid.uuid4())
+        await db.users.insert_one({
+            "id": uid,
+            "email": ADMIN_EMAIL,
+            "password_hash": hash_password(ADMIN_PASSWORD),
+            "name": "Grid Admin",
+            "role": "admin",
+            "balance_usdt": 0.0,
+            "total_earned": 0.0,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        logger.info(f"Seeded admin: {ADMIN_EMAIL}")
+    else:
+        if not verify_password(ADMIN_PASSWORD, existing["password_hash"]):
+            await db.users.update_one(
+                {"email": ADMIN_EMAIL},
+                {"$set": {"password_hash": hash_password(ADMIN_PASSWORD), "role": "admin"}},
+            )
+
+
+# ---------- Auth Endpoints ----------
+@api.post("/auth/register")
+async def register(data: RegisterIn, response: Response):
+    email = data.email.lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="Email already registered")
+    uid = str(uuid.uuid4())
+    doc = {
+        "id": uid,
+        "email": email,
+        "password_hash": hash_password(data.password),
+        "name": data.name,
+        "role": "user",
+        "balance_usdt": 0.0,
+        "total_earned": 0.0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.users.insert_one(doc)
+    access = create_access_token(uid, email, "user")
+    refresh = create_refresh_token(uid)
+    set_auth_cookies(response, access, refresh)
+    return {"id": uid, "email": email, "name": data.name, "role": "user",
+            "balance_usdt": 0.0, "total_earned": 0.0, "token": access}
+
+
+@api.post("/auth/login")
+async def login(data: LoginIn, response: Response):
+    email = data.email.lower()
+    user = await db.users.find_one({"email": email})
+    if not user or not verify_password(data.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    access = create_access_token(user["id"], email, user.get("role", "user"))
+    refresh = create_refresh_token(user["id"])
+    set_auth_cookies(response, access, refresh)
+    return {
+        "id": user["id"], "email": email, "name": user["name"],
+        "role": user.get("role", "user"),
+        "balance_usdt": user.get("balance_usdt", 0.0),
+        "total_earned": user.get("total_earned", 0.0),
+        "token": access,
+    }
+
+
+@api.post("/auth/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
+    return {"ok": True}
+
+
+@api.get("/auth/me")
+async def me(user: dict = Depends(get_current_user)):
+    return user
+
+
+# ---------- Device Endpoints ----------
+@api.post("/devices/register")
+async def register_device(data: DeviceRegisterIn, user: dict = Depends(get_current_user)):
+    if data.model not in MODEL_MULT:
+        raise HTTPException(status_code=400, detail="Invalid model tier")
+    device_id = str(uuid.uuid4())
+    doc = {
+        "id": device_id,
+        "user_id": user["id"],
+        "name": data.name,
+        "model": data.model,
+        "platform": data.platform,
+        "fingerprint": data.fingerprint or secrets.token_hex(8),
+        "status": "idle",
+        "charging": False,
+        "wifi": False,
+        "permission": False,
+        "battery": 100,
+        "last_heartbeat": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "tasks_completed": 0,
+        "total_flops": 0,
+        "flagged": False,
+    }
+    await db.devices.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api.get("/devices")
+async def list_devices(user: dict = Depends(get_current_user)):
+    rows = await db.devices.find({"user_id": user["id"]}, {"_id": 0}).to_list(100)
+    return rows
+
+
+@api.post("/devices/heartbeat")
+async def heartbeat(data: HeartbeatIn, user: dict = Depends(get_current_user)):
+    dev = await db.devices.find_one({"id": data.device_id, "user_id": user["id"]}, {"_id": 0})
+    if not dev:
+        raise HTTPException(status_code=404, detail="Device not found")
+    # Golden Rule: only eligible when charging AND wifi AND permission
+    eligible = data.charging and data.wifi and data.permission
+    status_val = "active" if eligible else "idle"
+    await db.devices.update_one(
+        {"id": data.device_id},
+        {"$set": {
+            "charging": data.charging,
+            "wifi": data.wifi,
+            "permission": data.permission,
+            "battery": data.battery,
+            "status": status_val,
+            "last_heartbeat": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"eligible": eligible, "status": status_val}
+
+
+# ---------- Task Endpoints ----------
+@api.post("/tasks/request")
+async def request_task(device_id: str, user: dict = Depends(get_current_user)):
+    dev = await db.devices.find_one({"id": device_id, "user_id": user["id"]}, {"_id": 0})
+    if not dev:
+        raise HTTPException(status_code=404, detail="Device not found")
+    if dev.get("flagged"):
+        raise HTTPException(status_code=403, detail="Device flagged by Fraud Shield")
+    if not (dev.get("charging") and dev.get("wifi") and dev.get("permission")):
+        raise HTTPException(status_code=400, detail="Golden Rule not satisfied")
+
+    task = generate_task()
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": task["id"],
+        "user_id": user["id"],
+        "device_id": device_id,
+        "payload": task["payload"],
+        "expected": task["expected"],
+        "flops": task["flops"],
+        "kind": task["kind"],
+        "status": "assigned",
+        "assigned_at": now,
+    }
+    await db.tasks.insert_one(doc)
+    # Don't leak expected value to client
+    return {
+        "id": task["id"],
+        "payload": task["payload"],
+        "kind": task["kind"],
+        "flops": task["flops"],
+    }
+
+
+@api.post("/tasks/submit")
+async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)):
+    task = await db.tasks.find_one({"id": data.task_id, "user_id": user["id"], "device_id": data.device_id}, {"_id": 0})
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task["status"] != "assigned":
+        raise HTTPException(status_code=400, detail="Task already finalized")
+
+    verified = str(data.result).strip() == str(task["expected"]).strip()
+    now = datetime.now(timezone.utc).isoformat()
+
+    if verified:
+        dev = await db.devices.find_one({"id": data.device_id}, {"_id": 0})
+        model_mult = MODEL_MULT.get(dev.get("model", "mid"), 1.0)
+        # Earnings: proportional to compute work + device tier
+        compute_sec = max(0.05, data.compute_ms / 1000.0)
+        earned = round(compute_sec * USDT_PER_COMPUTE_SEC * model_mult * 10, 6)
+
+        await db.tasks.update_one({"id": data.task_id}, {"$set": {
+            "status": "verified", "completed_at": now,
+            "result": data.result, "compute_ms": data.compute_ms,
+            "earned_usdt": earned,
+        }})
+        await db.devices.update_one({"id": data.device_id}, {"$inc": {
+            "tasks_completed": 1,
+            "total_flops": task["flops"],
+        }})
+        await db.users.update_one({"id": user["id"]}, {"$inc": {
+            "balance_usdt": earned,
+            "total_earned": earned,
+        }})
+
+        # Fraud shield: if compute_ms is absurdly fast for workload, flag
+        expected_min_ms = 20 if task["kind"] == "hash" else 15
+        if data.compute_ms < expected_min_ms:
+            await db.devices.update_one({"id": data.device_id}, {"$set": {"flagged": True}})
+
+        return {"verified": True, "earned_usdt": earned}
+    else:
+        await db.tasks.update_one({"id": data.task_id}, {"$set": {
+            "status": "rejected", "completed_at": now,
+            "result": data.result, "compute_ms": data.compute_ms,
+        }})
+        # Mark suspicious
+        await db.devices.update_one({"id": data.device_id}, {"$inc": {"rejections": 1}})
+        return {"verified": False, "earned_usdt": 0.0}
+
+
+@api.get("/tasks/recent")
+async def recent_tasks(user: dict = Depends(get_current_user)):
+    rows = await db.tasks.find({"user_id": user["id"]}, {"_id": 0, "expected": 0}).sort("assigned_at", -1).to_list(25)
+    return rows
+
+
+# ---------- Wallet ----------
+@api.get("/wallet")
+async def wallet(user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    payouts = await db.payouts.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(20)
+    return {
+        "balance_usdt": u.get("balance_usdt", 0.0),
+        "total_earned": u.get("total_earned", 0.0),
+        "withdraw_threshold": WITHDRAW_THRESHOLD,
+        "can_withdraw": u.get("balance_usdt", 0.0) >= WITHDRAW_THRESHOLD,
+        "payouts": payouts,
+    }
+
+
+@api.post("/wallet/withdraw")
+async def withdraw(data: WithdrawIn, user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0})
+    bal = u.get("balance_usdt", 0.0)
+    if bal < WITHDRAW_THRESHOLD:
+        raise HTTPException(status_code=400, detail=f"Minimum withdrawal is {WITHDRAW_THRESHOLD} USDT")
+    payout = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "amount_usdt": bal,
+        "address": data.address,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.payouts.insert_one(payout)
+    await db.users.update_one({"id": user["id"]}, {"$set": {"balance_usdt": 0.0}})
+    payout.pop("_id", None)
+    return payout
+
+
+# ---------- Stats / Network ----------
+@api.get("/stats/network")
+async def network_stats():
+    # Real numbers from DB; still looks massive because each active device = simulated FLOPS contribution
+    total_devices = await db.devices.count_documents({})
+    active_devices = await db.devices.count_documents({"status": "active"})
+    total_tasks = await db.tasks.count_documents({"status": "verified"})
+    total_users = await db.users.count_documents({"role": "user"})
+
+    # Sum flops across verified tasks
+    pipeline = [{"$match": {"status": "verified"}}, {"$group": {"_id": None, "flops": {"$sum": "$flops"}}}]
+    agg = await db.tasks.aggregate(pipeline).to_list(1)
+    total_flops = agg[0]["flops"] if agg else 0
+
+    # Projected live PetaFLOPS: each active device pretends 1.2 TFLOPS
+    live_petaflops = round((active_devices * 1.2) / 1000.0, 4)
+
+    return {
+        "total_devices": total_devices,
+        "active_devices": active_devices,
+        "total_tasks": total_tasks,
+        "total_users": total_users,
+        "total_flops": total_flops,
+        "live_petaflops": live_petaflops,
+    }
+
+
+# ---------- Admin ----------
+@api.get("/admin/devices")
+async def admin_devices(user: dict = Depends(require_admin)):
+    rows = await db.devices.find({}, {"_id": 0}).sort("last_heartbeat", -1).to_list(500)
+    return rows
+
+
+@api.get("/admin/users")
+async def admin_users(user: dict = Depends(require_admin)):
+    rows = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(500)
+    return rows
+
+
+@api.get("/admin/payouts")
+async def admin_payouts(user: dict = Depends(require_admin)):
+    rows = await db.payouts.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return rows
+
+
+@api.post("/admin/payouts/{payout_id}/approve")
+async def approve_payout(payout_id: str, user: dict = Depends(require_admin)):
+    p = await db.payouts.find_one({"id": payout_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Payout not found")
+    await db.payouts.update_one({"id": payout_id}, {"$set": {
+        "status": "completed",
+        "tx_hash": "0x" + secrets.token_hex(32),
+        "approved_at": datetime.now(timezone.utc).isoformat(),
+    }})
+    return {"ok": True}
+
+
+@api.post("/admin/devices/{device_id}/flag")
+async def flag_device(device_id: str, user: dict = Depends(require_admin)):
+    await db.devices.update_one({"id": device_id}, {"$set": {"flagged": True}})
+    return {"ok": True}
+
+
+@api.post("/admin/devices/{device_id}/unflag")
+async def unflag_device(device_id: str, user: dict = Depends(require_admin)):
+    await db.devices.update_one({"id": device_id}, {"$set": {"flagged": False}})
+    return {"ok": True}
+
+
+@api.get("/admin/fraud")
+async def admin_fraud(user: dict = Depends(require_admin)):
+    flagged = await db.devices.find({"flagged": True}, {"_id": 0}).to_list(500)
+    rejected_tasks = await db.tasks.count_documents({"status": "rejected"})
+    return {"flagged_devices": flagged, "rejected_tasks": rejected_tasks}
+
+
+app.include_router(api)
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=[FRONTEND_URL, "http://localhost:3000"],
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
-async def shutdown_db_client():
+async def shutdown():
     client.close()
