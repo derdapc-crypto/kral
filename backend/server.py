@@ -114,6 +114,8 @@ class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6)
     name: str = Field(min_length=1)
+    role: Optional[str] = "user"  # 'user' (worker) | 'customer' (enterprise)
+    company: Optional[str] = None
 
 
 class LoginIn(BaseModel):
@@ -133,6 +135,8 @@ class DeviceRegisterIn(BaseModel):
     model: str  # 'flagship' | 'mid' | 'budget'
     platform: str = "web"
     fingerprint: Optional[str] = None
+    brand: Optional[str] = "Apple"
+    os_version: Optional[str] = "iOS 17.4"
 
 
 class HeartbeatIn(BaseModel):
@@ -141,6 +145,9 @@ class HeartbeatIn(BaseModel):
     wifi: bool
     permission: bool
     battery: int = 100
+    thermal: Optional[str] = "nominal"  # nominal | warm | hot | critical
+    brand: Optional[str] = None
+    os_version: Optional[str] = None
 
 
 class TaskSubmitIn(BaseModel):
@@ -152,6 +159,17 @@ class TaskSubmitIn(BaseModel):
 
 class WithdrawIn(BaseModel):
     address: str = Field(min_length=10)
+
+
+class JobCreateIn(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    file_name: str
+    file_size: int = Field(ge=0)
+    description: Optional[str] = ""
+    total_units: int = Field(ge=1, le=10000)
+    budget_usdt: float = Field(gt=0, le=1_000_000)
+    max_nodes: int = Field(ge=1, le=10000)
+    workload_type: str = "federated_learning"  # 'federated_learning' | 'matrix_compute' | 'hash_compute' | 'mixed'
 
 
 # ---------- Task generation ----------
@@ -202,9 +220,9 @@ def _hash_signature(nonce: str, difficulty: int) -> str:
             return f"{i}:{h}"
 
 
-def generate_task() -> dict:
+def generate_task(force_kind: Optional[str] = None) -> dict:
     """Create a task with verifiable expected result. Roughly 100-400ms on browser."""
-    kind = random.choice(["matrix", "hash"])
+    kind = force_kind if force_kind in ("matrix", "hash") else random.choice(["matrix", "hash"])
     if kind == "matrix":
         seed = random.randint(1, 10_000_000)
         size = random.choice([16, 20, 24])
@@ -236,6 +254,9 @@ async def startup():
     await db.tasks.create_index("id", unique=True)
     await db.tasks.create_index("status")
     await db.tasks.create_index("device_id")
+    await db.jobs.create_index("id", unique=True)
+    await db.jobs.create_index("customer_id")
+    await db.jobs.create_index("status")
 
     existing = await db.users.find_one({"email": ADMIN_EMAIL})
     if not existing:
@@ -265,22 +286,25 @@ async def register(data: RegisterIn, response: Response):
     email = data.email.lower()
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="Email already registered")
+    role = data.role if data.role in ("user", "customer") else "user"
     uid = str(uuid.uuid4())
     doc = {
         "id": uid,
         "email": email,
         "password_hash": hash_password(data.password),
         "name": data.name,
-        "role": "user",
+        "company": data.company or "",
+        "role": role,
         "balance_usdt": 0.0,
         "total_earned": 0.0,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.users.insert_one(doc)
-    access = create_access_token(uid, email, "user")
+    access = create_access_token(uid, email, role)
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
-    return {"id": uid, "email": email, "name": data.name, "role": "user",
+    return {"id": uid, "email": email, "name": data.name, "role": role,
+            "company": doc["company"],
             "balance_usdt": 0.0, "total_earned": 0.0, "token": access}
 
 
@@ -327,6 +351,9 @@ async def register_device(data: DeviceRegisterIn, user: dict = Depends(get_curre
         "model": data.model,
         "platform": data.platform,
         "fingerprint": data.fingerprint or secrets.token_hex(8),
+        "brand": data.brand or "Apple",
+        "os_version": data.os_version or "iOS 17.4",
+        "thermal": "nominal",
         "status": "idle",
         "charging": False,
         "wifi": False,
@@ -357,21 +384,30 @@ async def heartbeat(data: HeartbeatIn, user: dict = Depends(get_current_user)):
     # Golden Rule: only eligible when charging AND wifi AND permission
     eligible = data.charging and data.wifi and data.permission
     status_val = "active" if eligible else "idle"
-    await db.devices.update_one(
-        {"id": data.device_id},
-        {"$set": {
-            "charging": data.charging,
-            "wifi": data.wifi,
-            "permission": data.permission,
-            "battery": data.battery,
-            "status": status_val,
-            "last_heartbeat": datetime.now(timezone.utc).isoformat(),
-        }},
-    )
+    update_doc = {
+        "charging": data.charging,
+        "wifi": data.wifi,
+        "permission": data.permission,
+        "battery": data.battery,
+        "thermal": data.thermal or "nominal",
+        "status": status_val,
+        "last_heartbeat": datetime.now(timezone.utc).isoformat(),
+    }
+    if data.brand: update_doc["brand"] = data.brand
+    if data.os_version: update_doc["os_version"] = data.os_version
+    await db.devices.update_one({"id": data.device_id}, {"$set": update_doc})
     return {"eligible": eligible, "status": status_val}
 
 
 # ---------- Task Endpoints ----------
+async def _pick_active_job():
+    """Pick the oldest running job that still has units to process."""
+    return await db.jobs.find_one({
+        "status": "running",
+        "$expr": {"$lt": ["$processed_units", "$total_units"]},
+    }, {"_id": 0})
+
+
 @api.post("/tasks/request")
 async def request_task(device_id: str, user: dict = Depends(get_current_user)):
     dev = await db.devices.find_one({"id": device_id, "user_id": user["id"]}, {"_id": 0})
@@ -382,7 +418,23 @@ async def request_task(device_id: str, user: dict = Depends(get_current_user)):
     if not (dev.get("charging") and dev.get("wifi") and dev.get("permission")):
         raise HTTPException(status_code=400, detail="Golden Rule not satisfied")
 
-    task = generate_task()
+    # Try to draw a unit from a running customer job first
+    job = await _pick_active_job()
+    job_id = None
+    if job:
+        # Force kind based on job workload type
+        wt = job.get("workload_type", "mixed")
+        if wt == "matrix_compute":
+            kind_force = "matrix"
+        elif wt == "hash_compute":
+            kind_force = "hash"
+        else:
+            kind_force = random.choice(["matrix", "hash"])
+        task = generate_task(force_kind=kind_force)
+        job_id = job["id"]
+    else:
+        task = generate_task()
+
     now = datetime.now(timezone.utc).isoformat()
     doc = {
         "id": task["id"],
@@ -394,14 +446,15 @@ async def request_task(device_id: str, user: dict = Depends(get_current_user)):
         "kind": task["kind"],
         "status": "assigned",
         "assigned_at": now,
+        "job_id": job_id,
     }
     await db.tasks.insert_one(doc)
-    # Don't leak expected value to client
     return {
         "id": task["id"],
         "payload": task["payload"],
         "kind": task["kind"],
         "flops": task["flops"],
+        "job_id": job_id,
     }
 
 
@@ -423,10 +476,27 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
         compute_sec = max(0.05, data.compute_ms / 1000.0)
         earned = round(compute_sec * USDT_PER_COMPUTE_SEC * model_mult * 10, 6)
 
+        # If task belongs to a customer job, customer pays rate_per_unit and
+        # platform takes a fee. Worker earnings already calculated above.
+        job_id = task.get("job_id")
+        revenue = 0.0
+        if job_id:
+            job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+            if job:
+                rate = job.get("rate_per_unit", 0.0)
+                revenue = round(rate, 6)
+                new_processed = (job.get("processed_units", 0) or 0) + 1
+                new_status = "completed" if new_processed >= job.get("total_units", 0) else job.get("status", "running")
+                await db.jobs.update_one({"id": job_id}, {
+                    "$inc": {"processed_units": 1, "spent_usdt": revenue},
+                    "$set": {"status": new_status,
+                             "completed_at": datetime.now(timezone.utc).isoformat() if new_status == "completed" else job.get("completed_at")},
+                })
+
         await db.tasks.update_one({"id": data.task_id}, {"$set": {
             "status": "verified", "completed_at": now,
             "result": data.result, "compute_ms": data.compute_ms,
-            "earned_usdt": earned,
+            "earned_usdt": earned, "revenue_usdt": revenue,
         }})
         await db.devices.update_one({"id": data.device_id}, {"$inc": {
             "tasks_completed": 1,
@@ -442,7 +512,7 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
         if data.compute_ms < expected_min_ms:
             await db.devices.update_one({"id": data.device_id}, {"$set": {"flagged": True}})
 
-        return {"verified": True, "earned_usdt": earned}
+        return {"verified": True, "earned_usdt": earned, "job_id": job_id}
     else:
         await db.tasks.update_one({"id": data.task_id}, {"$set": {
             "status": "rejected", "completed_at": now,
@@ -569,6 +639,126 @@ async def admin_fraud(user: dict = Depends(require_admin)):
     flagged = await db.devices.find({"flagged": True}, {"_id": 0}).to_list(500)
     rejected_tasks = await db.tasks.count_documents({"status": "rejected"})
     return {"flagged_devices": flagged, "rejected_tasks": rejected_tasks}
+
+
+# ---------- Customer / Jobs ----------
+async def require_customer(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("role") not in ("customer", "admin"):
+        raise HTTPException(status_code=403, detail="Customer access required")
+    return user
+
+
+@api.post("/jobs")
+async def create_job(data: JobCreateIn, user: dict = Depends(require_customer)):
+    rate = round(data.budget_usdt / max(1, data.total_units), 6)
+    job_id = str(uuid.uuid4())
+    doc = {
+        "id": job_id,
+        "customer_id": user["id"],
+        "customer_email": user["email"],
+        "customer_name": user.get("company") or user.get("name") or user["email"],
+        "name": data.name,
+        "file_name": data.file_name,
+        "file_size": data.file_size,
+        "description": data.description or "",
+        "total_units": data.total_units,
+        "processed_units": 0,
+        "budget_usdt": data.budget_usdt,
+        "spent_usdt": 0.0,
+        "rate_per_unit": rate,
+        "max_nodes": data.max_nodes,
+        "workload_type": data.workload_type,
+        "status": "pending",  # pending -> running -> completed | rejected
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.jobs.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api.get("/jobs")
+async def list_my_jobs(user: dict = Depends(require_customer)):
+    rows = await db.jobs.find({"customer_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return rows
+
+
+@api.get("/jobs/{job_id}")
+async def get_my_job(job_id: str, user: dict = Depends(require_customer)):
+    j = await db.jobs.find_one({"id": job_id, "customer_id": user["id"]}, {"_id": 0})
+    if not j:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return j
+
+
+@api.get("/admin/jobs")
+async def admin_jobs(user: dict = Depends(require_admin)):
+    rows = await db.jobs.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return rows
+
+
+@api.post("/admin/jobs/{job_id}/approve")
+async def approve_job(job_id: str, user: dict = Depends(require_admin)):
+    j = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not j:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if j["status"] not in ("pending", "rejected"):
+        raise HTTPException(status_code=400, detail=f"Cannot approve job in '{j['status']}' state")
+    await db.jobs.update_one({"id": job_id}, {"$set": {
+        "status": "running",
+        "approved_at": datetime.now(timezone.utc).isoformat(),
+        "approved_by": user["email"],
+    }})
+    return {"ok": True}
+
+
+@api.post("/admin/jobs/{job_id}/reject")
+async def reject_job(job_id: str, user: dict = Depends(require_admin)):
+    j = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not j:
+        raise HTTPException(status_code=404, detail="Job not found")
+    await db.jobs.update_one({"id": job_id}, {"$set": {
+        "status": "rejected",
+        "rejected_at": datetime.now(timezone.utc).isoformat(),
+        "rejected_by": user["email"],
+    }})
+    return {"ok": True}
+
+
+@api.get("/admin/ledger")
+async def admin_ledger(user: dict = Depends(require_admin)):
+    # Revenue from customers = sum of revenue_usdt across verified tasks (= sum of jobs.spent_usdt)
+    rev_pipeline = [{"$group": {"_id": None, "total": {"$sum": "$spent_usdt"}}}]
+    rev_agg = await db.jobs.aggregate(rev_pipeline).to_list(1)
+    revenue = round(rev_agg[0]["total"] if rev_agg else 0.0, 6)
+
+    # Worker payouts owed = sum of all users.balance_usdt + completed payouts
+    user_owed = await db.users.aggregate([
+        {"$match": {"role": "user"}},
+        {"$group": {"_id": None, "owed": {"$sum": "$balance_usdt"},
+                    "earned": {"$sum": "$total_earned"}}},
+    ]).to_list(1)
+    owed = round(user_owed[0]["owed"] if user_owed else 0.0, 6)
+    paid_out = await db.payouts.aggregate([
+        {"$match": {"status": "completed"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount_usdt"}}},
+    ]).to_list(1)
+    paid = round(paid_out[0]["total"] if paid_out else 0.0, 6)
+    total_earned = round((user_owed[0]["earned"] if user_owed else 0.0), 6)
+
+    pending_payouts = await db.payouts.aggregate([
+        {"$match": {"status": "pending"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount_usdt"}}},
+    ]).to_list(1)
+    pending = round(pending_payouts[0]["total"] if pending_payouts else 0.0, 6)
+
+    return {
+        "revenue_usdt": revenue,
+        "worker_owed_usdt": owed,
+        "worker_paid_usdt": paid,
+        "worker_total_earned_usdt": total_earned,
+        "pending_withdrawals_usdt": pending,
+        "platform_margin_usdt": round(max(0.0, revenue - total_earned), 6),
+    }
 
 
 app.include_router(api)

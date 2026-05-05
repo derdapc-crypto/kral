@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 2 backend testing complete. 20/20 new tests pass for customer portal, jobs lifecycle, worker job binding, ledger and device-health fields. Combined regression run: 40 passed / 1 failed / 1 skipped. The 1 failure is a regression in the iteration-1 Fraud Shield (server.py thresholds were lowered from 15/20ms to 2/3ms making compute_ms=5 no longer flag a device).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/tasks/submit (Fraud Shield)", "issue": "Threshold dropped to expected_min_ms = 2 (matrix) / 3 (hash); a 5ms submission of correct results no longer flags. Previously flagged at <15/<20ms. Real flagship phones will not compute a 24x24 matmul in <2ms — but the cushion vs. server-side shortcut attempts is now near zero. Recommend restoring tier-aware thresholds (e.g., flagship≥10ms, mid≥30ms, budget≥50ms)."},
+      {"endpoint": "/api/admin/jobs/{id}/approve", "issue": "Allows pending → running AND rejected → running per spec, but a 'completed' or already-'running' job returns 400 — this is fine, but message says \"Cannot approve job in 'completed' state\" without a documented endpoint to undo. Consider documenting allowed transitions."},
+      {"endpoint": "/api/jobs (POST)", "issue": "JobCreateIn.workload_type is a free-form string (default 'federated_learning'). Backend only branches on 'matrix_compute' / 'hash_compute' — anything else (incl. the default!) falls through to random kind. Recommend Pydantic Literal['federated_learning','matrix_compute','hash_compute','mixed'] and explicit handling of FL/mixed."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration2_customer_jobs.py",
+    "/app/backend/tests/test_grid_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/pytest/iter2_results.xml"
+  ],
+  "action_items": [
+    "Restore meaningful Fraud Shield thresholds in /app/backend/server.py /tasks/submit (currently 2/3 ms — too lax). Suggested: matrix >=10ms, hash >=20ms, or scale by device tier.",
+    "Tighten JobCreateIn.workload_type to a Literal and decide what happens for 'federated_learning' / 'mixed' (currently behaves as random kind — inconsistent with workload semantics).",
+    "Optional: cap reject->approve cycles or prevent re-approval of completed jobs (currently /admin/jobs/{id}/approve only allows pending|rejected, which is correct)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 778 lines — close to the 700-line guideline; jobs/admin routes should be split into routers/jobs.py + routers/admin.py.",
+    "_pick_active_job uses '$expr' on every /tasks/request call; with a covering index on {status, processed_units, total_units} it is fine but currently only {status} is indexed. Consider compound index or a precomputed 'has_capacity' field.",
+    "create_job stores customer_email/customer_name on the job; if the user later updates name/company, jobs become stale snapshots. Either denormalise on read (join /admin/jobs with users) or keep only customer_id.",
+    "Race condition in /tasks/submit: read-modify-write on jobs.processed_units is not atomic across the find_one + update_one window. Two concurrent verified submissions for the last unit could both push processed_units to total_units+0/+1 and credit revenue twice. Use a single findOneAndUpdate with $inc + $set conditional on processed_units<total_units.",
+    "rate_per_unit is rounded to 6dp but spent_usdt is then `$inc` by that rounded value — small drift from budget over many units. Consider storing fractional cents and reconciling at completion.",
+    "/admin/ledger 'revenue_usdt' is computed from jobs.spent_usdt aggregate, but the comment in the code claims it equals 'sum of revenue_usdt across verified tasks' — true today but only because tasks/submit writes both fields in the same transaction. Add a consistency check job."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration2_customer_jobs.py"
+  ],
+  "success_rate": {"backend": "97.6% (40/41 non-skipped, 100% on iteration-2 scope)", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "admin@thegrid.io / Grid@Admin2026 verified. Customer/worker accounts created per test run with TEST_/test_ prefix and UUIDs.",
+  "seed_data_creation": "Each test creates fresh customer (test_cust_*@grid.io, company TEST_Acme), worker (test_worker_*@grid.io with TEST_w_dev device), and TEST_-prefixed jobs. _drain_running_jobs helper rejects any leftover running jobs at the start of binding/golden tests so order is deterministic.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Two test files now: test_grid_backend.py (iteration 1, 21 tests) and test_iteration2_customer_jobs.py (iteration 2, 20 tests). Run together with: pytest /app/backend/tests/ -v. The Fraud Shield test (TestTasks::test_fraud_shield_flags_on_fast_correct) currently FAILS due to lowered server thresholds — fix server.py expected_min_ms or update the test's compute_ms=5 to compute_ms=1. Customer Portal, Jobs CRUD, Admin Jobs/Ledger, Worker job binding (matrix_compute / hash_compute / null), incorrect-result no-increment, and end-to-end golden flow (3 units, budget 1.5, completion) are all green.",
+  "rca of the issue": "Fraud Shield regression — server.py line 511 sets expected_min_ms = 3 if hash else 2. Iteration-1 test submits compute_ms=5, which is now >= both thresholds, so the device is never flagged. Reproduction: POST /api/tasks/submit with verified result and compute_ms=5 — device.flagged stays False. Mitigation: bump expected_min_ms back to 15/20 (or tier-aware) in /app/backend/server.py."
+}

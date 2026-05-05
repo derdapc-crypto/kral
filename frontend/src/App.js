@@ -24,6 +24,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/device" element={<ProtectedRoute><Device /></ProtectedRoute>} />
+            <Route path="/customer" element={<ProtectedRoute customerOnly><CustomerPortal /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
           </Routes>
           <Toaster theme="dark" />

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, Users } from "lucide-react";
+import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, Users, Briefcase, FileText, Cpu, Thermometer, Battery, Wifi, BatteryCharging, X, Check } from "lucide-react";
 
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
 
@@ -15,6 +15,30 @@ function Tab({ active, onClick, children, testId }) {
   );
 }
 
+function ThermalBadge({ value }) {
+  const map = {
+    nominal: "text-green-400 bg-green-400/5 border-green-400/30",
+    warm: "text-yellow-300 bg-yellow-300/5 border-yellow-300/30",
+    hot: "text-orange-400 bg-orange-400/5 border-orange-400/30",
+    critical: "text-red-400 bg-red-400/5 border-red-400/30",
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] tracking-widest uppercase ${map[value] || map.nominal}`}>
+      <Thermometer className="w-3 h-3" /> {value || "nominal"}
+    </span>
+  );
+}
+
+function JobStatus({ status }) {
+  const map = {
+    pending: "text-yellow-300 border-yellow-300/40",
+    running: "text-[#F2C94C] border-[#F2C94C]/40",
+    completed: "text-green-400 border-green-400/40",
+    rejected: "text-red-400 border-red-400/40",
+  };
+  return <span className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full border ${map[status] || map.pending}`}>{status}</span>;
+}
+
 export default function Admin() {
   const [tab, setTab] = useState("map");
   const [devices, setDevices] = useState([]);
@@ -22,15 +46,19 @@ export default function Admin() {
   const [payouts, setPayouts] = useState([]);
   const [fraud, setFraud] = useState({ flagged_devices: [], rejected_tasks: 0 });
   const [stats, setStats] = useState({});
+  const [jobs, setJobs] = useState([]);
+  const [ledger, setLedger] = useState(null);
   const [msg, setMsg] = useState("");
 
   const load = async () => {
     try {
-      const [d, u, p, f, s] = await Promise.all([
+      const [d, u, p, f, s, j, l] = await Promise.all([
         api.get("/admin/devices"), api.get("/admin/users"), api.get("/admin/payouts"),
         api.get("/admin/fraud"), api.get("/stats/network"),
+        api.get("/admin/jobs"), api.get("/admin/ledger"),
       ]);
-      setDevices(d.data); setUsers(u.data); setPayouts(p.data); setFraud(f.data); setStats(s.data);
+      setDevices(d.data); setUsers(u.data); setPayouts(p.data); setFraud(f.data);
+      setStats(s.data); setJobs(j.data); setLedger(l.data);
     } catch (e) { setMsg(formatApiError(e)); }
   };
 
@@ -45,6 +73,8 @@ export default function Admin() {
   const approve = async (id) => { await api.post(`/admin/payouts/${id}/approve`); load(); };
   const flag = async (id) => { await api.post(`/admin/devices/${id}/flag`); load(); };
   const unflag = async (id) => { await api.post(`/admin/devices/${id}/unflag`); load(); };
+  const approveJob = async (id) => { await api.post(`/admin/jobs/${id}/approve`); load(); };
+  const rejectJob = async (id) => { await api.post(`/admin/jobs/${id}/reject`); load(); };
 
   // Map dots — deterministic pseudo locations based on device id
   const mapDots = useMemo(() => {
@@ -54,6 +84,8 @@ export default function Admin() {
       return { id: d.id, x: 4 + (h % 92), y: 10 + ((h >> 8) % 72), active: d.status === "active", flagged: !!d.flagged };
     });
   }, [devices]);
+
+  const pendingJobs = jobs.filter(j => j.status === "pending").length;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] grid-bg">
@@ -67,6 +99,11 @@ export default function Admin() {
           </div>
           <div className="flex gap-2 flex-wrap">
             <Tab active={tab === "map"} onClick={() => setTab("map")} testId="admin-tab-map">War Map</Tab>
+            <Tab active={tab === "devices"} onClick={() => setTab("devices")} testId="admin-tab-devices">Device Health</Tab>
+            <Tab active={tab === "jobs"} onClick={() => setTab("jobs")} testId="admin-tab-jobs">
+              Jobs {pendingJobs > 0 && <span className="ml-1 inline-block px-1.5 py-0 rounded-full bg-yellow-300/30 text-yellow-200 text-[9px]">{pendingJobs}</span>}
+            </Tab>
+            <Tab active={tab === "ledger"} onClick={() => setTab("ledger")} testId="admin-tab-ledger">Ledger</Tab>
             <Tab active={tab === "payouts"} onClick={() => setTab("payouts")} testId="admin-tab-payouts">Payouts</Tab>
             <Tab active={tab === "fraud"} onClick={() => setTab("fraud")} testId="admin-tab-fraud">Fraud Shield</Tab>
             <Tab active={tab === "users"} onClick={() => setTab("users")} testId="admin-tab-users">Users</Tab>
@@ -78,8 +115,8 @@ export default function Admin() {
           {[
             { label: "Active Nodes", val: activeDevices.length, icon: Radio },
             { label: "Total Devices", val: devices.length, icon: Globe2 },
-            { label: "Users", val: stats.total_users || users.length, icon: Users },
-            { label: "Rejected Tasks", val: fraud.rejected_tasks, icon: AlertTriangle },
+            { label: "Pending Jobs", val: pendingJobs, icon: Briefcase },
+            { label: "Revenue USDT", val: ledger ? ledger.revenue_usdt.toFixed(4) : "—", icon: CircleDollarSign },
           ].map((s) => (
             <div key={s.label} className="p-6 rounded-2xl glass">
               <div className="flex items-center justify-between">
@@ -110,37 +147,136 @@ export default function Admin() {
                 <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-400" /> Flagged</span>
               </div>
             </div>
+          </div>
+        )}
 
-            <div className="mt-8 overflow-auto max-h-[360px]">
-              <table className="w-full text-sm" data-testid="admin-devices-table">
-                <thead>
-                  <tr className="text-left text-[10px] uppercase tracking-[0.25em] text-white/40 border-b border-white/5">
-                    <th className="py-3">Device</th><th>Model</th><th>Status</th><th>Tasks</th><th>Last Seen</th><th></th>
+        {tab === "devices" && (
+          <div className="rounded-3xl glass p-6 overflow-auto">
+            <table className="w-full text-sm" data-testid="admin-devices-table">
+              <thead>
+                <tr className="text-left text-[10px] uppercase tracking-[0.25em] text-white/40 border-b border-white/5">
+                  <th className="py-3">Device</th><th>Brand</th><th>OS</th><th>Tier</th><th>Battery</th><th>Thermal</th><th>Tasks</th><th>Status</th><th>Last Seen</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {devices.map((d) => (
+                  <tr key={d.id} className="border-b border-white/5 hover:bg-white/[0.02]">
+                    <td className="py-3"><div className="text-white">{d.name}</div><div className="text-[10px] text-white/40 font-mono">{d.id.slice(0, 8)}</div></td>
+                    <td className="text-white/80 text-xs">{d.brand || "—"}</td>
+                    <td className="text-white/60 text-xs">{d.os_version || "—"}</td>
+                    <td className="uppercase text-xs text-white/60">{d.model}</td>
+                    <td className="text-xs"><span className="inline-flex items-center gap-1 text-white/70"><Battery className="w-3 h-3" />{d.battery || 0}%</span></td>
+                    <td><ThermalBadge value={d.thermal} /></td>
+                    <td className="font-mono-num">{d.tasks_completed || 0}</td>
+                    <td><span className={`text-[10px] uppercase tracking-widest ${d.status === "active" ? "text-[#F2C94C]" : "text-white/50"}`}>{d.status}</span></td>
+                    <td className="text-[10px] text-white/50">{new Date(d.last_heartbeat).toLocaleTimeString()}</td>
+                    <td>
+                      {d.flagged
+                        ? <button onClick={() => unflag(d.id)} data-testid={`unflag-${d.id}`} className="text-[10px] px-3 py-1.5 rounded-full border gold-border text-[#F2C94C]">UNFLAG</button>
+                        : <button onClick={() => flag(d.id)} data-testid={`flag-${d.id}`} className="text-[10px] px-3 py-1.5 rounded-full border border-red-400/30 text-red-400">FLAG</button>}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {devices.map((d) => (
-                    <tr key={d.id} className="border-b border-white/5 hover:bg-white/[0.02]">
-                      <td className="py-3"><div className="text-white">{d.name}</div><div className="text-[10px] text-white/40 font-mono">{d.id.slice(0, 8)}</div></td>
-                      <td className="uppercase text-xs text-white/60">{d.model}</td>
-                      <td><span className={`text-[10px] uppercase tracking-widest ${d.status === "active" ? "text-[#F2C94C]" : "text-white/50"}`}>{d.status}</span></td>
-                      <td className="font-mono-num">{d.tasks_completed || 0}</td>
-                      <td className="text-xs text-white/50">{new Date(d.last_heartbeat).toLocaleTimeString()}</td>
-                      <td>
-                        {d.flagged
-                          ? <button onClick={() => unflag(d.id)} data-testid={`unflag-${d.id}`} className="text-[10px] px-3 py-1.5 rounded-full border gold-border text-[#F2C94C]">UNFLAG</button>
-                          : <button onClick={() => flag(d.id)} data-testid={`flag-${d.id}`} className="text-[10px] px-3 py-1.5 rounded-full border border-red-400/30 text-red-400">FLAG</button>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+                {devices.length === 0 && <tr><td colSpan={10} className="text-center py-10 text-white/40">No devices registered.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {tab === "jobs" && (
+          <div className="rounded-3xl glass p-6">
+            <div className="space-y-4" data-testid="admin-jobs-list">
+              {jobs.length === 0 && <div className="text-center py-12 text-white/40 text-sm">No customer workloads yet.</div>}
+              {jobs.map((j) => {
+                const pct = Math.min(100, Math.round((j.processed_units / Math.max(1, j.total_units)) * 100));
+                return (
+                  <div key={j.id} className="p-5 rounded-2xl bg-black/40 border border-white/10" data-testid={`admin-job-${j.id}`}>
+                    <div className="flex flex-wrap justify-between gap-3">
+                      <div className="flex-1 min-w-[260px]">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <Briefcase className="w-4 h-4 text-[#F2C94C]" />
+                          <div className="font-display font-bold text-base">{j.name}</div>
+                          <JobStatus status={j.status} />
+                        </div>
+                        <div className="mt-1 text-xs text-white/50 flex items-center gap-2 flex-wrap">
+                          <FileText className="w-3 h-3" /> {j.file_name} · {(j.file_size/1024).toFixed(1)} KB
+                          <span>·</span><span>{j.customer_name || j.customer_email}</span>
+                          <span>·</span><span className="uppercase tracking-widest text-[10px]">{(j.workload_type || "mixed").replace("_"," ")}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Budget</div>
+                        <div className="font-mono-num text-[#F2C94C] text-lg">{j.budget_usdt.toFixed(2)}</div>
+                        <div className="text-[10px] text-white/40">spent {j.spent_usdt?.toFixed(4) || "0.0000"}</div>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <div className="flex justify-between text-[10px] uppercase tracking-[0.25em] text-white/40 mb-1">
+                        <span>Progress</span><span className="text-[#F2C94C]">{j.processed_units}/{j.total_units} ({pct}%)</span>
+                      </div>
+                      <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B]" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                    {j.status === "pending" && (
+                      <div className="mt-4 flex gap-2">
+                        <button onClick={() => approveJob(j.id)} data-testid={`job-approve-${j.id}`}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black font-semibold text-xs">
+                          <Check className="w-3.5 h-3.5" /> Approve & Dispatch
+                        </button>
+                        <button onClick={() => rejectJob(j.id)} data-testid={`job-reject-${j.id}`}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-red-400/30 text-red-400 text-xs">
+                          <X className="w-3.5 h-3.5" /> Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {tab === "ledger" && ledger && (
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="rounded-3xl glass-strong p-8 relative overflow-hidden">
+              <div className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-[#D4AF37]/15 blur-3xl" />
+              <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 relative">Customer Revenue</div>
+              <div className="mt-3 text-5xl font-display font-black gold-text font-mono-num relative" data-testid="ledger-revenue">{ledger.revenue_usdt.toFixed(4)}</div>
+              <div className="text-sm text-white/50 mt-1">USDT — collected from approved workloads</div>
+
+              <div className="mt-8 grid grid-cols-2 gap-3">
+                <div className="p-4 rounded-xl bg-black/40 border border-white/10">
+                  <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Platform Margin</div>
+                  <div className="mt-2 text-xl font-mono-num text-[#F2C94C]" data-testid="ledger-margin">{ledger.platform_margin_usdt.toFixed(4)}</div>
+                </div>
+                <div className="p-4 rounded-xl bg-black/40 border border-white/10">
+                  <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Pending Withdrawals</div>
+                  <div className="mt-2 text-xl font-mono-num text-white">{ledger.pending_withdrawals_usdt.toFixed(4)}</div>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-3xl glass p-8">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-white/40">Worker Payouts</div>
+              <div className="mt-3 text-5xl font-display font-black text-white font-mono-num" data-testid="ledger-owed">{ledger.worker_owed_usdt.toFixed(4)}</div>
+              <div className="text-sm text-white/50 mt-1">USDT — currently owed to operators</div>
+
+              <div className="mt-8 grid grid-cols-2 gap-3">
+                <div className="p-4 rounded-xl bg-black/40 border border-white/10">
+                  <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Total Earned (lifetime)</div>
+                  <div className="mt-2 text-xl font-mono-num text-white">{ledger.worker_total_earned_usdt.toFixed(4)}</div>
+                </div>
+                <div className="p-4 rounded-xl bg-black/40 border border-white/10">
+                  <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Paid Out</div>
+                  <div className="mt-2 text-xl font-mono-num text-green-400">{ledger.worker_paid_usdt.toFixed(4)}</div>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {tab === "payouts" && (
-          <div className="rounded-3xl glass p-6">
+          <div className="rounded-3xl glass p-6 overflow-auto">
             <table className="w-full text-sm" data-testid="admin-payouts-table">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-[0.25em] text-white/40 border-b border-white/5">
@@ -200,7 +336,7 @@ export default function Admin() {
         )}
 
         {tab === "users" && (
-          <div className="rounded-3xl glass p-6">
+          <div className="rounded-3xl glass p-6 overflow-auto">
             <table className="w-full text-sm" data-testid="admin-users-table">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-[0.25em] text-white/40 border-b border-white/5">
@@ -210,9 +346,9 @@ export default function Admin() {
               <tbody>
                 {users.map((u) => (
                   <tr key={u.id} className="border-b border-white/5">
-                    <td className="py-3">{u.name}</td>
+                    <td className="py-3">{u.name}{u.company ? <span className="text-white/40 text-[10px] block">{u.company}</span> : null}</td>
                     <td className="text-white/60 text-xs">{u.email}</td>
-                    <td><span className={`text-[10px] uppercase tracking-widest ${u.role === "admin" ? "text-[#F2C94C]" : "text-white/60"}`}>{u.role}</span></td>
+                    <td><span className={`text-[10px] uppercase tracking-widest ${u.role === "admin" ? "text-[#F2C94C]" : u.role === "customer" ? "text-purple-300" : "text-white/60"}`}>{u.role}</span></td>
                     <td className="font-mono-num">{(u.balance_usdt || 0).toFixed(4)}</td>
                     <td className="font-mono-num">{(u.total_earned || 0).toFixed(4)}</td>
                   </tr>

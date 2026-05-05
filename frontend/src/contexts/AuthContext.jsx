@@ -31,9 +31,9 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const register = async (email, password, name) => {
+  const register = async (email, password, name, role = "user", company = "") => {
     try {
-      const { data } = await api.post("/auth/register", { email, password, name });
+      const { data } = await api.post("/auth/register", { email, password, name, role, company });
       if (data.token) localStorage.setItem("grid_token", data.token);
       setUser(data);
       return { ok: true, user: data };

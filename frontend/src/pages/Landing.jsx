@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { ArrowRight, Cpu, Globe2, Zap, Shield, Lock, Sparkles, Smartphone, BatteryCharging, Wifi, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Cpu, Globe2, Zap, Shield, Lock, Sparkles, Smartphone, BatteryCharging, Wifi, CheckCircle2, Download, Briefcase } from "lucide-react";
+import ApkSetupModal from "../components/ApkSetupModal";
 
 const HERO_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/de66970575fd0c962a0ae5998fbd3ca1fb71b7d5fc3bbccec837805a15b80cb7.png";
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
@@ -93,6 +94,7 @@ export default function Landing() {
   const [stats, setStats] = useState({ active_devices: 0, live_petaflops: 0, total_tasks: 0, total_users: 0 });
   const [tier, setTier] = useState("flagship");
   const [hours, setHours] = useState(6);
+  const [apkOpen, setApkOpen] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -133,15 +135,20 @@ export default function Landing() {
               a paid node powering frontier AI.
             </p>
             <div className="mt-10 flex flex-wrap gap-4 items-center">
-              <Link to="/register" data-testid="hero-cta-join"
+              <button onClick={() => setApkOpen(true)} data-testid="hero-apk-btn"
                 className="group inline-flex items-center gap-3 px-7 py-4 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black font-semibold text-sm tracking-wide hover:shadow-[0_0_40px_rgba(242,201,76,0.6)] transition-all">
-                Claim Your Node
+                <Download className="w-4 h-4" />
+                Download APK
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </button>
+              <Link to="/register" data-testid="hero-cta-join"
+                className="px-7 py-4 rounded-full border gold-border text-[#F2C94C] text-sm tracking-wide hover:bg-[#F2C94C]/10 transition-colors">
+                Claim Your Node
               </Link>
-              <a href="#calculator" data-testid="hero-cta-calc"
-                className="px-7 py-4 rounded-full border border-white/15 text-white/90 text-sm tracking-wide hover:border-[#D4AF37] hover:text-[#F2C94C] transition-colors">
-                Run the Numbers
-              </a>
+              <Link to="/register?role=customer" data-testid="hero-cta-customer"
+                className="px-7 py-4 rounded-full border border-white/15 text-white/90 text-sm tracking-wide hover:border-[#D4AF37] hover:text-[#F2C94C] transition-colors inline-flex items-center gap-2">
+                <Briefcase className="w-4 h-4" /> Customer Portal
+              </Link>
             </div>
 
             <div className="mt-16 grid grid-cols-3 gap-px bg-white/5 rounded-2xl overflow-hidden border border-white/10">
@@ -339,6 +346,7 @@ export default function Landing() {
       <footer className="py-10 border-t border-white/5 text-center text-xs text-white/40 tracking-[0.25em] uppercase">
         © 2026 THE GRID · Sovereign Compute Protocol
       </footer>
+      <ApkSetupModal open={apkOpen} onClose={() => setApkOpen(false)} />
     </div>
   );
 }

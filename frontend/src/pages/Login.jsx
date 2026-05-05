@@ -16,8 +16,11 @@ export default function Login() {
     setErr(""); setLoading(true);
     const r = await login(email, password);
     setLoading(false);
-    if (r.ok) nav(r.user.role === "admin" ? "/admin" : "/dashboard");
-    else setErr(r.error);
+    if (r.ok) {
+      if (r.user.role === "admin") nav("/admin");
+      else if (r.user.role === "customer") nav("/customer");
+      else nav("/dashboard");
+    } else setErr(r.error);
   };
 
   return (

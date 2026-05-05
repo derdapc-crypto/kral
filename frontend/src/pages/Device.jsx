@@ -52,10 +52,19 @@ export default function Device() {
   // Heartbeat every 4s regardless of running state
   useEffect(() => {
     if (!selected) return;
+    // Detect platform metadata once
+    const ua = navigator.userAgent;
+    const brand = /iPhone|iPad|Mac/i.test(ua) ? "Apple" : /Samsung/i.test(ua) ? "Samsung" : /Pixel/i.test(ua) ? "Google" : "Generic";
+    const os_version = /iPhone OS ([\d_]+)/.test(ua) ? `iOS ${RegExp.$1.replace(/_/g, ".")}` :
+                       /Android ([\d.]+)/.test(ua) ? `Android ${RegExp.$1}` :
+                       /Mac OS X ([\d_]+)/.test(ua) ? `macOS ${RegExp.$1.replace(/_/g, ".")}` : "Unknown";
+    const thermals = ["nominal", "nominal", "nominal", "warm"]; // mostly nominal
     const hb = async () => {
       try {
         await api.post("/devices/heartbeat", {
           device_id: selected, charging, wifi, permission, battery: 92,
+          thermal: thermals[Math.floor(Math.random() * thermals.length)],
+          brand, os_version,
         });
       } catch {}
     };
