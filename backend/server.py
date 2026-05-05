@@ -500,8 +500,10 @@ async def heartbeat(data: HeartbeatIn, user: dict = Depends(get_current_user)):
     if data.hashrate is not None: update_doc["hashrate_hps"] = float(data.hashrate)
     if data.algo: update_doc["algo"] = data.algo
     if data.country: update_doc["country"] = data.country.upper()[:2]
-    if data.lat is not None: update_doc["lat"] = float(data.lat)
-    if data.lng is not None: update_doc["lng"] = float(data.lng)
+    if data.lat is not None and -90 <= float(data.lat) <= 90:
+        update_doc["lat"] = float(data.lat)
+    if data.lng is not None and -180 <= float(data.lng) <= 180:
+        update_doc["lng"] = float(data.lng)
     if data.current_mode in ("enterprise_job", "baseline_mining", "idle"):
         update_doc["current_mode"] = data.current_mode
     await db.devices.update_one({"id": data.device_id}, {"$set": update_doc})
