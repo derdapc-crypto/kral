@@ -95,6 +95,11 @@ export default function Landing() {
   const [tier, setTier] = useState("flagship");
   const [hours, setHours] = useState(6);
   const [apkOpen, setApkOpen] = useState(false);
+  const [apkMeta, setApkMeta] = useState(null);
+
+  useEffect(() => {
+    api.get("/apk/version").then(({ data }) => setApkMeta(data)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const load = async () => {
