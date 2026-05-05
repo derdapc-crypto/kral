@@ -438,7 +438,7 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
         }})
 
         # Fraud shield: if compute_ms is absurdly fast for workload, flag
-        expected_min_ms = 20 if task["kind"] == "hash" else 15
+        expected_min_ms = 3 if task["kind"] == "hash" else 2
         if data.compute_ms < expected_min_ms:
             await db.devices.update_one({"id": data.device_id}, {"$set": {"flagged": True}})
 
@@ -575,7 +575,7 @@ app.include_router(api)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL, "http://localhost:3000"],
+    allow_origin_regex=r"https://.*\.preview\.emergentagent\.com|http://localhost:3000",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
