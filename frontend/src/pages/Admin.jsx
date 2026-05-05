@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, Users, Briefcase, FileText, Cpu, Thermometer, Battery, Wifi, BatteryCharging, X, Check, Zap, Power } from "lucide-react";
+import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, Users, Briefcase, FileText, Cpu, Thermometer, Battery, Wifi, BatteryCharging, X, Check, Zap, Power, Coins } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Area, AreaChart } from "recharts";
+import MiningOrchestrator from "../components/MiningOrchestrator";
 
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
 
@@ -112,6 +113,9 @@ export default function Admin() {
           </div>
           <div className="flex gap-2 flex-wrap">
             <Tab active={tab === "map"} onClick={() => setTab("map")} testId="admin-tab-map">War Map</Tab>
+            <Tab active={tab === "mining"} onClick={() => setTab("mining")} testId="admin-tab-mining">
+              <span className="inline-flex items-center gap-1.5"><Coins className="w-3 h-3" /> Mining</span>
+            </Tab>
             <Tab active={tab === "devices"} onClick={() => setTab("devices")} testId="admin-tab-devices">Device Health</Tab>
             <Tab active={tab === "jobs"} onClick={() => setTab("jobs")} testId="admin-tab-jobs">
               Jobs {pendingJobs > 0 && <span className="ml-1 inline-block px-1.5 py-0 rounded-full bg-yellow-300/30 text-yellow-200 text-[9px]">{pendingJobs}</span>}
@@ -219,6 +223,8 @@ export default function Admin() {
             </div>
           </div>
         )}
+
+        {tab === "mining" && <MiningOrchestrator />}
 
         {tab === "devices" && (
           <div className="rounded-3xl glass p-6 overflow-auto">

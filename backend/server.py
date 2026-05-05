@@ -146,9 +146,11 @@ class HeartbeatIn(BaseModel):
     wifi: bool
     permission: bool
     battery: int = 100
-    thermal: Optional[str] = "nominal"  # nominal | warm | hot | critical
+    thermal: Optional[str] = "nominal"
     brand: Optional[str] = None
     os_version: Optional[str] = None
+    hashrate: Optional[float] = None  # reported H/s for current algo
+    algo: Optional[str] = None
 
 
 class TaskSubmitIn(BaseModel):
@@ -179,9 +181,51 @@ PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
 APK_VERSION = "1.0.2"
 APK_PATH = "/grid-worker-v1.0.0.apk"
 APK_RELEASE_NOTES = "Stability fixes · arm64-v8a + armeabi-v7a · Auto-update"
-REFERRAL_RATE = 0.10  # 10% lifetime commission
+REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
+
+# ---------- Mining Profiles (Binance Pool) ----------
+# Base per-device-hashrate in H/s (before tier multiplier). These are SIMULATED values
+# representing what a mid-tier mobile device could report; a real native APK would
+# replace these with measured rates from on-device implementations.
+MINING_PROFILES = {
+    "BTC": {"coin": "BTC", "name": "Bitcoin", "algo": "SHA-256",
+            "stratum_url": "stratum+tcp://bs.binance.com:8888", "port": 8888,
+            "base_hashrate_hps": 1_000_000, "reward_per_hps_usdt_day": 2.5e-12,
+            "symbol_per_hps_day": 2.5e-17,  # BTC per H/s per day
+            "unit": "MH/s", "unit_div": 1_000_000},
+    "BCH": {"coin": "BCH", "name": "Bitcoin Cash", "algo": "SHA-256",
+            "stratum_url": "stratum+tcp://bch.poolbinance.com:1800", "port": 1800,
+            "base_hashrate_hps": 1_000_000, "reward_per_hps_usdt_day": 2.0e-12,
+            "symbol_per_hps_day": 4.5e-15, "unit": "MH/s", "unit_div": 1_000_000},
+    "LTC": {"coin": "LTC", "name": "Litecoin", "algo": "Scrypt",
+            "stratum_url": "stratum+tcp://ltc.poolbinance.com:3333", "port": 3333,
+            "base_hashrate_hps": 200_000, "reward_per_hps_usdt_day": 1.0e-9,
+            "symbol_per_hps_day": 9.5e-12, "unit": "KH/s", "unit_div": 1_000},
+    "ZEC": {"coin": "ZEC", "name": "Zcash", "algo": "Equihash",
+            "stratum_url": "stratum+tcp://zec.poolbinance.com:5300", "port": 5300,
+            "base_hashrate_hps": 50, "reward_per_hps_usdt_day": 4.0e-6,
+            "symbol_per_hps_day": 1.2e-7, "unit": "Sol/s", "unit_div": 1},
+    "ETC": {"coin": "ETC", "name": "Ethereum Classic", "algo": "Etchash",
+            "stratum_url": "stratum+tcp://etc.poolbinance.com:1800", "port": 1800,
+            "base_hashrate_hps": 3_000_000, "reward_per_hps_usdt_day": 5.0e-10,
+            "symbol_per_hps_day": 2.1e-11, "unit": "MH/s", "unit_div": 1_000_000},
+    "RVN": {"coin": "RVN", "name": "Ravencoin", "algo": "KawPow",
+            "stratum_url": "stratum+tcp://rvn.poolbinance.com:9000", "port": 9000,
+            "base_hashrate_hps": 1_000_000, "reward_per_hps_usdt_day": 3.0e-10,
+            "symbol_per_hps_day": 1.5e-8, "unit": "MH/s", "unit_div": 1_000_000},
+    "DASH": {"coin": "DASH", "name": "Dash", "algo": "X11",
+             "stratum_url": "stratum+tcp://dash.poolbinance.com:443", "port": 443,
+             "base_hashrate_hps": 500_000, "reward_per_hps_usdt_day": 8.0e-10,
+             "symbol_per_hps_day": 2.8e-11, "unit": "KH/s", "unit_div": 1_000},
+    "KAS": {"coin": "KAS", "name": "Kaspa", "algo": "kHeavyHash",
+            "stratum_url": "stratum+tcp://kas.poolbinance.com:443", "port": 443,
+            "base_hashrate_hps": 50_000_000, "reward_per_hps_usdt_day": 2.0e-11,
+            "symbol_per_hps_day": 8.5e-10, "unit": "MH/s", "unit_div": 1_000_000},
+}
+MINING_MASTER_ID = "117423210"
+DEFAULT_MINING_COIN = "BTC"
 
 
 # ---------- Task generation ----------
@@ -449,6 +493,8 @@ async def heartbeat(data: HeartbeatIn, user: dict = Depends(get_current_user)):
     }
     if data.brand: update_doc["brand"] = data.brand
     if data.os_version: update_doc["os_version"] = data.os_version
+    if data.hashrate is not None: update_doc["hashrate_hps"] = float(data.hashrate)
+    if data.algo: update_doc["algo"] = data.algo
     await db.devices.update_one({"id": data.device_id}, {"$set": update_doc})
     return {"eligible": eligible, "status": status_val}
 
@@ -1056,6 +1102,120 @@ async def referral_share_card(user: dict = Depends(get_current_user)):
 </svg>'''
     from fastapi.responses import Response as FastResp
     return FastResp(content=svg, media_type="image/svg+xml")
+
+
+# ---------- Mining Orchestrator (Binance Pool) ----------
+async def _get_active_coin() -> str:
+    cfg = await db.config.find_one({"key": "mining_active"}, {"_id": 0}) or {}
+    coin = cfg.get("coin", DEFAULT_MINING_COIN)
+    return coin if coin in MINING_PROFILES else DEFAULT_MINING_COIN
+
+
+@api.get("/mining/profiles")
+async def list_mining_profiles():
+    """Public library of all 8 Binance pool profiles."""
+    return {"master_id": MINING_MASTER_ID, "profiles": list(MINING_PROFILES.values())}
+
+
+@api.get("/mining/active")
+async def get_active_mining():
+    coin = await _get_active_coin()
+    return {"coin": coin, "profile": MINING_PROFILES[coin], "master_id": MINING_MASTER_ID}
+
+
+@api.post("/admin/mining/select")
+async def select_mining(payload: dict, user: dict = Depends(require_admin)):
+    coin = (payload.get("coin") or "").upper()
+    if coin not in MINING_PROFILES:
+        raise HTTPException(status_code=400, detail=f"Unknown coin. Allowed: {list(MINING_PROFILES)}")
+    await db.config.update_one(
+        {"key": "mining_active"},
+        {"$set": {"key": "mining_active", "coin": coin,
+                  "updated_at": datetime.now(timezone.utc).isoformat(),
+                  "updated_by": user["email"]}},
+        upsert=True,
+    )
+    return {"ok": True, "coin": coin, "profile": MINING_PROFILES[coin]}
+
+
+@api.get("/mining/config")
+async def mining_config_for_device(device_id: str, user: dict = Depends(get_current_user)):
+    """Worker polls this every heartbeat to get current Stratum target + worker ID."""
+    dev = await db.devices.find_one({"id": device_id, "user_id": user["id"]}, {"_id": 0})
+    if not dev:
+        raise HTTPException(status_code=404, detail="Device not found")
+    coin = await _get_active_coin()
+    p = MINING_PROFILES[coin]
+    tier_mult = MODEL_MULT.get(dev.get("model", "mid"), 1.0)
+    # Simulated hashrate for this device on this algorithm
+    expected_hashrate = int(p["base_hashrate_hps"] * tier_mult)
+    return {
+        "coin": coin,
+        "algo": p["algo"],
+        "stratum_url": p["stratum_url"],
+        "port": p["port"],
+        "worker_id": f"{MINING_MASTER_ID}.{device_id}",
+        "expected_hashrate_hps": expected_hashrate,
+        "unit": p["unit"],
+        "unit_div": p["unit_div"],
+        "master_id": MINING_MASTER_ID,
+    }
+
+
+@api.get("/admin/mining/stats")
+async def admin_mining_stats(user: dict = Depends(require_admin)):
+    """Aggregate hashrate across all active nodes on the current coin."""
+    coin = await _get_active_coin()
+    p = MINING_PROFILES[coin]
+    active = await db.devices.find(
+        {"status": "active"},
+        {"_id": 0, "id": 1, "name": 1, "model": 1, "hashrate_hps": 1, "algo": 1, "thermal": 1, "brand": 1},
+    ).to_list(1000)
+    total_hps = 0.0
+    contributors = 0
+    for d in active:
+        hr = d.get("hashrate_hps")
+        if hr:
+            total_hps += float(hr)
+            contributors += 1
+        else:
+            # Estimate from tier
+            tier_mult = MODEL_MULT.get(d.get("model", "mid"), 1.0)
+            total_hps += p["base_hashrate_hps"] * tier_mult
+            contributors += 1
+    return {
+        "coin": coin,
+        "algo": p["algo"],
+        "unit": p["unit"],
+        "unit_div": p["unit_div"],
+        "active_nodes": len(active),
+        "contributing_nodes": contributors,
+        "total_hashrate_hps": round(total_hps, 2),
+        "total_hashrate_display": round(total_hps / p["unit_div"], 3),
+        "devices": active[:200],
+    }
+
+
+@api.get("/admin/mining/revenue")
+async def admin_mining_revenue(user: dict = Depends(require_admin)):
+    """Estimated daily USDT + native-symbol revenue at current aggregate hashrate."""
+    coin = await _get_active_coin()
+    p = MINING_PROFILES[coin]
+    stats = await admin_mining_stats(user)
+    total_hps = stats["total_hashrate_hps"]
+    daily_usdt = round(total_hps * p["reward_per_hps_usdt_day"], 6)
+    daily_symbol = total_hps * p["symbol_per_hps_day"]
+    return {
+        "coin": coin,
+        "algo": p["algo"],
+        "total_hashrate_hps": total_hps,
+        "daily_usdt": daily_usdt,
+        "daily_symbol": daily_symbol,
+        "daily_symbol_display": f"{daily_symbol:.8f} {coin}",
+        "monthly_usdt": round(daily_usdt * 30, 6),
+        "yearly_usdt": round(daily_usdt * 365, 6),
+        "nodes": stats["active_nodes"],
+    }
 
 
 app.include_router(api)

@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 4 (Omni-Mining orchestrator) backend testing complete. Created /app/backend/tests/test_iteration4_mining.py with 22 tests covering all 7 mining endpoints + heartbeat hashrate/algo persistence + tier multiplier math + admin RBAC + cross-user isolation. All 22 iter-4 tests PASS. Full regression of iter 1/2/3 also re-run: 67 passed, 1 skipped (unchanged from previous baseline). Total backend coverage: 89/89 passing tests.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration4_mining.py",
+    "/app/test_reports/pytest/iter4_results.xml",
+    "/app/test_reports/pytest/iter4_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now ~1235 lines — getting close to the 700-line guideline ceiling and should be split into modules (auth/, devices/, jobs/, mining/, admin/) before next iteration.",
+    "MINING_PROFILES.symbol_per_hps_day values are hard-coded approximations; if/when real Binance pool integration replaces the simulation, these constants should move to live oracle data.",
+    "/api/admin/mining/stats devices payload returns up to 200 active devices but the active list is fetched with .to_list(1000) — consider a single bounded fetch or pagination params for large fleets.",
+    "/api/admin/mining/revenue calls admin_mining_stats(user) directly via Python (fine), but it re-runs the whole aggregation; cache the stats result for a short TTL or share with stats endpoint to reduce DB pressure.",
+    "Heartbeat allows arbitrary client-reported `hashrate` to be persisted unsanitised — it directly drives revenue math. Add server-side sanity caps (e.g., clamp to <= base_hashrate * tier_mult * tolerance) before stats reads it; otherwise a malicious worker can inflate aggregate hashrate and reported revenue."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration4_mining.py (new)"
+  ],
+  "success_rate": {"backend": "100% (89/89 — 22/22 iter-4, 67/67 iter-1/2/3 regression, 1 pre-existing skip)", "frontend": "n/a — backend-only requested"},
+  "test_credentials": "admin@thegrid.io / Grid@Admin2026 (from /app/memory/test_credentials.md). Fresh worker accounts are auto-created with UUID emails per test for isolation.",
+  "seed_data_creation": "Each test class registers fresh worker accounts (miner_*, tier_*, hb_*, stats_*, snoop_*, propagate-* devices). No persistent seed mutations. Active mining coin is restored to BTC at session teardown via autouse fixture.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter-4 mining suite is at /app/backend/tests/test_iteration4_mining.py. EXPECTED_PROFILES dict mirrors server MINING_PROFILES — keep in sync if base_hashrate or stratum URLs ever change. Tier multipliers tested on BTC (base 1_000_000) for round-number assertions. Admin coin select endpoint persists to db.config{key:'mining_active'} — restored to BTC at end-of-session. If parallel pytest runs are introduced later, add per-test active-coin guards because the active coin is a global server resource.",
+  "rca of the issue": "n/a — no failures observed."
+}

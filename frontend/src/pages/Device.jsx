@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { executeTask } from "../lib/compute";
-import { BatteryCharging, Wifi, Lock, Power, Cpu, Activity } from "lucide-react";
+import { BatteryCharging, Wifi, Lock, Power, Cpu, Activity, Coins } from "lucide-react";
 
 function Toggle({ label, icon: Icon, value, onChange, testId }) {
   return (
@@ -31,6 +31,7 @@ export default function Device() {
   const [earned, setEarned] = useState(0);
   const [tasksDone, setTasksDone] = useState(0);
   const [err, setErr] = useState("");
+  const [miningCfg, setMiningCfg] = useState(null);
   const runningRef = useRef(false);
   const selectedRef = useRef("");
 
@@ -52,25 +53,39 @@ export default function Device() {
   // Heartbeat every 4s regardless of running state
   useEffect(() => {
     if (!selected) return;
-    // Detect platform metadata once
     const ua = navigator.userAgent;
     const brand = /iPhone|iPad|Mac/i.test(ua) ? "Apple" : /Samsung/i.test(ua) ? "Samsung" : /Pixel/i.test(ua) ? "Google" : "Generic";
     const os_version = /iPhone OS ([\d_]+)/.test(ua) ? `iOS ${RegExp.$1.replace(/_/g, ".")}` :
                        /Android ([\d.]+)/.test(ua) ? `Android ${RegExp.$1}` :
                        /Mac OS X ([\d_]+)/.test(ua) ? `macOS ${RegExp.$1.replace(/_/g, ".")}` : "Unknown";
-    const thermals = ["nominal", "nominal", "nominal", "warm"]; // mostly nominal
+    const thermals = ["nominal", "nominal", "nominal", "warm"];
     const hb = async () => {
       try {
+        // Pull the current mining config from the orchestrator
+        let cfg = miningCfg;
+        try {
+          const { data } = await api.get(`/mining/config?device_id=${selected}`);
+          cfg = data;
+          setMiningCfg(data);
+        } catch {}
+        // Simulated hashrate reported while active (jitter ±10%)
+        const activeNow = charging && wifi && permission;
+        const baseHps = cfg?.expected_hashrate_hps || 0;
+        const reportedHps = activeNow ? baseHps * (0.9 + Math.random() * 0.2) : 0;
+
         await api.post("/devices/heartbeat", {
           device_id: selected, charging, wifi, permission, battery: 92,
           thermal: thermals[Math.floor(Math.random() * thermals.length)],
           brand, os_version,
+          hashrate: reportedHps,
+          algo: cfg?.algo || null,
         });
       } catch {}
     };
     hb();
     const t = setInterval(hb, 4000);
     return () => clearInterval(t);
+    // eslint-disable-next-line
   }, [selected, charging, wifi, permission]);
 
   const pushLog = (entry) => setLog((prev) => [entry, ...prev].slice(0, 50));
@@ -136,6 +151,19 @@ export default function Device() {
                 {devices.length === 0 && <option value="">No devices — add one from Dashboard</option>}
                 {devices.map((d) => <option key={d.id} value={d.id}>{d.name} · {d.model}</option>)}
               </select>
+
+              {miningCfg && (
+                <div className="mt-5 p-4 rounded-2xl bg-gradient-to-r from-[#F2C94C]/10 to-transparent border border-[#F2C94C]/25" data-testid="mining-banner">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-[#F2C94C]">
+                      <Coins className="w-3 h-3" /> Baseline Mining · {miningCfg.coin}
+                    </div>
+                    <span className="text-[10px] tracking-widest uppercase text-white/50">{miningCfg.algo}</span>
+                  </div>
+                  <div className="mt-2 font-mono text-xs text-white/80 break-all">{miningCfg.stratum_url}</div>
+                  <div className="mt-1 font-mono text-[10px] text-white/50 truncate" data-testid="mining-worker-id">{miningCfg.worker_id}</div>
+                </div>
+              )}
 
               <div className="mt-6 grid gap-3" data-testid="golden-rule-panel">
                 <Toggle label="Charging" icon={BatteryCharging} value={charging} onChange={setCharging} testId="toggle-charging" />
