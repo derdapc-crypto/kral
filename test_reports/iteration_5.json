@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 5 (mobile-mode routing + kill switch + admin telemetry WebSocket) backend testing complete. Created /app/backend/tests/test_iteration5_mode_kill_ws.py with 13 tests covering: new fields on /api/mining/config (mode, polling_interval_ms=5000, user_worker_id, device_worker_id, worker_id back-compat), mode routing (baseline_mining default, enterprise_job overrides, idle after kill), POST /api/admin/mining/kill response shape (ok/kill_switch/active_devices_affected) + /resume, RBAC (worker + unauthenticated rejected with 403/401), heartbeat geo persistence (country uppercased, lat/lng saved, invalid current_mode silently rejected), and WebSocket /api/ws/admin/telemetry (admin receives JSON frame with ts/coin/algo/active_nodes/total_hashrate_hps within 5s; non-admin and tokenless connections closed with 4401). All 13 iter-5 tests PASS. Regression of iter 1/2/3/4 re-run: 89 passed, 1 skipped (unchanged from previous baseline). Total backend coverage: 102/102 effective passes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration5_mode_kill_ws.py",
+    "/app/test_reports/pytest/iter5_results.xml",
+    "/app/test_reports/pytest/iter5_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now ~1340 lines (was ~1235 in iter 4) — keeps growing. The newly added kill/resume endpoints, /mining/config mode logic, and the WebSocket telemetry block are all glued onto the same module. Strongly recommend splitting into modules (auth/, devices/, jobs/, mining/, admin/, ws/) before iter 6.",
+    "/api/mining/config triggers a count_documents() on db.jobs *every* poll (every 5s per device). With many devices this becomes the hot path. Add an index on {status:1, processed_units:1, total_units:1} or cache the running-job-exists boolean for ~2s.",
+    "WebSocket /api/ws/admin/telemetry has no max-frame / max-clients cap and runs an unbounded `while True`. If many admin tabs connect, each opens its own DB query loop every 2s. Consider a single broadcaster task + fan-out, or cap concurrent connections.",
+    "WebSocket close on auth failure uses code 4401 — that is fine — but the success path's exception handler swallows ALL exceptions silently (`except Exception: pass`). Log them; otherwise live-telemetry failures (DB outages) will be invisible.",
+    "Heartbeat now accepts client-supplied lat/lng with NO validation — values like lat=99 or lng=200 are accepted. Add Pydantic validators (lat ∈ [-90,90], lng ∈ [-180,180]) to prevent corrupt geo data from polluting admin dashboards.",
+    "Heartbeat country is truncated to 2 chars after upper-casing but not validated against ISO-3166. Garbage like `country='zz'` is stored as `ZZ`. Either validate or document accepted values.",
+    "Kill-switch response promises `active_devices_affected` but it's just `count_documents({status:'active'})` *at kill time* — devices that go idle for unrelated reasons (battery/wifi) still get counted. Acceptable for a stat, but document the semantics.",
+    "Pre-existing carry-over: `hashrate` from heartbeat is still un-sanitised (flagged in iter-4 review). This now also drives the WS telemetry total_hashrate_hps so a malicious worker can inflate live admin charts. Server-side cap recommended."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration5_mode_kill_ws.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 iter-5 + 89/90 regression with 1 pre-existing skip = 102/103 collected, 0 failures)",
+    "frontend": "n/a — backend-only testing requested"
+  },
+  "test_credentials": "admin@thegrid.io / Grid@Admin2026 (from /app/memory/test_credentials.md). Worker + customer accounts auto-created with UUID emails per session.",
+  "seed_data_creation": "Per-session: one worker user with one flagship-tier device (charging+wifi+permission so it's 'active'); one customer user. Enterprise-mode test creates+approves a 10000-unit job and rejects it on teardown. autouse session fixture re-runs /api/admin/mining/resume at exit so auto_mining is left = true for the next test agent.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter-5 suite: /app/backend/tests/test_iteration5_mode_kill_ws.py. WebSocket tests use the `websockets` library (v16.0, already installed) and require pytest-asyncio (now installed). The test file exposes 13 tests across 6 classes; teardown always calls /admin/mining/resume so auto_mining returns to True. If new tests need to assert kill-switch, place them AFTER baseline-mode tests or call _ensure_auto_mining_on() in setup. Device 'model' field MUST be one of {flagship, mid, budget} — anything else returns 400 'Invalid model tier'. The WebSocket URL is wss://<host>/api/ws/admin/telemetry?token=<jwt> — non-admin tokens are closed with code 4401 (modern websockets lib raises InvalidStatus / ConnectionClosed including '4401' in str). For full regression keep all 4 prior iteration test files in the run.",
+  "rca of the issue": "n/a — no failures observed. One first-run setup failure was a test-side bug (used model='high' instead of 'flagship'); fixed and re-ran green."
+}

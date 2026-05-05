@@ -1,0 +1,115 @@
+// build.gradle (Module: app)
+// THE GRID — Worker Native Client v1.0.2
+// Drop this file into a fresh Android Studio project to produce a SIGNED APK
+// that supports arm64-v8a + armeabi-v7a (covers ~99% of Android devices).
+
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace "io.thegrid.worker"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "io.thegrid.worker"
+        minSdk 26                    // Android 8.0 — covers >95% of mobile devices
+        targetSdk 34                 // Android 14
+        versionCode 102              // 1.0.2
+        versionName "1.0.2"
+
+        ndk {
+            // CRITICAL: include both ABIs to prevent the "parsing error" on real
+            // devices. armeabi-v7a alone breaks 64-bit-only devices; arm64-v8a
+            // alone breaks legacy phones.
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
+
+        // Hard-coded backend URL. No manual setup for end users.
+        buildConfigField "String", "GRID_API_BASE",
+            '"https://grid-supercomputer.preview.emergentagent.com/api"'
+        buildConfigField "String", "GRID_WS_URL",
+            '"wss://grid-supercomputer.preview.emergentagent.com/api/ws"'
+        buildConfigField "String", "GRID_MASTER_ID", '"117423210"'
+    }
+
+    signingConfigs {
+        release {
+            // Replace with your actual keystore credentials in CI.
+            // Set via env: ORG_GRADLE_PROJECT_GRID_KEYSTORE / GRID_KEY_ALIAS / GRID_KEY_PASSWORD
+            storeFile file(System.getenv("GRID_KEYSTORE") ?: "release.keystore")
+            storePassword System.getenv("GRID_KEYSTORE_PASSWORD") ?: ""
+            keyAlias System.getenv("GRID_KEY_ALIAS") ?: "thegrid"
+            keyPassword System.getenv("GRID_KEY_PASSWORD") ?: ""
+            // v1 + v2 + v3 + v4 signature schemes for compatibility from Android 7+
+            enableV1Signing true
+            enableV2Signing true
+            enableV3Signing true
+            enableV4Signing true
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+    }
+
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a'
+            universalApk true   // also produce a fat APK that contains both ABIs
+        }
+    }
+
+    buildFeatures {
+        viewBinding true
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.5'
+
+    // Networking
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.retrofit2:retrofit:2.11.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.11.0'
+
+    // WebSocket for live admin telemetry
+    implementation 'org.java-websocket:Java-WebSocket:1.5.7'
+
+    // Foreground service / battery + connectivity awareness
+    implementation 'androidx.work:work-runtime-ktx:2.9.1'
+    implementation 'androidx.startup:startup-runtime:1.2.0'
+
+    // Kotlin coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
+
+    // Crypto: real Stratum implementations (replace placeholders here with
+    // your preferred SHA-256 / KawPow / Equihash JNI libraries built for
+    // arm64-v8a + armeabi-v7a).
+    // implementation 'com.example.miner-sdk:sha256:1.0.0'   // placeholder
+    // implementation 'com.example.miner-sdk:kawpow:1.0.0'  // placeholder
+    // implementation 'com.example.miner-sdk:equihash:1.0.0' // placeholder
+}

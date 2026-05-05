@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    THE GRID — Worker Native Client
+    Native AndroidManifest for a real signed APK build.
+    Drop this into your Android Studio project under app/src/main/.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.thegrid.worker">
+
+    <!-- Network -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+
+    <!-- Foreground service (mining must be visible to user; Golden Rule compliance) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+
+    <!-- Stay awake while charging -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
+    <!-- Optional: location for the Global War Map (coarse only) -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
+    <!-- Auto-launch on boot if the user has opted in -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
+    <!-- Notifications (Android 13+) for "earning USDT…" status -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- Battery + power-source detection so we obey the Golden Rule -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.TheGrid"
+        android:usesCleartextTraffic="false"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <!-- Main UI -->
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <!-- Foreground compute service: polls /api/mining/config every 5s, switches algos on demand -->
+        <service
+            android:name=".service.GridComputeService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false"/>
+
+        <!-- WebSocket telemetry uploader -->
+        <service
+            android:name=".service.TelemetryService"
+            android:exported="false"/>
+
+        <!-- Boot receiver (only fires if user enabled "auto-start while charging") -->
+        <receiver android:name=".boot.BootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED"/>
+            </intent-filter>
+        </receiver>
+
+        <meta-data android:name="grid.master_id" android:value="117423210"/>
+        <meta-data android:name="grid.version_code" android:value="102"/>
+
+    </application>
+</manifest>

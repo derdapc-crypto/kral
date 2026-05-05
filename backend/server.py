@@ -149,8 +149,12 @@ class HeartbeatIn(BaseModel):
     thermal: Optional[str] = "nominal"
     brand: Optional[str] = None
     os_version: Optional[str] = None
-    hashrate: Optional[float] = None  # reported H/s for current algo
+    hashrate: Optional[float] = None
     algo: Optional[str] = None
+    country: Optional[str] = None  # ISO-3166 alpha-2
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    current_mode: Optional[str] = None  # 'enterprise_job' | 'baseline_mining' | 'idle'
 
 
 class TaskSubmitIn(BaseModel):
@@ -495,6 +499,11 @@ async def heartbeat(data: HeartbeatIn, user: dict = Depends(get_current_user)):
     if data.os_version: update_doc["os_version"] = data.os_version
     if data.hashrate is not None: update_doc["hashrate_hps"] = float(data.hashrate)
     if data.algo: update_doc["algo"] = data.algo
+    if data.country: update_doc["country"] = data.country.upper()[:2]
+    if data.lat is not None: update_doc["lat"] = float(data.lat)
+    if data.lng is not None: update_doc["lng"] = float(data.lng)
+    if data.current_mode in ("enterprise_job", "baseline_mining", "idle"):
+        update_doc["current_mode"] = data.current_mode
     await db.devices.update_one({"id": data.device_id}, {"$set": update_doc})
     return {"eligible": eligible, "status": status_val}
 
@@ -1138,23 +1147,66 @@ async def select_mining(payload: dict, user: dict = Depends(require_admin)):
     return {"ok": True, "coin": coin, "profile": MINING_PROFILES[coin]}
 
 
+@api.post("/admin/mining/kill")
+async def kill_switch(user: dict = Depends(require_admin)):
+    """Global kill-switch: disables baseline mining on every device on next poll."""
+    await db.config.update_one(
+        {"key": "auto_mining"},
+        {"$set": {"key": "auto_mining", "enabled": False,
+                  "killed_at": datetime.now(timezone.utc).isoformat(),
+                  "killed_by": user["email"]}},
+        upsert=True,
+    )
+    affected = await db.devices.count_documents({"status": "active"})
+    return {"ok": True, "kill_switch": True, "active_devices_affected": affected}
+
+
+@api.post("/admin/mining/resume")
+async def resume_mining(user: dict = Depends(require_admin)):
+    await db.config.update_one(
+        {"key": "auto_mining"},
+        {"$set": {"key": "auto_mining", "enabled": True,
+                  "resumed_at": datetime.now(timezone.utc).isoformat(),
+                  "resumed_by": user["email"]}},
+        upsert=True,
+    )
+    return {"ok": True, "kill_switch": False}
+
+
 @api.get("/mining/config")
 async def mining_config_for_device(device_id: str, user: dict = Depends(get_current_user)):
-    """Worker polls this every heartbeat to get current Stratum target + worker ID."""
+    """Worker polls this every 5s to get current Stratum target + mode."""
     dev = await db.devices.find_one({"id": device_id, "user_id": user["id"]}, {"_id": 0})
     if not dev:
         raise HTTPException(status_code=404, detail="Device not found")
+    # Determine routing mode
+    has_running_job = await db.jobs.count_documents({
+        "status": "running",
+        "$expr": {"$lt": ["$processed_units", "$total_units"]},
+    })
+    am_cfg = await db.config.find_one({"key": "auto_mining"}, {"_id": 0}) or {}
+    auto_on = am_cfg.get("enabled", True)
+    if has_running_job:
+        mode = "enterprise_job"
+    elif auto_on:
+        mode = "baseline_mining"
+    else:
+        mode = "idle"
+
     coin = await _get_active_coin()
     p = MINING_PROFILES[coin]
     tier_mult = MODEL_MULT.get(dev.get("model", "mid"), 1.0)
-    # Simulated hashrate for this device on this algorithm
     expected_hashrate = int(p["base_hashrate_hps"] * tier_mult)
     return {
+        "mode": mode,
+        "polling_interval_ms": 5000,
         "coin": coin,
         "algo": p["algo"],
         "stratum_url": p["stratum_url"],
         "port": p["port"],
         "worker_id": f"{MINING_MASTER_ID}.{device_id}",
+        "user_worker_id": f"{MINING_MASTER_ID}.{user['id']}",
+        "device_worker_id": f"{MINING_MASTER_ID}.{device_id}",
         "expected_hashrate_hps": expected_hashrate,
         "unit": p["unit"],
         "unit_div": p["unit_div"],
@@ -1219,6 +1271,59 @@ async def admin_mining_revenue(user: dict = Depends(require_admin)):
 
 
 app.include_router(api)
+
+# ---------- WebSocket: live admin telemetry ----------
+from fastapi import WebSocket, WebSocketDisconnect
+import asyncio
+
+
+async def _verify_ws_admin(token: str) -> bool:
+    if not token:
+        return False
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload.get("role") == "admin" and payload.get("type") == "access"
+    except Exception:
+        return False
+
+
+@app.websocket("/api/ws/admin/telemetry")
+async def admin_telemetry_ws(websocket: WebSocket, token: str = ""):
+    """Streams aggregate hashrate + active-node count every 2s to admin dashboards."""
+    if not await _verify_ws_admin(token):
+        await websocket.close(code=4401)
+        return
+    await websocket.accept()
+    try:
+        while True:
+            coin = await _get_active_coin()
+            p = MINING_PROFILES[coin]
+            active = await db.devices.find(
+                {"status": "active"},
+                {"_id": 0, "id": 1, "name": 1, "model": 1, "hashrate_hps": 1, "thermal": 1, "country": 1, "current_mode": 1},
+            ).to_list(500)
+            total_hps = 0.0
+            for d in active:
+                hr = d.get("hashrate_hps")
+                if hr:
+                    total_hps += float(hr)
+                else:
+                    total_hps += p["base_hashrate_hps"] * MODEL_MULT.get(d.get("model", "mid"), 1.0)
+            await websocket.send_json({
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "coin": coin,
+                "algo": p["algo"],
+                "active_nodes": len(active),
+                "total_hashrate_hps": round(total_hps, 2),
+                "total_hashrate_display": round(total_hps / p["unit_div"], 3),
+                "unit": p["unit"],
+            })
+            await asyncio.sleep(2)
+    except WebSocketDisconnect:
+        return
+    except Exception:
+        try: await websocket.close()
+        except: pass
 
 app.add_middleware(
     CORSMiddleware,

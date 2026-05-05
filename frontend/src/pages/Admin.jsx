@@ -231,7 +231,7 @@ export default function Admin() {
             <table className="w-full text-sm" data-testid="admin-devices-table">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-[0.25em] text-white/40 border-b border-white/5">
-                  <th className="py-3">Device</th><th>Brand</th><th>OS</th><th>Tier</th><th>Battery</th><th>Thermal</th><th>Tasks</th><th>Status</th><th>Last Seen</th><th></th>
+                  <th className="py-3">Device</th><th>Brand</th><th>OS</th><th>Tier</th><th>Battery</th><th>Thermal</th><th>Loc</th><th>Mode</th><th>Tasks</th><th>Status</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -243,9 +243,10 @@ export default function Admin() {
                     <td className="uppercase text-xs text-white/60">{d.model}</td>
                     <td className="text-xs"><span className="inline-flex items-center gap-1 text-white/70"><Battery className="w-3 h-3" />{d.battery || 0}%</span></td>
                     <td><ThermalBadge value={d.thermal} /></td>
+                    <td className="text-xs text-white/70 font-mono uppercase">{d.country || "—"}</td>
+                    <td><span className={`text-[10px] uppercase tracking-widest ${d.current_mode === "enterprise_job" ? "text-[#F2C94C]" : d.current_mode === "baseline_mining" ? "text-white/80" : "text-white/40"}`}>{(d.current_mode || "—").replace("_", " ")}</span></td>
                     <td className="font-mono-num">{d.tasks_completed || 0}</td>
                     <td><span className={`text-[10px] uppercase tracking-widest ${d.status === "active" ? "text-[#F2C94C]" : "text-white/50"}`}>{d.status}</span></td>
-                    <td className="text-[10px] text-white/50">{new Date(d.last_heartbeat).toLocaleTimeString()}</td>
                     <td>
                       {d.flagged
                         ? <button onClick={() => unflag(d.id)} data-testid={`unflag-${d.id}`} className="text-[10px] px-3 py-1.5 rounded-full border gold-border text-[#F2C94C]">UNFLAG</button>
@@ -253,7 +254,7 @@ export default function Admin() {
                     </td>
                   </tr>
                 ))}
-                {devices.length === 0 && <tr><td colSpan={10} className="text-center py-10 text-white/40">No devices registered.</td></tr>}
+                {devices.length === 0 && <tr><td colSpan={11} className="text-center py-10 text-white/40">No devices registered.</td></tr>}
               </tbody>
             </table>
           </div>

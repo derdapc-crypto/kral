@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { Zap, Cpu, Coins, Radio, AlertCircle, TrendingUp, Copy } from "lucide-react";
+import { Zap, Cpu, Coins, Radio, AlertCircle, TrendingUp, Copy, Power, ShieldOff } from "lucide-react";
 
 function fmtHashrate(hps, unit, unit_div) {
   const v = hps / (unit_div || 1);
@@ -45,6 +45,25 @@ export default function MiningOrchestrator() {
     try { await api.post("/admin/mining/select", { coin }); await load(); }
     catch (e) { setErr(formatApiError(e)); }
     finally { setSwitching(false); }
+  };
+
+  const killAll = async () => {
+    if (!window.confirm("KILL SWITCH: Stop mining on every device immediately?")) return;
+    setKilling(true);
+    try {
+      const { data } = await api.post("/admin/mining/kill");
+      setKillStatus({ killed: true, affected: data.active_devices_affected });
+    } catch (e) { setErr(formatApiError(e)); }
+    finally { setKilling(false); }
+  };
+
+  const resumeAll = async () => {
+    setKilling(true);
+    try {
+      await api.post("/admin/mining/resume");
+      setKillStatus({ killed: false });
+    } catch (e) { setErr(formatApiError(e)); }
+    finally { setKilling(false); }
   };
 
   const copy = (val, label) => {
@@ -195,6 +214,34 @@ export default function MiningOrchestrator() {
           Stratum broadcast reaches every connected node. Real production clients (signed native APK) would open a raw socket to the selected pool.
           Browser-based nodes in this preview <span className="text-white/80">simulate</span> hashrate per algo based on device tier.
         </p>
+      </div>
+
+      {/* Kill switch */}
+      <div className={`rounded-3xl p-6 border ${killStatus?.killed ? "border-red-400/40 bg-red-500/5" : "border-white/10 bg-black/30"}`}>
+        <div className="flex flex-wrap justify-between items-center gap-3">
+          <div className="flex items-center gap-3">
+            <ShieldOff className={`w-5 h-5 ${killStatus?.killed ? "text-red-400" : "text-white/50"}`} />
+            <div>
+              <div className="font-display font-bold text-base">Global Kill Switch</div>
+              <div className="text-xs text-white/50 mt-0.5">Halts mining on all devices on next 5s poll. Enterprise jobs unaffected.</div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={killAll} disabled={killing} data-testid="kill-switch-btn"
+              className="px-5 py-2.5 rounded-full bg-red-500/15 border border-red-400/40 text-red-300 text-xs tracking-widest uppercase font-semibold hover:bg-red-500/25 transition-colors disabled:opacity-50">
+              <Power className="w-3.5 h-3.5 inline mr-1.5" /> Stop All Mining
+            </button>
+            <button onClick={resumeAll} disabled={killing} data-testid="resume-mining-btn"
+              className="px-5 py-2.5 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black text-xs tracking-widest uppercase font-semibold disabled:opacity-50">
+              Resume
+            </button>
+          </div>
+        </div>
+        {killStatus?.killed && (
+          <div className="mt-3 text-xs text-red-300" data-testid="kill-status">
+            Kill switch ENGAGED · {killStatus.affected} active device{killStatus.affected === 1 ? "" : "s"} stopping…
+          </div>
+        )}
       </div>
     </div>
   );

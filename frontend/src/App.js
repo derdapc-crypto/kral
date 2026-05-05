@@ -12,6 +12,7 @@ import Device from "./pages/Device";
 import Admin from "./pages/Admin";
 import CustomerPortal from "./pages/CustomerPortal";
 import Referrals from "./pages/Referrals";
+import Mobile from "./pages/Mobile";
 import { Toaster } from "./components/ui/sonner";
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
             <Route path="/device" element={<ProtectedRoute><Device /></ProtectedRoute>} />
             <Route path="/customer" element={<ProtectedRoute customerOnly><CustomerPortal /></ProtectedRoute>} />
             <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
+            <Route path="/mobile" element={<ProtectedRoute><Mobile /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
           </Routes>
           <Toaster theme="dark" />
