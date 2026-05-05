@@ -44,6 +44,7 @@ export default function Navbar() {
             <>
               <Link to="/dashboard" className={linkCls("/dashboard")} data-testid="nav-dashboard">Dashboard</Link>
               <Link to="/device" className={linkCls("/device")} data-testid="nav-device">Node</Link>
+              <Link to="/referrals" className={linkCls("/referrals")} data-testid="nav-referrals">Referrals</Link>
             </>
           )}
           {user && user.role === "admin" && (

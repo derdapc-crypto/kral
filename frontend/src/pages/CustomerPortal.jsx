@@ -2,13 +2,19 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-import { Upload, Plus, Briefcase, FileText, Cpu, X, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { Upload, Plus, Briefcase, FileText, Cpu, X, CheckCircle2, Clock, XCircle, Download, Key, RefreshCw, Copy, Zap } from "lucide-react";
 
 const WORKLOADS = [
   { id: "federated_learning", label: "Federated Learning" },
   { id: "matrix_compute", label: "Matrix Compute" },
   { id: "hash_compute", label: "Hash / PoW" },
   { id: "mixed", label: "Mixed Workload" },
+];
+
+const PRIORITIES = [
+  { id: "economy", label: "Economy", desc: "0.7× — Best value", mult: 0.7 },
+  { id: "standard", label: "Standard", desc: "1.0× — Balanced", mult: 1.0 },
+  { id: "instant", label: "Instant", desc: "2.5× — Top of the queue", mult: 2.5 },
 ];
 
 function StatusPill({ status }) {
@@ -38,18 +44,37 @@ export default function CustomerPortal() {
   const [budget, setBudget] = useState(25);
   const [maxNodes, setMaxNodes] = useState(20);
   const [workload, setWorkload] = useState("federated_learning");
+  const [priority, setPriority] = useState("standard");
   const [drag, setDrag] = useState(false);
   const [err, setErr] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [keyCopied, setKeyCopied] = useState(false);
   const nav = useNavigate();
 
   const load = async () => {
     try { const { data } = await api.get("/jobs"); setJobs(data); } catch {}
   };
 
+  const loadKey = async () => {
+    try { const { data } = await api.get("/customer/api-key"); setApiKey(data.api_key); } catch {}
+  };
+
+  const regenerateKey = async () => {
+    if (!window.confirm("Regenerate API key? Existing automations using the old key will break.")) return;
+    try { const { data } = await api.post("/customer/api-key/regenerate"); setApiKey(data.api_key); }
+    catch (e) { setErr(formatApiError(e)); }
+  };
+
+  const copyKey = () => {
+    navigator.clipboard.writeText(apiKey);
+    setKeyCopied(true); setTimeout(() => setKeyCopied(false), 2000);
+  };
+
   useEffect(() => {
     if (user && user.role !== "customer" && user.role !== "admin") { nav("/dashboard"); return; }
     load();
+    loadKey();
     const t = setInterval(load, 4000);
     return () => clearInterval(t);
   }, [user, nav]);
@@ -99,6 +124,30 @@ export default function CustomerPortal() {
             className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black font-semibold text-sm hover:shadow-[0_0_30px_rgba(242,201,76,0.6)] transition-shadow">
             <Plus className="w-4 h-4" /> New Workload
           </button>
+        </div>
+
+        {/* API Key panel */}
+        <div className="mb-8 p-6 rounded-3xl glass-strong">
+          <div className="flex justify-between items-start gap-4 flex-wrap">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.3em] text-[#F2C94C] flex items-center gap-1.5">
+                <Key className="w-3 h-3" /> Programmatic Access
+              </div>
+              <div className="font-display font-bold text-lg mt-1">API Key</div>
+              <p className="text-xs text-white/50 mt-1">Use <code className="text-[#F2C94C]">X-API-Key</code> header to automate workload uploads from your CI/CD.</p>
+            </div>
+            <div className="flex gap-2 flex-wrap items-center">
+              <div className="px-3 py-2 rounded-xl bg-black/50 border border-white/10 font-mono text-xs text-white/80 max-w-[420px] truncate" data-testid="api-key-display">{apiKey || "Loading…"}</div>
+              <button onClick={copyKey} data-testid="api-key-copy"
+                className="px-3 py-2 rounded-full bg-[#F2C94C] text-black text-[10px] tracking-widest uppercase font-semibold inline-flex items-center gap-1.5">
+                <Copy className="w-3 h-3" /> {keyCopied ? "Copied!" : "Copy"}
+              </button>
+              <button onClick={regenerateKey} data-testid="api-key-regen"
+                className="px-3 py-2 rounded-full border border-red-400/30 text-red-400 text-[10px] tracking-widest uppercase inline-flex items-center gap-1.5">
+                <RefreshCw className="w-3 h-3" /> Rotate
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Stats */}
@@ -169,6 +218,26 @@ export default function CustomerPortal() {
                     <div className="text-white/50">Rate / unit <span className="text-white font-mono-num">{j.rate_per_unit?.toFixed(6)}</span></div>
                     <div className="text-white/50">Created <span className="text-white">{new Date(j.created_at).toLocaleString()}</span></div>
                   </div>
+                  {/* Priority + Export buttons */}
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded-full border ${
+                      j.priority === "instant" ? "border-[#F2C94C]/60 text-[#F2C94C] bg-[#F2C94C]/5" :
+                      j.priority === "economy" ? "border-white/20 text-white/50" :
+                      "border-white/30 text-white/70"
+                    }`}><Zap className="w-3 h-3 inline mr-1" />{(j.priority || "standard").toUpperCase()} TIER</span>
+                    {j.processed_units > 0 && (
+                      <div className="flex gap-2">
+                        <a href={`${process.env.REACT_APP_BACKEND_URL}/api/jobs/${j.id}/results.json`} target="_blank" rel="noreferrer" data-testid={`export-json-${j.id}`}
+                          className="text-[10px] tracking-widest uppercase px-3 py-1.5 rounded-full border gold-border text-[#F2C94C] inline-flex items-center gap-1.5">
+                          <Download className="w-3 h-3" /> JSON
+                        </a>
+                        <a href={`${process.env.REACT_APP_BACKEND_URL}/api/jobs/${j.id}/results.csv`} target="_blank" rel="noreferrer" data-testid={`export-csv-${j.id}`}
+                          className="text-[10px] tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/15 text-white/70 inline-flex items-center gap-1.5">
+                          <Download className="w-3 h-3" /> CSV
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -237,6 +306,24 @@ export default function CustomerPortal() {
                   <input type="number" step="0.01" min={1} required value={budget} onChange={(e) => setBudget(e.target.value)} data-testid="new-job-budget"
                     className="mt-2 w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-[#D4AF37] focus:outline-none" />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase tracking-[0.25em] text-white/40">Priority Tier</label>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {PRIORITIES.map((p) => (
+                    <button type="button" key={p.id} onClick={() => setPriority(p.id)} data-testid={`new-job-priority-${p.id}`}
+                      className={`p-3 rounded-xl text-left transition-all ${
+                        priority === p.id
+                          ? p.id === "instant" ? "bg-gradient-to-br from-[#F2C94C] to-[#B8860B] text-black shadow-[0_0_30px_rgba(242,201,76,0.4)]" : "bg-[#F2C94C] text-black"
+                          : "border border-white/10 text-white/70 hover:border-[#D4AF37]"
+                      }`}>
+                      <div className="font-display font-bold text-sm">{p.label}</div>
+                      <div className={`text-[10px] mt-1 ${priority === p.id ? "opacity-80" : "text-white/40"}`}>{p.desc}</div>
+                    </button>
+                  ))}
+                </div>
+                <div className="text-[10px] text-white/40 mt-1.5">Higher tiers = higher worker payouts = your job gets priority routing.</div>
               </div>
 
               <div>

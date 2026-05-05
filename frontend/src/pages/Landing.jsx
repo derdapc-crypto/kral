@@ -113,6 +113,22 @@ export default function Landing() {
 
   return (
     <div className="relative">
+      {/* APK update banner */}
+      {apkMeta && (
+        <div className="bg-gradient-to-r from-[#F2C94C]/15 via-[#D4AF37]/8 to-transparent border-b border-[#F2C94C]/20" data-testid="apk-update-banner">
+          <div className="max-w-7xl mx-auto px-6 sm:px-10 h-10 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 text-[10px] sm:text-xs tracking-[0.2em] uppercase text-white/70">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F2C94C] dot-pulse" />
+              <span><span className="text-[#F2C94C]">v{apkMeta.version}</span> available · {apkMeta.release_notes}</span>
+            </div>
+            <button onClick={() => setApkOpen(true)} data-testid="apk-banner-update"
+              className="text-[10px] tracking-[0.25em] uppercase text-[#F2C94C] hover:underline whitespace-nowrap">
+              Update APK →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* HERO */}
       <section className="relative min-h-[92vh] overflow-hidden">
         <div className="absolute inset-0" style={{ backgroundImage: `url(${HERO_BG})`, backgroundSize: "cover", backgroundPosition: "center" }} />

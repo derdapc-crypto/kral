@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, Users, Briefcase, FileText, Cpu, Thermometer, Battery, Wifi, BatteryCharging, X, Check } from "lucide-react";
+import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, Users, Briefcase, FileText, Cpu, Thermometer, Battery, Wifi, BatteryCharging, X, Check, Zap, Power } from "lucide-react";
+import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Area, AreaChart } from "recharts";
 
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
 
@@ -48,17 +49,29 @@ export default function Admin() {
   const [stats, setStats] = useState({});
   const [jobs, setJobs] = useState([]);
   const [ledger, setLedger] = useState(null);
+  const [autoMining, setAutoMining] = useState(true);
+  const [hashrate, setHashrate] = useState({ series: [], total_hashrate_hps: 0, total_tasks: 0 });
   const [msg, setMsg] = useState("");
 
   const load = async () => {
     try {
-      const [d, u, p, f, s, j, l] = await Promise.all([
+      const [d, u, p, f, s, j, l, am, hr] = await Promise.all([
         api.get("/admin/devices"), api.get("/admin/users"), api.get("/admin/payouts"),
         api.get("/admin/fraud"), api.get("/stats/network"),
         api.get("/admin/jobs"), api.get("/admin/ledger"),
+        api.get("/admin/auto-mining"), api.get("/admin/hashrate"),
       ]);
       setDevices(d.data); setUsers(u.data); setPayouts(p.data); setFraud(f.data);
       setStats(s.data); setJobs(j.data); setLedger(l.data);
+      setAutoMining(am.data.enabled); setHashrate(hr.data);
+    } catch (e) { setMsg(formatApiError(e)); }
+  };
+
+  const toggleAutoMining = async () => {
+    try {
+      const next = !autoMining;
+      await api.post("/admin/auto-mining", { enabled: next });
+      setAutoMining(next);
     } catch (e) { setMsg(formatApiError(e)); }
   };
 
@@ -129,22 +142,79 @@ export default function Admin() {
         </div>
 
         {tab === "map" && (
-          <div className="rounded-3xl glass p-6">
-            <div className="relative w-full aspect-[2/1] rounded-2xl overflow-hidden border border-white/10"
-              style={{ backgroundImage: `url(${DATA_BG})`, backgroundSize: "cover", backgroundPosition: "center" }}>
-              <div className="absolute inset-0 bg-black/60" />
-              {mapDots.map((d) => (
-                <div key={d.id}
-                  className={`absolute rounded-full ${d.flagged ? "bg-red-400" : d.active ? "bg-[#F2C94C] dot-pulse" : "bg-white/40"}`}
-                  style={{ left: `${d.x}%`, top: `${d.y}%`, width: d.active ? 8 : 4, height: d.active ? 8 : 4,
-                    transform: "translate(-50%,-50%)",
-                    boxShadow: d.active ? "0 0 18px rgba(242,201,76,0.9)" : d.flagged ? "0 0 12px rgba(239,68,68,0.8)" : "none" }}
-                  data-testid={`map-dot-${d.id}`} />
-              ))}
-              <div className="absolute bottom-5 left-5 flex gap-4 text-[10px] tracking-[0.3em] uppercase">
-                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#F2C94C]" /> Active</span>
-                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-white/40" /> Idle</span>
-                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-400" /> Flagged</span>
+          <div className="space-y-6">
+            {/* Auto-mining + hashrate panel */}
+            <div className="grid lg:grid-cols-[1fr_2fr] gap-6">
+              <div className={`rounded-3xl p-6 border transition-all ${autoMining ? "border-[#F2C94C]/40 bg-gradient-to-br from-[#F2C94C]/10 to-transparent" : "border-white/10 bg-black/40"}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-white/40">
+                    <Power className="w-3.5 h-3.5" /> Baseline Mining
+                  </div>
+                  <button onClick={toggleAutoMining} data-testid="auto-mining-toggle"
+                    className={`w-12 h-7 rounded-full p-0.5 transition-colors ${autoMining ? "bg-[#F2C94C]" : "bg-white/15"}`}>
+                    <div className={`w-6 h-6 rounded-full bg-black transition-transform ${autoMining ? "translate-x-5" : ""}`} />
+                  </button>
+                </div>
+                <div className="mt-4">
+                  <div className="font-display text-xl font-bold">{autoMining ? "ACTIVE" : "DISABLED"}</div>
+                  <p className="text-xs text-white/60 mt-2 leading-relaxed">
+                    When idle (no enterprise jobs queued), nodes receive SHA-256 PoW tasks so the network is always under load and operators always earn.
+                  </p>
+                </div>
+                <div className="mt-5 p-3 rounded-xl bg-black/40 border border-white/10">
+                  <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Network Hashrate</div>
+                  <div className="text-3xl font-display font-black gold-text font-mono-num mt-1" data-testid="network-hashrate">
+                    {hashrate.total_hashrate_hps >= 1000
+                      ? `${(hashrate.total_hashrate_hps/1000).toFixed(2)}K`
+                      : hashrate.total_hashrate_hps.toFixed(0)} <span className="text-base text-white/50">H/s</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-3xl glass p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 flex items-center gap-2">
+                    <Zap className="w-3.5 h-3.5 text-[#F2C94C]" /> Total Network Hashrate · 30 min
+                  </div>
+                  <div className="text-[10px] tracking-widest uppercase text-white/40">{hashrate.total_tasks} tasks</div>
+                </div>
+                <div className="h-[180px]" data-testid="hashrate-chart">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={hashrate.series} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="hashGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#F2C94C" stopOpacity={0.55}/>
+                          <stop offset="100%" stopColor="#F2C94C" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: "#666", fontSize: 10 }} stroke="rgba(255,255,255,0.1)" interval={5} />
+                      <YAxis tick={{ fill: "#666", fontSize: 10 }} stroke="rgba(255,255,255,0.1)" />
+                      <Tooltip contentStyle={{ background: "#0A0A0A", border: "1px solid #D4AF37", borderRadius: 8, fontSize: 12 }} />
+                      <Area type="monotone" dataKey="hashes" stroke="#F2C94C" strokeWidth={2} fill="url(#hashGrad)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl glass p-6">
+              <div className="relative w-full aspect-[2/1] rounded-2xl overflow-hidden border border-white/10"
+                style={{ backgroundImage: `url(${DATA_BG})`, backgroundSize: "cover", backgroundPosition: "center" }}>
+                <div className="absolute inset-0 bg-black/60" />
+                {mapDots.map((d) => (
+                  <div key={d.id}
+                    className={`absolute rounded-full ${d.flagged ? "bg-red-400" : d.active ? "bg-[#F2C94C] dot-pulse" : "bg-white/40"}`}
+                    style={{ left: `${d.x}%`, top: `${d.y}%`, width: d.active ? 8 : 4, height: d.active ? 8 : 4,
+                      transform: "translate(-50%,-50%)",
+                      boxShadow: d.active ? "0 0 18px rgba(242,201,76,0.9)" : d.flagged ? "0 0 12px rgba(239,68,68,0.8)" : "none" }}
+                    data-testid={`map-dot-${d.id}`} />
+                ))}
+                <div className="absolute bottom-5 left-5 flex gap-4 text-[10px] tracking-[0.3em] uppercase">
+                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#F2C94C]" /> Active</span>
+                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-white/40" /> Idle</span>
+                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-400" /> Flagged</span>
+                </div>
               </div>
             </div>
           </div>
@@ -197,6 +267,11 @@ export default function Admin() {
                           <Briefcase className="w-4 h-4 text-[#F2C94C]" />
                           <div className="font-display font-bold text-base">{j.name}</div>
                           <JobStatus status={j.status} />
+                          <span className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+                            j.priority === "instant" ? "border-[#F2C94C]/60 text-[#F2C94C]" :
+                            j.priority === "economy" ? "border-white/20 text-white/50" :
+                            "border-white/30 text-white/70"
+                          }`}>{j.priority || "standard"}</span>
                         </div>
                         <div className="mt-1 text-xs text-white/50 flex items-center gap-2 flex-wrap">
                           <FileText className="w-3 h-3" /> {j.file_name} · {(j.file_size/1024).toFixed(1)} KB

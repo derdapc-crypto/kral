@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Device from "./pages/Device";
 import Admin from "./pages/Admin";
 import CustomerPortal from "./pages/CustomerPortal";
+import Referrals from "./pages/Referrals";
 import { Toaster } from "./components/ui/sonner";
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/device" element={<ProtectedRoute><Device /></ProtectedRoute>} />
             <Route path="/customer" element={<ProtectedRoute customerOnly><CustomerPortal /></ProtectedRoute>} />
+            <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
           </Routes>
           <Toaster theme="dark" />

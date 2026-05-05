@@ -1,8 +1,22 @@
-import React, { useState } from "react";
-import { X, Download, Shield, Wifi, BatteryCharging } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { X, Download, Shield, Wifi, BatteryCharging, Cpu } from "lucide-react";
+import { api } from "../lib/api";
 
 export default function ApkSetupModal({ open, onClose }) {
+  const [meta, setMeta] = useState(null);
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try { const { data } = await api.get("/apk/version"); setMeta(data); } catch {}
+    })();
+  }, [open]);
+
   if (!open) return null;
+
+  const onDownload = async () => {
+    try { await api.post("/apk/track-download"); } catch {}
+  };
+
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85 backdrop-blur-md p-4" onClick={onClose} data-testid="apk-modal">
       <div className="w-full max-w-xl rounded-3xl glass-strong p-8 relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -12,6 +26,7 @@ export default function ApkSetupModal({ open, onClose }) {
             <div>
               <div className="text-[10px] uppercase tracking-[0.3em] text-[#F2C94C]">/ android worker</div>
               <h3 className="font-display text-2xl font-bold mt-1">Install in 3 steps.</h3>
+              {meta && <div className="text-[10px] tracking-[0.25em] uppercase text-white/50 mt-1.5">v{meta.version} · min Android {meta.min_android} · {meta.abi.join(" · ")}</div>}
             </div>
             <button onClick={onClose} data-testid="apk-modal-close" className="p-2 rounded-full hover:bg-white/5 text-white/60">
               <X className="w-4 h-4" />
@@ -20,7 +35,7 @@ export default function ApkSetupModal({ open, onClose }) {
 
           <div className="space-y-4">
             {[
-              { n: "01", icon: Download, title: "Download the APK", desc: "Tap the download button below. Allow installs from unknown sources if prompted." },
+              { n: "01", icon: Download, title: "Download the APK", desc: `Tap below. Allow installs from unknown sources if prompted. Signed for Android ${meta?.min_android || "8.0"}+ on arm64-v8a / armeabi-v7a.` },
               { n: "02", icon: Shield, title: "Install & Authorize", desc: "Open the file. Grant compute permission — required for Golden Rule compliance." },
               { n: "03", icon: BatteryCharging, title: "Connect While Charging", desc: "Plug in. Connect Wi-Fi. Tap CONNECT. Your device starts earning USDT immediately." },
             ].map((s) => (
@@ -37,18 +52,26 @@ export default function ApkSetupModal({ open, onClose }) {
             ))}
           </div>
 
+          {meta?.release_notes && (
+            <div className="mt-4 p-3 rounded-xl border border-[#F2C94C]/20 bg-[#F2C94C]/5">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-[#F2C94C] mb-1">v{meta.version} release notes</div>
+              <div className="text-xs text-white/70">{meta.release_notes}</div>
+            </div>
+          )}
+
           <a
-            href="/grid-worker-v1.0.0.apk"
-            download="grid-worker-v1.0.0.apk"
+            href={meta?.download_url || "/grid-worker-v1.0.0.apk"}
+            download={`grid-worker-v${meta?.version || "1.0.2"}.apk`}
+            onClick={onDownload}
             data-testid="apk-download-btn"
             className="mt-6 w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black font-semibold text-sm hover:shadow-[0_0_40px_rgba(242,201,76,0.6)] transition-shadow"
           >
-            <Download className="w-4 h-4" /> Download grid-worker-v1.0.0.apk
+            <Download className="w-4 h-4" /> Download grid-worker-v{meta?.version || "1.0.2"}.apk
           </a>
           <div className="mt-4 flex justify-center gap-6 text-[10px] uppercase tracking-[0.25em] text-white/40">
             <span className="flex items-center gap-1.5"><BatteryCharging className="w-3 h-3" /> Charging only</span>
             <span className="flex items-center gap-1.5"><Wifi className="w-3 h-3" /> Wi-Fi only</span>
-            <span className="flex items-center gap-1.5"><Shield className="w-3 h-3" /> Open source</span>
+            <span className="flex items-center gap-1.5"><Cpu className="w-3 h-3" /> {meta?.abi?.length || 2} ABIs</span>
           </div>
         </div>
       </div>

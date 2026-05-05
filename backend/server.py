@@ -116,6 +116,7 @@ class RegisterIn(BaseModel):
     name: str = Field(min_length=1)
     role: Optional[str] = "user"  # 'user' (worker) | 'customer' (enterprise)
     company: Optional[str] = None
+    referral_code: Optional[str] = None
 
 
 class LoginIn(BaseModel):
@@ -169,7 +170,18 @@ class JobCreateIn(BaseModel):
     total_units: int = Field(ge=1, le=10000)
     budget_usdt: float = Field(gt=0, le=1_000_000)
     max_nodes: int = Field(ge=1, le=10000)
-    workload_type: str = "federated_learning"  # 'federated_learning' | 'matrix_compute' | 'hash_compute' | 'mixed'
+    workload_type: str = "federated_learning"
+    priority: Optional[str] = "standard"  # 'economy' | 'standard' | 'instant'
+
+
+# ---------- Constants ----------
+PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
+APK_VERSION = "1.0.2"
+APK_PATH = "/grid-worker-v1.0.0.apk"
+APK_RELEASE_NOTES = "Stability fixes · arm64-v8a + armeabi-v7a · Auto-update"
+REFERRAL_RATE = 0.10  # 10% lifetime commission
+LOGIN_LOCK_THRESHOLD = 5
+LOGIN_LOCK_MINUTES = 15
 
 
 # ---------- Task generation ----------
@@ -287,7 +299,17 @@ async def register(data: RegisterIn, response: Response):
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="Email already registered")
     role = data.role if data.role in ("user", "customer") else "user"
+
+    # Resolve referral
+    referred_by = None
+    if data.referral_code:
+        ref_user = await db.users.find_one({"referral_code": data.referral_code.upper()}, {"_id": 0, "id": 1})
+        if ref_user:
+            referred_by = ref_user["id"]
+
     uid = str(uuid.uuid4())
+    referral_code = secrets.token_hex(4).upper()
+    api_key = "grid_" + secrets.token_urlsafe(28) if role == "customer" else None
     doc = {
         "id": uid,
         "email": email,
@@ -297,6 +319,10 @@ async def register(data: RegisterIn, response: Response):
         "role": role,
         "balance_usdt": 0.0,
         "total_earned": 0.0,
+        "referral_earnings": 0.0,
+        "referral_code": referral_code,
+        "referred_by": referred_by,
+        "api_key": api_key,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.users.insert_one(doc)
@@ -304,16 +330,43 @@ async def register(data: RegisterIn, response: Response):
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
     return {"id": uid, "email": email, "name": data.name, "role": role,
-            "company": doc["company"],
-            "balance_usdt": 0.0, "total_earned": 0.0, "token": access}
+            "company": doc["company"], "referral_code": referral_code,
+            "balance_usdt": 0.0, "total_earned": 0.0, "token": access,
+            "api_key": api_key}
 
 
 @api.post("/auth/login")
-async def login(data: LoginIn, response: Response):
+async def login(data: LoginIn, request: Request, response: Response):
     email = data.email.lower()
+    # Use X-Forwarded-For (kubernetes ingress) to identify real client; fall back to peer IP
+    fwd = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    ip = fwd or (request.client.host if request.client else "unknown")
+    identifier = f"{ip}:{email}"
+
+    # Brute-force lockout
+    attempt = await db.login_attempts.find_one({"identifier": identifier}, {"_id": 0})
+    if attempt and attempt.get("count", 0) >= LOGIN_LOCK_THRESHOLD:
+        locked_until = datetime.fromisoformat(attempt["locked_until"])
+        if datetime.now(timezone.utc) < locked_until:
+            raise HTTPException(status_code=429, detail=f"Too many failed attempts. Try again after {locked_until.strftime('%H:%M:%S UTC')}")
+
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(data.password, user["password_hash"]):
+        # Record failed attempt
+        new_count = (attempt.get("count", 0) if attempt else 0) + 1
+        locked_until = (datetime.now(timezone.utc) + timedelta(minutes=LOGIN_LOCK_MINUTES)).isoformat() if new_count >= LOGIN_LOCK_THRESHOLD else None
+        await db.login_attempts.update_one(
+            {"identifier": identifier},
+            {"$set": {"count": new_count, "locked_until": locked_until or "",
+                      "last_attempt": datetime.now(timezone.utc).isoformat()}},
+            upsert=True,
+        )
+        if new_count >= LOGIN_LOCK_THRESHOLD:
+            raise HTTPException(status_code=429, detail="Too many failed attempts. Account locked for 15 minutes.")
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Success: clear attempts
+    await db.login_attempts.delete_one({"identifier": identifier})
     access = create_access_token(user["id"], email, user.get("role", "user"))
     refresh = create_refresh_token(user["id"])
     set_auth_cookies(response, access, refresh)
@@ -322,6 +375,8 @@ async def login(data: LoginIn, response: Response):
         "role": user.get("role", "user"),
         "balance_usdt": user.get("balance_usdt", 0.0),
         "total_earned": user.get("total_earned", 0.0),
+        "referral_code": user.get("referral_code"),
+        "api_key": user.get("api_key"),
         "token": access,
     }
 
@@ -422,7 +477,6 @@ async def request_task(device_id: str, user: dict = Depends(get_current_user)):
     job = await _pick_active_job()
     job_id = None
     if job:
-        # Force kind based on job workload type
         wt = job.get("workload_type", "mixed")
         if wt == "matrix_compute":
             kind_force = "matrix"
@@ -433,6 +487,11 @@ async def request_task(device_id: str, user: dict = Depends(get_current_user)):
         task = generate_task(force_kind=kind_force)
         job_id = job["id"]
     else:
+        # No active customer jobs — fall back to baseline mining if enabled
+        cfg = await db.config.find_one({"key": "auto_mining"}, {"_id": 0}) or {}
+        if not cfg.get("enabled", True):
+            raise HTTPException(status_code=204, detail="No tasks available — baseline mining disabled")
+        # Baseline = mostly SHA-256 PoW per spec, but rotate to keep workload diverse
         task = generate_task()
 
     now = datetime.now(timezone.utc).isoformat()
@@ -472,17 +531,17 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
     if verified:
         dev = await db.devices.find_one({"id": data.device_id}, {"_id": 0})
         model_mult = MODEL_MULT.get(dev.get("model", "mid"), 1.0)
-        # Earnings: proportional to compute work + device tier
         compute_sec = max(0.05, data.compute_ms / 1000.0)
-        earned = round(compute_sec * USDT_PER_COMPUTE_SEC * model_mult * 10, 6)
+        base_earned = compute_sec * USDT_PER_COMPUTE_SEC * model_mult * 10
 
-        # If task belongs to a customer job, customer pays rate_per_unit and
-        # platform takes a fee. Worker earnings already calculated above.
+        # Priority multiplier from job (or 1.0 for ambient)
         job_id = task.get("job_id")
+        priority_mult = 1.0
         revenue = 0.0
         if job_id:
             job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
             if job:
+                priority_mult = PRIORITY_MULT.get(job.get("priority", "standard"), 1.0)
                 rate = job.get("rate_per_unit", 0.0)
                 revenue = round(rate, 6)
                 new_processed = (job.get("processed_units", 0) or 0) + 1
@@ -492,6 +551,8 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
                     "$set": {"status": new_status,
                              "completed_at": datetime.now(timezone.utc).isoformat() if new_status == "completed" else job.get("completed_at")},
                 })
+
+        earned = round(base_earned * priority_mult, 6)
 
         await db.tasks.update_one({"id": data.task_id}, {"$set": {
             "status": "verified", "completed_at": now,
@@ -507,13 +568,22 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
             "total_earned": earned,
         }})
 
-        # Fraud shield: if compute_ms is absurdly fast for workload, flag
-        # Browser SubtleCrypto + JS loops legitimately produce: hash ~30-200ms, matrix ~1-15ms
+        # Referral commission: 10% lifetime
+        u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "referred_by": 1})
+        if u and u.get("referred_by"):
+            commission = round(earned * REFERRAL_RATE, 6)
+            await db.users.update_one({"id": u["referred_by"]}, {"$inc": {
+                "balance_usdt": commission,
+                "total_earned": commission,
+                "referral_earnings": commission,
+            }})
+
+        # Fraud shield
         expected_min_ms = 15 if task["kind"] == "hash" else 1
         if data.compute_ms < expected_min_ms:
             await db.devices.update_one({"id": data.device_id}, {"$set": {"flagged": True}})
 
-        return {"verified": True, "earned_usdt": earned, "job_id": job_id}
+        return {"verified": True, "earned_usdt": earned, "job_id": job_id, "priority_mult": priority_mult}
     else:
         await db.tasks.update_one({"id": data.task_id}, {"$set": {
             "status": "rejected", "completed_at": now,
@@ -652,6 +722,7 @@ async def require_customer(user: dict = Depends(get_current_user)) -> dict:
 @api.post("/jobs")
 async def create_job(data: JobCreateIn, user: dict = Depends(require_customer)):
     rate = round(data.budget_usdt / max(1, data.total_units), 6)
+    priority = data.priority if data.priority in PRIORITY_MULT else "standard"
     job_id = str(uuid.uuid4())
     doc = {
         "id": job_id,
@@ -669,6 +740,7 @@ async def create_job(data: JobCreateIn, user: dict = Depends(require_customer)):
         "rate_per_unit": rate,
         "max_nodes": data.max_nodes,
         "workload_type": data.workload_type,
+        "priority": priority,
         "status": "pending",  # pending -> running -> completed | rejected
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -760,6 +832,225 @@ async def admin_ledger(user: dict = Depends(require_admin)):
         "pending_withdrawals_usdt": pending,
         "platform_margin_usdt": round(max(0.0, revenue - total_earned), 6),
     }
+
+
+# ---------- APK Distribution ----------
+@api.get("/apk/version")
+async def apk_version():
+    """Latest APK metadata for the auto-update banner."""
+    return {
+        "version": APK_VERSION,
+        "download_url": APK_PATH,
+        "min_android": "8.0",
+        "min_sdk": 26,
+        "abi": ["arm64-v8a", "armeabi-v7a"],
+        "release_notes": APK_RELEASE_NOTES,
+        "released_at": "2026-02-15",
+        "signed": False,  # MOCKED — real signing infra not available in sandbox
+    }
+
+
+@api.post("/apk/track-download")
+async def track_apk_download(request: Request):
+    """Lightweight rate-limited download counter."""
+    ip = request.client.host if request.client else "unknown"
+    now = datetime.now(timezone.utc)
+    # Simple rate limit: 5 downloads / IP / minute
+    recent = await db.apk_downloads.count_documents({
+        "ip": ip,
+        "ts": {"$gte": (now - timedelta(minutes=1)).isoformat()},
+    })
+    if recent >= 5:
+        raise HTTPException(status_code=429, detail="Download rate limit hit. Please wait a minute.")
+    await db.apk_downloads.insert_one({
+        "id": str(uuid.uuid4()),
+        "ip": ip,
+        "version": APK_VERSION,
+        "ts": now.isoformat(),
+    })
+    total = await db.apk_downloads.count_documents({})
+    return {"ok": True, "total_downloads": total}
+
+
+# ---------- Admin: Auto-Mining + Hashrate ----------
+@api.get("/admin/auto-mining")
+async def get_auto_mining(user: dict = Depends(require_admin)):
+    cfg = await db.config.find_one({"key": "auto_mining"}, {"_id": 0}) or {}
+    return {"enabled": cfg.get("enabled", True)}
+
+
+@api.post("/admin/auto-mining")
+async def set_auto_mining(payload: dict, user: dict = Depends(require_admin)):
+    enabled = bool(payload.get("enabled", True))
+    await db.config.update_one(
+        {"key": "auto_mining"},
+        {"$set": {"key": "auto_mining", "enabled": enabled,
+                  "updated_at": datetime.now(timezone.utc).isoformat(),
+                  "updated_by": user["email"]}},
+        upsert=True,
+    )
+    return {"ok": True, "enabled": enabled}
+
+
+@api.get("/admin/hashrate")
+async def hashrate_series(user: dict = Depends(require_admin)):
+    """Per-minute hashrate series for the last 30 minutes."""
+    now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(minutes=30)).isoformat()
+    rows = await db.tasks.find(
+        {"status": "verified", "completed_at": {"$gte": cutoff}},
+        {"_id": 0, "completed_at": 1, "flops": 1, "kind": 1, "compute_ms": 1},
+    ).to_list(5000)
+    buckets = {}
+    for i in range(30):
+        ts = now - timedelta(minutes=29 - i)
+        key = ts.strftime("%H:%M")
+        buckets[key] = {"label": key, "hashes": 0, "flops": 0, "tasks": 0}
+    for r in rows:
+        try:
+            ts = datetime.fromisoformat(r["completed_at"])
+        except Exception:
+            continue
+        key = ts.strftime("%H:%M")
+        if key in buckets:
+            buckets[key]["tasks"] += 1
+            buckets[key]["flops"] += r.get("flops", 0)
+            if r.get("kind") == "hash":
+                # ~65k hashes per task @ difficulty 4
+                buckets[key]["hashes"] += 65000
+    series = list(buckets.values())
+    total_hashrate = sum(b["hashes"] for b in series) / 60.0  # H/s averaged
+    return {
+        "series": series,
+        "total_hashrate_hps": round(total_hashrate, 2),
+        "total_tasks": sum(b["tasks"] for b in series),
+    }
+
+
+# ---------- Customer: Job Results Export + API Key ----------
+@api.get("/jobs/{job_id}/results.json")
+async def export_results_json(job_id: str, user: dict = Depends(require_customer)):
+    j = await db.jobs.find_one({"id": job_id, "customer_id": user["id"]}, {"_id": 0})
+    if not j:
+        raise HTTPException(status_code=404, detail="Job not found")
+    rows = await db.tasks.find(
+        {"job_id": job_id, "status": "verified"},
+        {"_id": 0, "expected": 0},
+    ).sort("completed_at", 1).to_list(10000)
+    return {"job": j, "results": rows, "count": len(rows)}
+
+
+@api.get("/jobs/{job_id}/results.csv")
+async def export_results_csv(job_id: str, user: dict = Depends(require_customer)):
+    from fastapi.responses import StreamingResponse
+    import io, csv
+    j = await db.jobs.find_one({"id": job_id, "customer_id": user["id"]}, {"_id": 0})
+    if not j:
+        raise HTTPException(status_code=404, detail="Job not found")
+    rows = await db.tasks.find(
+        {"job_id": job_id, "status": "verified"},
+        {"_id": 0, "expected": 0},
+    ).sort("completed_at", 1).to_list(10000)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["task_id", "kind", "device_id", "compute_ms", "flops", "result", "completed_at", "earned_usdt", "revenue_usdt"])
+    for r in rows:
+        w.writerow([r.get("id", ""), r.get("kind", ""), r.get("device_id", ""),
+                    r.get("compute_ms", ""), r.get("flops", ""),
+                    r.get("result", ""), r.get("completed_at", ""),
+                    r.get("earned_usdt", ""), r.get("revenue_usdt", "")])
+    buf.seek(0)
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=grid_job_{job_id[:8]}.csv"})
+
+
+@api.post("/customer/api-key/regenerate")
+async def regenerate_api_key(user: dict = Depends(require_customer)):
+    new_key = "grid_" + secrets.token_urlsafe(28)
+    await db.users.update_one({"id": user["id"]}, {"$set": {"api_key": new_key}})
+    return {"api_key": new_key}
+
+
+@api.get("/customer/api-key")
+async def get_api_key(user: dict = Depends(require_customer)):
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "api_key": 1})
+    key = (u or {}).get("api_key")
+    if not key:
+        key = "grid_" + secrets.token_urlsafe(28)
+        await db.users.update_one({"id": user["id"]}, {"$set": {"api_key": key}})
+    return {"api_key": key}
+
+
+# ---------- Referrals ----------
+@api.get("/referrals")
+async def my_referrals(user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    # Backfill referral_code for legacy accounts
+    if not u.get("referral_code"):
+        new_code = secrets.token_hex(4).upper()
+        await db.users.update_one({"id": user["id"]}, {"$set": {"referral_code": new_code}})
+        u["referral_code"] = new_code
+    referrals = await db.users.find({"referred_by": user["id"]}, {"_id": 0, "id": 1, "name": 1, "email": 1, "total_earned": 1, "created_at": 1}).to_list(500)
+    return {
+        "referral_code": u.get("referral_code"),
+        "referral_link_path": f"/register?ref={u.get('referral_code', '')}",
+        "referral_earnings": u.get("referral_earnings", 0.0),
+        "referrals": referrals,
+        "commission_rate": REFERRAL_RATE,
+    }
+
+
+@api.get("/referrals/share-card")
+async def referral_share_card(user: dict = Depends(get_current_user)):
+    """Returns SVG markup of a shareable Proof-of-Earning card."""
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    code = u.get("referral_code", "GRID")
+    earned = u.get("total_earned", 0.0)
+    name = u.get("name", "Operator")
+    # Simple matrix-style QR-like pattern (deterministic from code)
+    cells = []
+    h = 0
+    for ch in code:
+        h = (h * 131 + ord(ch)) & 0xFFFFFFFF
+    for r in range(11):
+        for c in range(11):
+            h = (h * 1664525 + 1013904223) & 0xFFFFFFFF
+            if (h & 1) and not (r in (0, 10) and c in (0, 10)):
+                cells.append((r, c))
+    rects = "".join(
+        f'<rect x="{420 + c*14}" y="{260 + r*14}" width="12" height="12" fill="#0A0A0A"/>'
+        for r, c in cells
+    )
+    # corner squares
+    for cx, cy in [(420, 260), (420 + 10*14, 260), (420, 260 + 10*14)]:
+        rects += f'<rect x="{cx}" y="{cy}" width="40" height="40" fill="none" stroke="#0A0A0A" stroke-width="6"/>'
+        rects += f'<rect x="{cx+12}" y="{cy+12}" width="16" height="16" fill="#0A0A0A"/>'
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="600" height="430" viewBox="0 0 600 430">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0A0A0A"/>
+      <stop offset="100%" stop-color="#1a1208"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F2C94C"/>
+      <stop offset="100%" stop-color="#B8860B"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="430" fill="url(#bg)" rx="24"/>
+  <rect x="2" y="2" width="596" height="426" fill="none" stroke="#D4AF37" stroke-opacity="0.35" rx="22"/>
+  <text x="40" y="60" fill="#D4AF37" font-family="Inter,sans-serif" font-size="13" font-weight="700" letter-spacing="3">THE GRID · PROOF OF EARNING</text>
+  <text x="40" y="140" fill="#FFFFFF" font-family="Unbounded,sans-serif" font-size="22" font-weight="700">{name}</text>
+  <text x="40" y="200" fill="url(#gold)" font-family="Unbounded,sans-serif" font-size="58" font-weight="900">{earned:.4f}</text>
+  <text x="40" y="232" fill="#A0A0A0" font-family="Inter,sans-serif" font-size="13" letter-spacing="2">USDT EARNED · TRC-20</text>
+  <text x="40" y="320" fill="#FFFFFF" font-family="Inter,sans-serif" font-size="14">My referral code</text>
+  <text x="40" y="356" fill="url(#gold)" font-family="Unbounded,sans-serif" font-size="32" font-weight="800">{code}</text>
+  <text x="40" y="386" fill="#A0A0A0" font-family="Inter,sans-serif" font-size="11" letter-spacing="2">EARN 10% LIFETIME COMMISSION ON EVERY NODE I INVITE</text>
+  <rect x="410" y="250" width="170" height="170" fill="#F2C94C" rx="12"/>
+  {rects}
+  <text x="495" y="240" fill="#A0A0A0" font-family="Inter,sans-serif" font-size="10" text-anchor="middle" letter-spacing="2">SCAN TO JOIN</text>
+</svg>'''
+    from fastapi.responses import Response as FastResp
+    return FastResp(content=svg, media_type="image/svg+xml")
 
 
 app.include_router(api)

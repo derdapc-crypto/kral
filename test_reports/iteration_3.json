@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 3 backend testing — 25/26 new tests pass. Combined regression: 66 passed, 1 failed, 1 skipped (the iter-1 Fraud Shield skip from iter-2 report; nothing new). Single failure is a legitimate bug: /api/apk/track-download uses request.client.host for rate-limit identification, which is the kubernetes ingress proxy IP (varies per request behind LB/CDN), so the 5/min limit never engages from external clients. All other 25 features verified — APK metadata, admin auto-mining toggle (incl. negative path: workers blocked when off), admin hashrate (30 buckets), priority tiers (default standard, instant persists, priority_mult=2.5x verified end-to-end vs 1.0x standard with same compute_ms), JSON+CSV exports with cross-customer 404, customer api-key get/regenerate/role-gate, referral code on register, /api/referrals structure, share-card SVG with code embedded, full referral commission flow (10% credited to A on B's verified task; B unchanged), brute-force lockout (4×401 then 429, X-Forwarded-For-keyed), success clears counter, login payload now carries referral_code (all roles) + api_key (customer only).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/apk/track-download",
+        "issue": "Rate limit (5/min/IP) does not engage from external clients. Endpoint uses `request.client.host` which behind the Kubernetes ingress is the proxy/CDN IP and effectively rotates or never matches the test client's apparent IP. login() correctly uses X-Forwarded-For — apply the same pattern here. Reproduction: POST /api/apk/track-download 8 times in <60s → all 8 return 200 instead of 5×200 + 3×429. Fix: read `request.headers.get('x-forwarded-for', '').split(',')[0].strip() or request.client.host` and key the count_documents query by that.",
+        "priority": "MINOR (security/abuse vector — APK download counter can be inflated indefinitely from a single client)"
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration3_features.py",
+    "/app/backend/tests/test_iteration2_customer_jobs.py",
+    "/app/backend/tests/test_grid_backend.py",
+    "/app/test_reports/pytest/iter3_results.xml"
+  ],
+  "action_items": [
+    "Fix /api/apk/track-download to use X-Forwarded-For (mirror login endpoint) so the 5/min rate limit actually engages behind the kubernetes ingress.",
+    "(Carry-over from iter-2) Restore meaningful Fraud Shield thresholds in /api/tasks/submit — currently expected_min_ms = 1ms (matrix) / 15ms (hash). The matrix=1 is essentially disabled. Suggested: matrix>=10ms, hash>=20ms, or tier-aware (flagship 5ms / mid 15ms / budget 30ms).",
+    "(Carry-over) Tighten JobCreateIn.workload_type to a Literal so default 'federated_learning' doesn't fall through to random kind."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 1070 lines — well past the 700-line guideline. Recommend splitting into routers/auth.py, routers/jobs.py, routers/admin.py, routers/tasks.py, routers/referrals.py, routers/apk.py.",
+    "track_apk_download uses request.client.host but login uses X-Forwarded-For — inconsistent client-IP detection across endpoints. Centralise via a get_client_ip(request) helper.",
+    "Referral commission ($inc total_earned by commission) inflates A's lifetime 'total_earned' from referee earnings. If 'total_earned' is supposed to be 'tasks I personally completed', this conflates compute earnings with passive commission. Consider a separate 'lifetime_total_credit' field.",
+    "set_auto_mining accepts a free-form `payload: dict` instead of a Pydantic model — no type validation; payload.get('enabled', True) silently coerces missing/junk to True.",
+    "The 'baseline mining disabled' branch raises HTTPException with status_code=204. RFC 7231 forbids a body on 204 — FastAPI/Starlette will still send a JSON detail body, and many clients will treat this as malformed. Use 503 (Service Unavailable) or 409 (Conflict) instead.",
+    "regenerate_api_key has no rate limit — a compromised session could rotate tokens at will, but more importantly, there is no audit log of regenerations. Add a created_at/regenerated_at timestamp on the user.",
+    "/api/jobs/{id}/results.json/csv passes through tasks.find without limiting fields — if a customer adds millions of units, the to_list(10000) cap silently truncates. Document the cap or paginate.",
+    "Hashrate hashes-per-task is hard-coded at 65000 — fine as an estimator but should be sourced from the actual task payload.difficulty so changing PoW difficulty doesn't silently misreport.",
+    "REFERRAL_RATE constant fine but no admin endpoint to view top referrers or set a per-user override. Future feature."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration3_features.py"
+  ],
+  "success_rate": {"backend": "96.2% (25/26 iter-3) / 98.5% combined (66/67 across all iterations)", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "admin@thegrid.io / Grid@Admin2026 verified. Customers/workers created per-test with TEST_/test_ prefix and UUID emails. Brute-force tests use unique X-Forwarded-For IPs per test (10.42.x.x and 10.43.x.x ranges) so they do not pollute or interact with each other.",
+  "seed_data_creation": "Each test creates fresh customer (test_cust3_*@grid.io, company TEST_AcmeIter3), workers (test_worker3_*@grid.io with TEST_w3 device on 'mid' tier, charging+wifi+permission). Referral test creates A→B linkage. APK test populates apk_downloads collection with current ingress IP. Auto-mining is reset to True at session start AND end via autouse session fixture.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Three test files now: test_grid_backend.py (iter 1 — 21 tests), test_iteration2_customer_jobs.py (iter 2 — 20 tests), test_iteration3_features.py (iter 3 — 26 tests). Run all: `pytest /app/backend/tests/ -v`. Known existing failures: (1) iter-1 Fraud Shield (unchanged from iter-2 report — server.py expected_min_ms thresholds too lax), (2) iter-3 APK rate-limit (request.client.host not usable behind ingress). Both have suggested fixes in action_items. The priority test isolates same compute_ms across two jobs (standard then instant) and verifies earned ratio ~2.5x. Referral commission test polls up to 6 baseline tasks for matrix kind to ensure verifiable result. Brute-force tests are isolated by unique X-Forwarded-For IPs to avoid cross-test pollution.",
+  "rca of the issue": "APK rate-limit failure RCA: server.py:856 reads `ip = request.client.host`. In the local FastAPI peer-IP model this is the immediate TCP peer, which behind the Kubernetes ingress is the ingress controller pod IP (or, if x-real-ip/forwarded headers aren't trusted, the LB IP). External test clients all map to the same ingress IP — but the count_documents query then over-counts across ALL external clients, OR (more likely given our 8/8 successes) the deployment's edge proxy varies the upstream-perceived IP per request, so each call writes a row with a different ip and the recent counter is always 0. Either way the 5/min/IP guarantee is not met. Fix: replicate the login() pattern: `fwd = request.headers.get('x-forwarded-for', '').split(',')[0].strip(); ip = fwd or (request.client.host if request.client else 'unknown')`. Reproduction: 8× POST /api/apk/track-download from a single curl loop returns 8× 200."
+}

@@ -8,6 +8,7 @@ export default function Register() {
   const nav = useNavigate();
   const [params] = useSearchParams();
   const [role, setRole] = useState(params.get("role") === "customer" ? "customer" : "user");
+  const refCode = params.get("ref") || "";
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
   const [email, setEmail] = useState("");
@@ -23,7 +24,7 @@ export default function Register() {
   const submit = async (e) => {
     e.preventDefault();
     setErr(""); setLoading(true);
-    const r = await register(email, password, name, role, company);
+    const r = await register(email, password, name, role, company, refCode);
     setLoading(false);
     if (r.ok) {
       if (r.user.role === "customer") nav("/customer");
@@ -61,6 +62,11 @@ export default function Register() {
           <p className="text-sm text-white/50 mt-2">
             {role === "customer" ? "Upload AI workloads. Pay only for compute solved." : "One minute to start earning USDT from idle compute."}
           </p>
+          {refCode && (
+            <div className="mt-4 px-3 py-2 rounded-xl border border-[#F2C94C]/30 bg-[#F2C94C]/5 text-xs text-[#F2C94C]" data-testid="register-ref-banner">
+              ✦ Joining with referral code <span className="font-mono font-bold">{refCode}</span> — your inviter earns 10% lifetime commission.
+            </div>
+          )}
           <form onSubmit={submit} className="mt-8 space-y-5">
             {role === "customer" && (
               <div>
