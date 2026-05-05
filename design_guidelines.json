@@ -1,0 +1,91 @@
+{
+  "theme": "dark",
+  "archetype": "5",
+  "archetype_name": "Jewel & Luxury with Cyber-Futuristic elements",
+  "mood": "Premium, High-End Enterprise SaaS, Investor-Grade, Cinematic, Wealthy, Trustworthy",
+  "colors": {
+    "background": "#0A0A0A",
+    "surface": "#121212",
+    "surface_glass": "rgba(0, 0, 0, 0.6)",
+    "primary": "#D4AF37",
+    "primary_hover": "#F2C94C",
+    "secondary": "#B8860B",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#A0A0A0",
+    "accent_glow": "rgba(212, 175, 55, 0.5)",
+    "success": "#10B981",
+    "danger": "#EF4444",
+    "border": "rgba(255, 255, 255, 0.1)"
+  },
+  "typography": {
+    "heading_font": "Cabinet Grotesk",
+    "body_font": "Inter",
+    "number_font": "Unbounded",
+    "scales": {
+      "h1": "text-5xl sm:text-6xl tracking-tighter font-black",
+      "h2": "text-3xl sm:text-4xl tracking-tight font-bold",
+      "h3": "text-2xl font-bold",
+      "h4": "text-xl font-semibold",
+      "body": "text-base leading-relaxed text-gray-300",
+      "small": "text-sm uppercase tracking-[0.2em] text-gray-400"
+    }
+  },
+  "spacing_and_layout": {
+    "section_padding": "py-24 sm:py-32",
+    "container_padding": "px-6 sm:px-12",
+    "card_padding": "p-6 sm:p-8",
+    "grid_gap": "gap-8 sm:gap-12",
+    "bento_dashboard": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+    "borderRadius": "rounded-2xl"
+  },
+  "surfaces_and_micro_themes": {
+    "header": "backdrop-blur-xl bg-black/60 border-b border-white/10 sticky top-0 z-50",
+    "hero_overlay": "bg-gradient-to-b from-black/40 via-black/60 to-[#0A0A0A]",
+    "card_glass": "bg-[#121212]/80 backdrop-blur-2xl border border-white/5 shadow-lg",
+    "card_glow": "hover:shadow-[0_0_30px_rgba(212,175,55,0.15)] transition-shadow duration-300",
+    "button_primary": "bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black font-bold hover:from-[#F2C94C] hover:to-[#D4AF37] transition-all",
+    "glow_accent": "drop-shadow-[0_0_12px_rgba(212,175,55,0.6)]"
+  },
+  "animations": {
+    "hover_state": "transition-all duration-300 ease-in-out",
+    "data_stream": "animate-pulse",
+    "start_button": "animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite] shadow-[0_0_40px_rgba(212,175,55,0.8)]"
+  },
+  "components": {
+    "strategy": "Hybrid",
+    "marketing_pages": "Custom HTML/Tailwind to allow extreme layout flexibility and bento grids.",
+    "dashboard": "Shadcn UI components heavily customized with dark mode + gold accents (Cards, Tables, Dialogs, Progress).",
+    "charts": "Recharts for PetaFLOPS live counter and earnings history with gold stroke/fill.",
+    "icons": "lucide-react"
+  },
+  "media": {
+    "images": {
+      "hero_background": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/de66970575fd0c962a0ae5998fbd3ca1fb71b7d5fc3bbccec837805a15b80cb7.png",
+        "description": "3D render of a futuristic global supercomputer network, glowing golden nodes across a dark obsidian world. Use as full-screen hero background."
+      },
+      "data_stream_abstract": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png",
+        "description": "Abstract data stream visualization with glowing gold data lines. Use for Dashboard background elements or Admin Command Center."
+      },
+      "geometric_accent": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/4d4b52ae803faae43333ad2470ef88109640608954e1850204ed0c18a52bc593.png",
+        "description": "Minimalist glowing gold geometric shape. Use for feature section illustrations or marketing graphics."
+      },
+      "texture_background": {
+        "url": "https://images.unsplash.com/photo-1704354428728-24b8ccab5c3d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxNzV8MHwxfHNlYXJjaHwzfHxvYnNpZGlhbiUyMGJsYWNrJTIwZ29sZCUyMGFic3RyYWN0JTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3NzgwMDQ0NzZ8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Close up of a black and gold abstract texture. Great for section dividers or footer background."
+      }
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the color palette. Do not use generic tailwind grays for backgrounds; use the specified #0A0A0A and #121212.",
+    "Implement a massive, pulsing 'Grid Connection' start button in the user dashboard that toggles connection state.",
+    "Use Cabinet Grotesk for all primary headings (H1, H2, H3). Use Unbounded for large numbers like the PetaFLOPS counter and Earnings.",
+    "Ensure all cards in the dashboard utilize the 'card_glass' class styles with internal p-6 or p-8 padding.",
+    "Add 'data-testid' attributes to all interactive elements (buttons, links, forms, toggles).",
+    "For the Admin Command Center Global War Map, use glowing dots (absolute positioning or a canvas library) on top of the 'data_stream_abstract' image.",
+    "Withdraw Now button should have a disabled state (dimmed, gray) until the $5 threshold is reached, then apply the 'glow_accent' and 'button_primary' styling.",
+    "Do not use the standard Shadcn UI aesthetic. Apply the custom borders, gold hover states, and dark mode background colors."
+  ]
+}
