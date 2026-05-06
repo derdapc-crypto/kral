@@ -3,6 +3,9 @@ import { Link } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { Cpu, Wallet, Plus, Smartphone, Zap, ArrowUpRight, ShieldCheck, Radio } from "lucide-react";
+import TGCCounter from "../components/TGCCounter";
+import PowerUpButton from "../components/PowerUpButton";
+import TierForecast from "../components/TierForecast";
 
 function StatCard({ label, value, suffix = "", testId }) {
   return (
@@ -58,7 +61,7 @@ export default function Dashboard() {
     setMsg("");
     try {
       const { data } = await api.post("/wallet/withdraw", { address: withdrawAddr || "TRC20-PENDING-ADDR" });
-      setMsg(`Withdrawal queued: ${data.amount_usdt.toFixed(4)} USDT → ${data.address.slice(0, 12)}…`);
+      setMsg(`Withdrawal queued: ${data.amount_tgc.toFixed(1)} TGC ($${data.amount_usdt.toFixed(2)} USDT) → ${data.address.slice(0, 12)}…`);
       setWithdrawAddr("");
       await loadAll();
       await refresh();
@@ -66,7 +69,7 @@ export default function Dashboard() {
   };
 
   const canWithdraw = wallet && wallet.can_withdraw;
-  const progress = wallet ? Math.min(100, (wallet.balance_usdt / wallet.withdraw_threshold) * 100) : 0;
+  const progress = wallet ? Math.min(100, ((wallet.tgc_balance ?? 0) / (wallet.withdraw_threshold_tgc || 200)) * 100) : 0;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] grid-bg">
@@ -88,32 +91,43 @@ export default function Dashboard() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-          <StatCard label="Balance USDT" value={wallet?.balance_usdt ?? 0} testId="stat-balance" />
-          <StatCard label="Total Earned" value={wallet?.total_earned ?? 0} testId="stat-earned" />
+          <StatCard label="Balance TGC" value={wallet?.tgc_balance ?? 0} testId="stat-balance" />
+          <StatCard label="Lifetime TGC" value={wallet?.tgc_total_earned ?? 0} testId="stat-earned" />
           <StatCard label="Your Devices" value={devices.length} testId="stat-devices" />
           <StatCard label="Network PetaFLOPS" value={stats.live_petaflops ?? 0} testId="stat-petaflops" />
         </div>
 
+        {/* Power-Up + Tier Forecast */}
+        <div className="grid lg:grid-cols-2 gap-6 mb-10">
+          <PowerUpButton onChange={loadAll} />
+          <TierForecast />
+        </div>
+
         {/* Wallet + Devices */}
         <div className="grid lg:grid-cols-[1.1fr_1fr] gap-6 mb-10">
-          {/* Wallet */}
+          {/* Wallet · TGC */}
           <div className="p-8 rounded-3xl glass-strong relative overflow-hidden">
             <div className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-[#D4AF37]/20 blur-3xl" />
             <div className="relative">
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-white/40">
-                <Wallet className="w-3.5 h-3.5" /> USDT TRC-20 Wallet
+                <Wallet className="w-3.5 h-3.5" /> TheGrid Coin Wallet · 1 TGC = $0.05
               </div>
               <div className="mt-5 flex items-baseline gap-3">
-                <div className="text-6xl font-display font-black gold-text font-mono-num">
-                  {(wallet?.balance_usdt ?? 0).toFixed(4)}
+                <div className="text-6xl font-display font-black gold-text">
+                  <TGCCounter value={wallet?.tgc_balance ?? 0} decimals={1} testId="dashboard-tgc-balance" />
                 </div>
-                <div className="text-white/50">USDT</div>
+                <div className="text-white/50">TGC</div>
+              </div>
+              <div className="text-xs text-white/50 mt-1" data-testid="dashboard-tgc-usdt-value">
+                ≈ ${(wallet?.tgc_balance_usdt_value ?? 0).toFixed(2)} USDT
               </div>
 
               <div className="mt-8">
                 <div className="flex justify-between text-xs text-white/50 mb-2">
                   <span>Withdrawal threshold</span>
-                  <span className="text-[#F2C94C]">${wallet?.withdraw_threshold?.toFixed(2) ?? "5.00"}</span>
+                  <span className="text-[#F2C94C]">
+                    {(wallet?.withdraw_threshold_tgc ?? 200).toFixed(0)} TGC · ${(wallet?.withdraw_threshold_usdt ?? 10).toFixed(2)}
+                  </span>
                 </div>
                 <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] transition-all" style={{ width: `${progress}%` }} />
@@ -136,7 +150,7 @@ export default function Dashboard() {
                       ? "bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black shadow-[0_0_40px_rgba(242,201,76,0.55)] hover:shadow-[0_0_60px_rgba(242,201,76,0.75)]"
                       : "bg-white/5 text-white/30 cursor-not-allowed"
                   }`}>
-                  Withdraw Now <ArrowUpRight className="w-4 h-4" />
+                  Withdraw TGC <ArrowUpRight className="w-4 h-4" />
                 </button>
               </div>
               {msg && <div className="mt-4 text-xs text-[#F2C94C]" data-testid="wallet-msg">{msg}</div>}
@@ -160,7 +174,11 @@ export default function Dashboard() {
                   </div>
                   <div className="text-right">
                     <div className={`text-xs font-semibold ${t.status === "verified" ? "text-[#F2C94C]" : "text-white/50"}`}>{t.status}</div>
-                    {t.earned_usdt > 0 && <div className="text-[10px] text-white/40">+{t.earned_usdt.toFixed(5)}</div>}
+                    {(t.earned_tgc > 0 || t.earned_usdt > 0) && (
+                      <div className="text-[10px] text-white/40">
+                        {t.earned_tgc > 0 ? `+${t.earned_tgc.toFixed(3)} TGC` : `+${t.earned_usdt.toFixed(5)}`}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

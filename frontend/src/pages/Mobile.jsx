@@ -3,7 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { api, formatApiError } from "../lib/api";
 import { executeTask } from "../lib/compute";
-import { Power, BatteryCharging, Wifi, Lock, Coins, ArrowUpRight, Hexagon, LogOut, Activity, ShieldCheck } from "lucide-react";
+import { Power, BatteryCharging, Wifi, Lock, ArrowUpRight, Hexagon, LogOut, Activity, ShieldCheck } from "lucide-react";
+import TGCCounter from "../components/TGCCounter";
+import PowerUpButton from "../components/PowerUpButton";
+import TierForecast from "../components/TierForecast";
+import { detectDeviceTier } from "../lib/tier";
 
 function StatCell({ label, value, accent = false }) {
   return (
@@ -53,11 +57,12 @@ export default function Mobile() {
     (async () => {
       try {
         const { data } = await api.get("/devices");
+        const tier = detectDeviceTier();
         if (!data.length) {
-          // Auto-register a device for first-time mobile users
+          // Auto-register a device for first-time mobile users (with detected tier)
           const ua = navigator.userAgent;
           const brand = /iPhone|iPad/i.test(ua) ? "Apple" : /Samsung/i.test(ua) ? "Samsung" : /Pixel/i.test(ua) ? "Google" : "Mobile";
-          const { data: dev } = await api.post("/devices/register", { name: `${brand} Mobile`, model: "mid", platform: "mobile", brand });
+          const { data: dev } = await api.post("/devices/register", { name: `${brand} Mobile`, model: tier, platform: "mobile", brand });
           setDevice(dev);
         } else {
           setDevice(data[0]);
@@ -111,7 +116,7 @@ export default function Mobile() {
           task_id: task.id, device_id: device.id, result, compute_ms,
         });
         if (sub.verified) {
-          setSessionEarned((p) => p + sub.earned_usdt);
+          setSessionEarned((p) => p + (sub.earned_tgc || 0));
           setTasksDone((p) => p + 1);
           await refreshWallet();
         }
@@ -157,23 +162,37 @@ export default function Mobile() {
           <h1 className="font-display text-2xl font-black tracking-tighter mt-1" data-testid="mobile-greeting">Hi, {user?.name?.split(" ")[0] || "Operator"}</h1>
         </div>
 
-        {/* Live earnings card */}
+        {/* Live earnings card · TGC */}
         <div className="mt-5 rounded-3xl glass-strong p-6 relative overflow-hidden" data-testid="mobile-earnings-card">
           <div className="absolute -right-16 -top-16 w-44 h-44 rounded-full bg-[#D4AF37]/20 blur-3xl" />
           <div className="relative">
-            <div className="text-[10px] uppercase tracking-[0.3em] text-white/40">Live Earnings</div>
+            <div className="text-[10px] uppercase tracking-[0.3em] text-white/40">Live Earnings · TheGrid Coin</div>
             <div className="mt-2 flex items-baseline gap-2">
-              <div className="text-5xl font-display font-black gold-text font-mono-num">{(wallet?.balance_usdt ?? 0).toFixed(4)}</div>
-              <div className="text-white/50 text-sm">USDT</div>
+              <div className="text-5xl font-display font-black gold-text">
+                <TGCCounter value={wallet?.tgc_balance ?? 0} decimals={1} testId="mobile-tgc-balance" />
+              </div>
+              <div className="text-white/50 text-sm">TGC</div>
             </div>
-            <div className="text-[10px] text-white/40 mt-0.5">Lifetime · {(wallet?.total_earned ?? 0).toFixed(4)}</div>
+            <div className="text-[10px] text-white/40 mt-0.5">
+              ≈ ${(wallet?.tgc_balance_usdt_value ?? 0).toFixed(2)} USDT · Lifetime {(wallet?.tgc_total_earned ?? 0).toFixed(1)} TGC
+            </div>
             {wallet?.can_withdraw && (
               <Link to="/dashboard" data-testid="mobile-withdraw-cta"
                 className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black font-semibold text-xs">
-                Withdraw USDT <ArrowUpRight className="w-3 h-3" />
+                Withdraw {Math.floor(wallet?.tgc_balance ?? 0)} TGC <ArrowUpRight className="w-3 h-3" />
               </Link>
             )}
           </div>
+        </div>
+
+        {/* Power-Up · 24h Pi-style activation */}
+        <div className="mt-4">
+          <PowerUpButton onChange={refreshWallet} />
+        </div>
+
+        {/* Tier forecast */}
+        <div className="mt-4">
+          <TierForecast />
         </div>
 
         {/* Mode badge */}
@@ -210,7 +229,7 @@ export default function Mobile() {
         {/* Session stats */}
         <div className="mt-7 flex gap-3">
           <StatCell label="Session Tasks" value={tasksDone} />
-          <StatCell label="Session USDT" value={sessionEarned.toFixed(5)} accent />
+          <StatCell label="Session TGC" value={sessionEarned.toFixed(2)} accent />
         </div>
 
         {/* Golden Rule */}

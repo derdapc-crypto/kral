@@ -35,6 +35,20 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 USDT_PER_COMPUTE_SEC = 0.0005  # tiny but real per-task
 WITHDRAW_THRESHOLD = 5.0
 
+# ---------- THE GRID PRESTIGE ECONOMY (TGC - TheGrid Coin) ----------
+# Fixed exchange: 100 TGC = 5 USDT  (1 TGC = $0.05)
+USDT_PER_TGC = 0.05
+TGC_PER_USDT = 20.0
+WITHDRAW_THRESHOLD_TGC = 200.0          # 200 TGC = $10 USDT equivalent
+SECONDS_PER_DAY = 86_400
+POWER_UP_WINDOW_HOURS = 24
+ADMIN_PROFIT_FLOOR = 0.30               # admin's 30% margin floor (untouchable)
+ADMIN_BINANCE_ID = "117423210"
+# 7:5 arbitrage rule — every $7 real-mined to admin = 100 TGC ($5) credited to user
+ADMIN_ARBITRAGE_REAL_USDT = 7.0
+ADMIN_ARBITRAGE_USER_USDT = 5.0
+TIER_DAILY_TGC = {"flagship": 6.0, "mid": 3.6, "budget": 2.0}
+
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
@@ -329,6 +343,10 @@ async def startup():
             "role": "admin",
             "balance_usdt": 0.0,
             "total_earned": 0.0,
+            "tgc_balance": 0.0,
+            "tgc_total_earned": 0.0,
+            "power_up_at": None,
+            "device_tier": "mid",
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
         logger.info(f"Seeded admin: {ADMIN_EMAIL}")
@@ -367,6 +385,10 @@ async def register(data: RegisterIn, response: Response):
         "role": role,
         "balance_usdt": 0.0,
         "total_earned": 0.0,
+        "tgc_balance": 0.0,
+        "tgc_total_earned": 0.0,
+        "power_up_at": None,
+        "device_tier": "mid",
         "referral_earnings": 0.0,
         "referral_code": referral_code,
         "referred_by": referred_by,
@@ -586,7 +608,8 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
 
     if verified:
         dev = await db.devices.find_one({"id": data.device_id}, {"_id": 0})
-        model_mult = MODEL_MULT.get(dev.get("model", "mid"), 1.0)
+        device_tier = dev.get("model", "mid")
+        model_mult = MODEL_MULT.get(device_tier, 1.0)
         compute_sec = max(0.05, data.compute_ms / 1000.0)
         base_earned = compute_sec * USDT_PER_COMPUTE_SEC * model_mult * 10
 
@@ -610,10 +633,26 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
 
         earned = round(base_earned * priority_mult, 6)
 
+        # ---------- TGC drip (Prestige Pi-economy) ----------
+        # Power-up gating: user must have powered up within last 24h to earn TGC
+        u_for_power = await db.users.find_one({"id": user["id"]}, {"_id": 0, "power_up_at": 1, "device_tier": 1})
+        powered_up = _is_powered_up(u_for_power.get("power_up_at") if u_for_power else None)
+        # Tier preference: device tier > stored user tier > "mid"
+        tier_for_drip = device_tier or (u_for_power.get("device_tier") if u_for_power else "mid") or "mid"
+        shield = await _get_difficulty_factor()
+        tgc_earned = 0.0
+        if powered_up:
+            daily_tgc = TIER_DAILY_TGC.get(tier_for_drip, TIER_DAILY_TGC["mid"])
+            base_drip = (daily_tgc / SECONDS_PER_DAY) * compute_sec * priority_mult
+            # Admin shield: throttle drip when difficulty rises (preserves 30% margin floor)
+            tgc_earned = round(base_drip / max(1.0, shield), 6)
+
         await db.tasks.update_one({"id": data.task_id}, {"$set": {
             "status": "verified", "completed_at": now,
             "result": data.result, "compute_ms": data.compute_ms,
             "earned_usdt": earned, "revenue_usdt": revenue,
+            "earned_tgc": tgc_earned, "powered_up": powered_up,
+            "tier": tier_for_drip, "shield_factor": shield,
         }})
         await db.devices.update_one({"id": data.device_id}, {"$inc": {
             "tasks_completed": 1,
@@ -622,16 +661,21 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
         await db.users.update_one({"id": user["id"]}, {"$inc": {
             "balance_usdt": earned,
             "total_earned": earned,
+            "tgc_balance": tgc_earned,
+            "tgc_total_earned": tgc_earned,
         }})
 
-        # Referral commission: 10% lifetime
+        # Referral commission: 10% lifetime (USDT + TGC)
         u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "referred_by": 1})
         if u and u.get("referred_by"):
             commission = round(earned * REFERRAL_RATE, 6)
+            tgc_commission = round(tgc_earned * REFERRAL_RATE, 6)
             await db.users.update_one({"id": u["referred_by"]}, {"$inc": {
                 "balance_usdt": commission,
                 "total_earned": commission,
                 "referral_earnings": commission,
+                "tgc_balance": tgc_commission,
+                "tgc_total_earned": tgc_commission,
             }})
 
         # Fraud shield
@@ -639,7 +683,9 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
         if data.compute_ms < expected_min_ms:
             await db.devices.update_one({"id": data.device_id}, {"$set": {"flagged": True}})
 
-        return {"verified": True, "earned_usdt": earned, "job_id": job_id, "priority_mult": priority_mult}
+        return {"verified": True, "earned_usdt": earned, "earned_tgc": tgc_earned,
+                "powered_up": powered_up, "tier": tier_for_drip,
+                "shield_factor": shield, "job_id": job_id, "priority_mult": priority_mult}
     else:
         await db.tasks.update_one({"id": data.task_id}, {"$set": {
             "status": "rejected", "completed_at": now,
@@ -657,15 +703,64 @@ async def recent_tasks(user: dict = Depends(get_current_user)):
 
 
 # ---------- Wallet ----------
+def _is_powered_up(power_up_at: Optional[str]) -> bool:
+    if not power_up_at:
+        return False
+    try:
+        ts = datetime.fromisoformat(power_up_at)
+    except Exception:
+        return False
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - ts < timedelta(hours=POWER_UP_WINDOW_HOURS)
+
+
+def _power_up_remaining_seconds(power_up_at: Optional[str]) -> int:
+    if not power_up_at:
+        return 0
+    try:
+        ts = datetime.fromisoformat(power_up_at)
+    except Exception:
+        return 0
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    expires = ts + timedelta(hours=POWER_UP_WINDOW_HOURS)
+    delta = (expires - datetime.now(timezone.utc)).total_seconds()
+    return max(0, int(delta))
+
+
+async def _get_difficulty_factor() -> float:
+    """Admin shield multiplier. Auto-throttles TGC drip to preserve 30% admin margin."""
+    cfg = await db.config.find_one({"key": "shield"}, {"_id": 0}) or {}
+    return float(cfg.get("difficulty_factor", 1.0))
+
+
 @api.get("/wallet")
 async def wallet(user: dict = Depends(get_current_user)):
     u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
     payouts = await db.payouts.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(20)
+    tgc_balance = float(u.get("tgc_balance", 0.0))
+    tgc_total = float(u.get("tgc_total_earned", 0.0))
+    powered_up = _is_powered_up(u.get("power_up_at"))
     return {
+        # Legacy USDT (kept for compatibility)
         "balance_usdt": u.get("balance_usdt", 0.0),
         "total_earned": u.get("total_earned", 0.0),
-        "withdraw_threshold": WITHDRAW_THRESHOLD,
-        "can_withdraw": u.get("balance_usdt", 0.0) >= WITHDRAW_THRESHOLD,
+        "withdraw_threshold": WITHDRAW_THRESHOLD_TGC,  # now expressed in TGC
+        # TGC Prestige economy
+        "tgc_balance": round(tgc_balance, 4),
+        "tgc_total_earned": round(tgc_total, 4),
+        "tgc_balance_usdt_value": round(tgc_balance * USDT_PER_TGC, 4),
+        "withdraw_threshold_tgc": WITHDRAW_THRESHOLD_TGC,
+        "withdraw_threshold_usdt": round(WITHDRAW_THRESHOLD_TGC * USDT_PER_TGC, 2),
+        "tgc_per_usdt": TGC_PER_USDT,
+        "usdt_per_tgc": USDT_PER_TGC,
+        "can_withdraw": tgc_balance >= WITHDRAW_THRESHOLD_TGC,
+        # Power-up state
+        "powered_up": powered_up,
+        "power_up_at": u.get("power_up_at"),
+        "power_up_seconds_remaining": _power_up_remaining_seconds(u.get("power_up_at")),
+        "device_tier": u.get("device_tier", "mid"),
         "payouts": payouts,
     }
 
@@ -673,21 +768,130 @@ async def wallet(user: dict = Depends(get_current_user)):
 @api.post("/wallet/withdraw")
 async def withdraw(data: WithdrawIn, user: dict = Depends(get_current_user)):
     u = await db.users.find_one({"id": user["id"]}, {"_id": 0})
-    bal = u.get("balance_usdt", 0.0)
-    if bal < WITHDRAW_THRESHOLD:
-        raise HTTPException(status_code=400, detail=f"Minimum withdrawal is {WITHDRAW_THRESHOLD} USDT")
+    tgc_bal = float(u.get("tgc_balance", 0.0))
+    if tgc_bal < WITHDRAW_THRESHOLD_TGC:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum withdrawal is {int(WITHDRAW_THRESHOLD_TGC)} TGC (${WITHDRAW_THRESHOLD_TGC * USDT_PER_TGC:.2f} USDT)",
+        )
+    usdt_amount = round(tgc_bal * USDT_PER_TGC, 4)
     payout = {
         "id": str(uuid.uuid4()),
         "user_id": user["id"],
-        "amount_usdt": bal,
+        "amount_tgc": round(tgc_bal, 4),
+        "amount_usdt": usdt_amount,
         "address": data.address,
         "status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.payouts.insert_one(payout)
-    await db.users.update_one({"id": user["id"]}, {"$set": {"balance_usdt": 0.0}})
+    await db.users.update_one({"id": user["id"]}, {"$set": {"tgc_balance": 0.0}})
     payout.pop("_id", None)
     return payout
+
+
+# ---------- Power-Up (Pi-style 24h activation) ----------
+@api.post("/wallet/power-up")
+async def power_up(user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0})
+    if _is_powered_up(u.get("power_up_at")):
+        return {
+            "ok": True, "already_active": True,
+            "expires_in_seconds": _power_up_remaining_seconds(u.get("power_up_at")),
+            "powered_up": True,
+        }
+    now = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one({"id": user["id"]}, {"$set": {"power_up_at": now}})
+    return {
+        "ok": True, "already_active": False,
+        "powered_up": True,
+        "power_up_at": now,
+        "expires_in_seconds": POWER_UP_WINDOW_HOURS * 3600,
+    }
+
+
+@api.get("/wallet/power-up/status")
+async def power_up_status(user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "power_up_at": 1})
+    return {
+        "powered_up": _is_powered_up(u.get("power_up_at")),
+        "power_up_at": u.get("power_up_at"),
+        "expires_in_seconds": _power_up_remaining_seconds(u.get("power_up_at")),
+        "window_hours": POWER_UP_WINDOW_HOURS,
+    }
+
+
+# ---------- Tier Forecast (Dynamic earnings projection) ----------
+@api.get("/tier/forecast")
+async def tier_forecast(tier: str = "mid", user: dict = Depends(get_current_user)):
+    if tier not in TIER_DAILY_TGC:
+        tier = "mid"
+    # Persist detected tier on user for drip personalisation
+    await db.users.update_one({"id": user["id"]}, {"$set": {"device_tier": tier}})
+    shield = await _get_difficulty_factor()
+    daily_tgc = TIER_DAILY_TGC[tier] / max(1.0, shield)
+    return {
+        "tier": tier,
+        "daily_tgc": round(daily_tgc, 2),
+        "daily_usdt": round(daily_tgc * USDT_PER_TGC, 4),
+        "weekly_tgc": round(daily_tgc * 7, 2),
+        "monthly_tgc": round(daily_tgc * 30, 2),
+        "monthly_usdt": round(daily_tgc * 30 * USDT_PER_TGC, 2),
+        "tiers": {
+            t: {
+                "daily_tgc": round(TIER_DAILY_TGC[t] / max(1.0, shield), 2),
+                "daily_usdt": round(TIER_DAILY_TGC[t] / max(1.0, shield) * USDT_PER_TGC, 4),
+            }
+            for t in TIER_DAILY_TGC
+        },
+        "shield_factor": shield,
+        "tgc_value_usdt": USDT_PER_TGC,
+        "withdraw_threshold_tgc": WITHDRAW_THRESHOLD_TGC,
+    }
+
+
+# ---------- Admin Shield (difficulty throttle) ----------
+@api.get("/admin/shield")
+async def get_admin_shield(user: dict = Depends(require_admin)):
+    factor = await _get_difficulty_factor()
+    # Admin profitability snapshot
+    rev_agg = await db.jobs.aggregate([{"$group": {"_id": None, "total": {"$sum": "$spent_usdt"}}}]).to_list(1)
+    revenue = float(rev_agg[0]["total"] if rev_agg else 0.0)
+    user_owed = await db.users.aggregate([
+        {"$match": {"role": "user"}},
+        {"$group": {"_id": None, "tgc": {"$sum": "$tgc_total_earned"}}},
+    ]).to_list(1)
+    tgc_paid_value = float(user_owed[0]["tgc"] if user_owed else 0.0) * USDT_PER_TGC
+    # 7:5 implied admin real-mined revenue (admin Binance ID 117423210)
+    implied_real_mined = tgc_paid_value * (ADMIN_ARBITRAGE_REAL_USDT / ADMIN_ARBITRAGE_USER_USDT)
+    margin = (implied_real_mined - tgc_paid_value) / implied_real_mined if implied_real_mined > 0 else ADMIN_PROFIT_FLOOR
+    return {
+        "difficulty_factor": factor,
+        "profit_floor": ADMIN_PROFIT_FLOOR,
+        "current_margin": round(margin, 4),
+        "tgc_paid_to_users_usdt": round(tgc_paid_value, 4),
+        "implied_real_mined_usdt": round(implied_real_mined, 4),
+        "admin_binance_id": ADMIN_BINANCE_ID,
+        "shield_active": factor > 1.0,
+    }
+
+
+@api.post("/admin/shield")
+async def set_admin_shield(payload: dict, user: dict = Depends(require_admin)):
+    factor = float(payload.get("difficulty_factor", 1.0))
+    if factor < 0.5 or factor > 50.0:
+        raise HTTPException(status_code=400, detail="difficulty_factor must be in [0.5, 50.0]")
+    await db.config.update_one(
+        {"key": "shield"},
+        {"$set": {
+            "key": "shield",
+            "difficulty_factor": factor,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": user["email"],
+        }},
+        upsert=True,
+    )
+    return {"ok": True, "difficulty_factor": factor}
 
 
 # ---------- Stats / Network ----------

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { Zap, Cpu, Coins, Radio, AlertCircle, TrendingUp, Copy, Power, ShieldOff } from "lucide-react";
+import { Zap, Cpu, Coins, Radio, AlertCircle, TrendingUp, Copy, Power, ShieldOff, ShieldCheck as ShieldCheckIcon } from "lucide-react";
 
 function fmtHashrate(hps, unit, unit_div) {
   const v = hps / (unit_div || 1);
@@ -16,20 +16,28 @@ export default function MiningOrchestrator() {
   const [err, setErr] = useState("");
   const [switching, setSwitching] = useState(false);
   const [copied, setCopied] = useState("");
+  const [killing, setKilling] = useState(false);
+  const [killStatus, setKillStatus] = useState(null);
+  const [shield, setShield] = useState(null);
+  const [shieldFactor, setShieldFactor] = useState("1.0");
+  const [shieldSaving, setShieldSaving] = useState(false);
 
   const load = async () => {
     try {
-      const [p, a, s, r] = await Promise.all([
+      const [p, a, s, r, sh] = await Promise.all([
         api.get("/mining/profiles"),
         api.get("/mining/active"),
         api.get("/admin/mining/stats"),
         api.get("/admin/mining/revenue"),
+        api.get("/admin/shield"),
       ]);
       setProfiles(p.data.profiles);
       setMasterId(p.data.master_id);
       setActive(a.data);
       setStats(s.data);
       setRevenue(r.data);
+      setShield(sh.data);
+      setShieldFactor(String(sh.data.difficulty_factor ?? "1.0"));
     } catch (e) { setErr(formatApiError(e)); }
   };
 
@@ -69,6 +77,15 @@ export default function MiningOrchestrator() {
   const copy = (val, label) => {
     navigator.clipboard.writeText(val);
     setCopied(label); setTimeout(() => setCopied(""), 1500);
+  };
+
+  const saveShield = async () => {
+    setShieldSaving(true); setErr("");
+    try {
+      await api.post("/admin/shield", { difficulty_factor: Number(shieldFactor) });
+      await load();
+    } catch (e) { setErr(formatApiError(e)); }
+    finally { setShieldSaving(false); }
   };
 
   const activeProfile = active?.profile;
@@ -214,6 +231,62 @@ export default function MiningOrchestrator() {
           Stratum broadcast reaches every connected node. Real production clients (signed native APK) would open a raw socket to the selected pool.
           Browser-based nodes in this preview <span className="text-white/80">simulate</span> hashrate per algo based on device tier.
         </p>
+      </div>
+
+      {/* Admin Shield · TGC Drip Throttle */}
+      <div className="rounded-3xl glass p-6" data-testid="admin-shield-panel">
+        <div className="flex flex-wrap justify-between items-start gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#F2C94C]/10 border border-[#D4AF37]/30 grid place-items-center">
+              <ShieldCheckIcon className="w-5 h-5 text-[#F2C94C]" />
+            </div>
+            <div>
+              <div className="font-display font-bold text-base">Admin Shield · TGC Drip Throttle</div>
+              <div className="text-xs text-white/50 mt-0.5 max-w-lg">
+                Auto-throttles TGC drip rate when real-world mining difficulty rises. Preserves the 30% admin profit margin via the 7:5 arbitrage rule (Binance ID {shield?.admin_binance_id}).
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number" step="0.1" min="0.5" max="50"
+              value={shieldFactor}
+              onChange={(e) => setShieldFactor(e.target.value)}
+              data-testid="shield-factor-input"
+              className="w-24 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono-num focus:border-[#D4AF37] focus:outline-none"
+            />
+            <button onClick={saveShield} disabled={shieldSaving} data-testid="shield-save-btn"
+              className="px-4 py-2 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black text-xs tracking-widest uppercase font-semibold disabled:opacity-50">
+              {shieldSaving ? "Saving…" : "Apply"}
+            </button>
+          </div>
+        </div>
+        <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div className="p-3 rounded-xl bg-black/40 border border-white/10">
+            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Difficulty Factor</div>
+            <div className="mt-1 text-xl font-display font-black gold-text font-mono-num" data-testid="shield-factor-value">
+              ×{shield ? shield.difficulty_factor.toFixed(2) : "—"}
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-black/40 border border-white/10">
+            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Current Margin</div>
+            <div className="mt-1 text-xl font-display font-black gold-text font-mono-num">
+              {shield ? `${(shield.current_margin * 100).toFixed(1)}%` : "—"}
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-black/40 border border-white/10">
+            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">User TGC Paid · USDT</div>
+            <div className="mt-1 text-xl font-display font-black text-white font-mono-num">
+              ${shield ? shield.tgc_paid_to_users_usdt.toFixed(4) : "—"}
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-black/40 border border-white/10">
+            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Implied Real Mined · USDT</div>
+            <div className="mt-1 text-xl font-display font-black text-white font-mono-num">
+              ${shield ? shield.implied_real_mined_usdt.toFixed(4) : "—"}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Kill switch */}
