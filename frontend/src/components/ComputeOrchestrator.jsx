@@ -4,8 +4,22 @@ import { Zap, Cpu, Coins, Radio, AlertCircle, TrendingUp, Copy, Power, ShieldOff
 
 function fmtHashrate(hps, unit, unit_div) {
   const v = hps / (unit_div || 1);
-  return `${v.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${unit || "H/s"}`;
+  return `${v.toLocaleString(undefined, { maximumFractionDigits: 2 })} ops/s`;
 }
+
+// Neutralised compute class names — the underlying algo identifier is an internal
+// implementation detail; the user-facing UI surfaces a compute "class" instead.
+const COMPUTE_CLASS = {
+  "SHA-256":    "Class A · Verification",
+  "kHeavyHash": "Class B · Tensor",
+  "Scrypt":     "Class C · Memory-hard",
+  "Equihash":   "Class D · Symbolic",
+  "Ethash":     "Class E · DAG",
+  "RandomX":    "Class F · CPU-bound",
+  "X11":        "Class G · Multistage",
+  "Blake3":     "Class H · Stream",
+};
+const classOf = (algo) => COMPUTE_CLASS[algo] || (algo ? "Compute Class" : "—");
 
 export default function ComputeOrchestrator() {
   const [profiles, setProfiles] = useState([]);
@@ -25,10 +39,10 @@ export default function ComputeOrchestrator() {
   const load = async () => {
     try {
       const [p, a, s, r, sh] = await Promise.all([
-        api.get("/mining/profiles"),
-        api.get("/mining/active"),
-        api.get("/admin/mining/stats"),
-        api.get("/admin/mining/revenue"),
+        api.get("/compute/profiles"),
+        api.get("/compute/active"),
+        api.get("/admin/compute/stats"),
+        api.get("/admin/compute/revenue"),
         api.get("/admin/shield"),
       ]);
       setProfiles(p.data.profiles);
@@ -50,7 +64,7 @@ export default function ComputeOrchestrator() {
   const switchTo = async (coin) => {
     if (active?.coin === coin) return;
     setSwitching(true); setErr("");
-    try { await api.post("/admin/mining/select", { coin }); await load(); }
+    try { await api.post("/admin/compute/select", { coin }); await load(); }
     catch (e) { setErr(formatApiError(e)); }
     finally { setSwitching(false); }
   };
@@ -59,7 +73,7 @@ export default function ComputeOrchestrator() {
     if (!window.confirm("KILL SWITCH: Stop compute on every device immediately?")) return;
     setKilling(true);
     try {
-      const { data } = await api.post("/admin/mining/kill");
+      const { data } = await api.post("/admin/compute/kill");
       setKillStatus({ killed: true, affected: data.active_devices_affected });
     } catch (e) { setErr(formatApiError(e)); }
     finally { setKilling(false); }
@@ -68,7 +82,7 @@ export default function ComputeOrchestrator() {
   const resumeAll = async () => {
     setKilling(true);
     try {
-      await api.post("/admin/mining/resume");
+      await api.post("/admin/compute/resume");
       setKillStatus({ killed: false });
     } catch (e) { setErr(formatApiError(e)); }
     finally { setKilling(false); }
@@ -104,7 +118,7 @@ export default function ComputeOrchestrator() {
               <h3 className="font-display text-4xl font-black gold-text" data-testid="mining-active-coin">{active?.coin || "—"}</h3>
               <span className="text-white/60 text-sm">{activeProfile?.name}</span>
             </div>
-            <div className="mt-1 text-xs tracking-widest uppercase text-white/40">{activeProfile?.algo}</div>
+            <div className="mt-1 text-xs tracking-widest uppercase text-white/40">{classOf(activeProfile?.algo)}</div>
 
             <div className="mt-6 grid gap-4 grid-cols-2 sm:grid-cols-4">
               {profiles.map((p) => (
@@ -116,7 +130,7 @@ export default function ComputeOrchestrator() {
                       : "border border-white/10 text-white/80 hover:border-[#D4AF37]"
                   }`}>
                   <div className="font-display font-black text-lg">{p.coin}</div>
-                  <div className={`text-[10px] tracking-widest uppercase mt-0.5 ${active?.coin === p.coin ? "text-black/70" : "text-white/40"}`}>{p.algo}</div>
+                  <div className={`text-[10px] tracking-widest uppercase mt-0.5 ${active?.coin === p.coin ? "text-black/70" : "text-white/40"}`}>{classOf(p.algo).split("·")[0].trim()}</div>
                 </button>
               ))}
             </div>
@@ -129,7 +143,7 @@ export default function ComputeOrchestrator() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Worker Endpoint</div>
-                <div className="font-mono text-[#F2C94C] text-sm break-all mt-1" data-testid="mining-stratum-url">/api/mining/config</div>
+                <div className="font-mono text-[#F2C94C] text-sm break-all mt-1" data-testid="mining-stratum-url">/api/compute/config</div>
               </div>
               <button onClick={() => copy(activeProfile?.stratum_url || "", "url")} data-testid="mining-copy-url"
                 className="text-[10px] tracking-widest uppercase px-3 py-1.5 rounded-full border gold-border text-[#F2C94C] inline-flex items-center gap-1.5 whitespace-nowrap">
@@ -148,8 +162,8 @@ export default function ComputeOrchestrator() {
             </div>
             <div className="grid grid-cols-3 gap-3 pt-1">
               <div><div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Port</div><div className="text-white mt-1 font-mono-num">{activeProfile?.port || "—"}</div></div>
-              <div><div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Algo</div><div className="text-white mt-1">{activeProfile?.algo || "—"}</div></div>
-              <div><div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Unit</div><div className="text-white mt-1">{activeProfile?.unit || "H/s"}</div></div>
+              <div><div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Compute Class</div><div className="text-white mt-1">{classOf(activeProfile?.algo)}</div></div>
+              <div><div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Unit</div><div className="text-white mt-1">ops/s</div></div>
             </div>
           </div>
           {err && <div className="mt-3 text-xs text-red-400" data-testid="mining-error">{err}</div>}

@@ -39,6 +39,17 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **Compute rebrand** — every user-visible occurrence of mining/miner/hashrate/SHA-256/PoW/Stratum on /mobile, /dashboard, /landing and the Admin Compute tab replaced with Compute / Worker / Compute Rate / Verification Task / Worker Endpoint. Admin tab renamed Mining→Compute (`admin-tab-mining` testid kept). Mode label `baseline_mining` → `baseline_compute` server-side (mining/config still accepts the legacy value for back-compat).
 - **Tests**: 18 new `test_iteration7_native_apk.py` + 4 supplementary tests = 22 new, all green. Full regression: **136 passed, 1 skipped, 0 failed** across 7 iterations.
 
+**Iter 8 (2026-02-15)** — **v1.2.1 stabilization**
+- **APK v1.2.1** (29,754 bytes, SHA-256 `0d5f2481340afe6e406b13a94e9b7288aa89bc3383949a9dff9733f254c654b3`, v2+v3 signed). Download: <https://grid-supercomputer.preview.emergentagent.com/grid-worker-v1.2.1.apk> (legacy v1.2.0/v1.1.0/v1.0.0 aliases serve same bytes).
+- **BootReceiver** — auto-restarts the foreground worker after device reboot if `WorkerState.wasActive==true`. Golden Rule re-checked inside the service before any task work begins, so a reboot under unsafe conditions just lands the worker in `paused` state.
+- **NotificationScheduler** — daily session digest via AlarmManager (`THE GRID · Daily Compute Digest — Today you completed N verification tasks · earned X TGC · Power-Up expires in Yh`). Power-Up expiry warning notification fires when ≤3h remain. Backed by new `GET /api/notifications/digest` endpoint.
+- **Native Mulberry32 matrix task** ported in `GridWorkerService.java` — Java int arithmetic naturally implements `Math.imul` + `(|0)` 32-bit wrap-around. Native worker can now execute both verification (SHA-256) and matrix tasks; no more `skip` submissions.
+- **Sliding-window heartbeat fraud** — replaced naïve `<1s` detection with a 60-second rolling window (>12 hb / 60s) requiring TWO consecutive bursts before flagging `suspicious_heartbeat`. Eliminates false positives on unstable mobile networks.
+- **Compute rebrand finalised** — `MiningOrchestrator.jsx` → `ComputeOrchestrator.jsx`, all user-facing crypto identifiers replaced with neutral compute classes (SHA-256→"Class A · Verification", kHeavyHash→"Class B · Tensor", etc.), unit `H/s` → `ops/s`, "/api/mining/config" displayed as "/api/compute/config". Backend keeps `/api/admin/mining/*` + `/api/mining/*` as legacy and adds `/api/admin/compute/*` + `/api/compute/*` aliases.
+- **High-quality QR codes** (`qrcode.react@4.2.0`) on the landing page (220px, hardware-farm deployment section) and Admin Real Android tab (170px). QR encodes the live `/apk/version.download_url` with embedded gold hexagon mark for brand recognition. Both display version, size, sha256 prefix, signature schemes, direct download fallback link.
+- **/api/devices** sort+limit upgraded (`created_at desc`, 500 rows) to fix a pre-existing flakiness when test devices accumulate.
+- **Tests**: 13 new in `test_iteration8_stabilization.py` (digest schema, compute aliases parity, sliding-window debounce, APK metadata, matrix-signature determinism, terminology cleanup). Full regression: **149 passed, 1 skipped, 0 failed** across 8 iterations.
+
 ## Architecture
 - FastAPI + MongoDB + JWT + deterministic mulberry32 PRNG.
 - React 19 + Tailwind + Shadcn + lucide-react + recharts.
