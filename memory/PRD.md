@@ -17,6 +17,14 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - Admin Shield (`/api/admin/shield` GET/POST) — difficulty_factor (Pydantic-validated [0.5, 50.0]) auto-throttles TGC drip. Dashboard shows current_margin = 1 - 5/(7·factor), suggested_difficulty_factor = 1.0204 to hit the 30% profit floor, and a "below floor" UI warning.
 - P0 fix — restored missing `useState` hooks (`killing`, `killStatus`, `shield`, `shieldFactor`, `shieldSaving`) in `MiningOrchestrator.jsx`; Kill Switch + Resume buttons no longer crash the React tree.
 
+**Iter 7 (2026-02-15)** — **Real signed Android APK**
+- Built a **real, installable** signed Android APK from scratch on the arm64 sandbox using only Debian-native arm64 tooling (`aapt`, `apksigner`, `zipalign`, `javac`) plus Google's pure-Java `d8.jar` for DEX compilation. No x86_64 emulation required.
+- APK is a thin Kotlin/Java WebView shell (`io.thegrid.worker.MainActivity`) that loads `https://grid-supercomputer.preview.emergentagent.com/mobile` — the existing /mobile React PWA already implements login, heartbeat, task fetch+execute+submit, TGC counter, Power-Up, Tier Forecast.
+- File: `/app/frontend/public/grid-worker-v1.1.0.apk` (alias `grid-worker-v1.0.0.apk` for legacy links).
+- Size: **17,466 bytes**. SHA-256: `81ff3b78a00781b42aff0b5d1ae53bf29441d6a9ae26e95acac7f12011beb13a`. Signed with **APK Signature Scheme v2 + v3** (`apksigner verify` ✓). minSdk 24 / targetSdk 34.
+- Backend `/api/apk/version` updated to advertise version, size, sha256, signature_schemes, signed=true. Landing page banner + modal now show real metadata; download link points to the new file.
+- Build pipeline + reproducible commands documented in `/app/android-client/README.md`.
+
 ## Architecture
 - FastAPI + MongoDB + JWT + deterministic mulberry32 PRNG.
 - React 19 + Tailwind + Shadcn + lucide-react + recharts.

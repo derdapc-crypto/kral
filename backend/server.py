@@ -196,9 +196,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.0.2"
-APK_PATH = "/grid-worker-v1.0.0.apk"
-APK_RELEASE_NOTES = "Stability fixes · arm64-v8a + armeabi-v7a · Auto-update"
+APK_VERSION = "1.1.0"
+APK_PATH = "/grid-worker-v1.1.0.apk"
+APK_RELEASE_NOTES = "Real signed Android APK · WebView wrapper for /mobile · v2+v3 signed · arm64-v8a + armeabi-v7a"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -1108,12 +1108,15 @@ async def apk_version():
     return {
         "version": APK_VERSION,
         "download_url": APK_PATH,
-        "min_android": "8.0",
-        "min_sdk": 26,
-        "abi": ["arm64-v8a", "armeabi-v7a"],
+        "min_android": "7.0",
+        "min_sdk": 24,
+        "abi": ["arm64-v8a", "armeabi-v7a", "x86_64", "x86"],
         "release_notes": APK_RELEASE_NOTES,
         "released_at": "2026-02-15",
-        "signed": False,  # MOCKED — real signing infra not available in sandbox
+        "size_bytes": 17466,
+        "sha256": "81ff3b78a00781b42aff0b5d1ae53bf29441d6a9ae26e95acac7f12011beb13a",
+        "signature_schemes": ["v2", "v3"],
+        "signed": True,
     }
 
 

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Hexagon mark in cyber-gold on obsidian black -->
+    <path
+        android:fillColor="#F2C94C"
+        android:pathData="M54,30 L74,42 L74,66 L54,78 L34,66 L34,42 Z" />
+    <path
+        android:fillColor="#070707"
+        android:pathData="M54,42 L62,46.6 L62,55.8 L54,60.4 L46,55.8 L46,46.6 Z" />
+</vector>
