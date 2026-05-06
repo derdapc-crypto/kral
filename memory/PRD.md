@@ -8,6 +8,15 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 **Iter 4**: Omni-Mining Orchestrator (8 Binance Pool profiles), admin coin selector, stratum broadcast, master worker ID, per-algorithm aggregate hashrate + revenue estimator.
 **Iter 5**: Bank-grade `/mobile` PWA, mining-config mode routing (`enterprise_job` / `baseline_mining` / `idle`), 5s polling cadence, geo-aware heartbeat, **Global Kill-Switch**, **WebSocket admin telemetry**, Android Studio source files (Manifest + Gradle).
 
+**Iter 6 (2026-02-15)** — **Prestige Pi-Economy & Tier Arbitrage**
+- TGC tokenomics (TheGrid Coin) — 100 TGC = $5 USDT (1 TGC = $0.05); maintained 7:5 arbitrage rule against admin Binance ID 117423210.
+- Dynamic Tier Forecasting — `/api/tier/forecast?tier=…` returns daily 6.0/3.6/2.0 TGC for flagship/mid/budget; UI auto-detects tier via `navigator.deviceMemory` + `hardwareConcurrency` + UA heuristics.
+- Pi-style 24h Power-Up — `POST /api/wallet/power-up` + `GET /api/wallet/power-up/status`; TGC drip ONLY accrues when `power_up_at` is within 24h window. Live countdown with progress bar.
+- Slow-tick TGC counter (`<TGCCounter />`) — RAF-driven ease-out animation, 1-decimal display ("1.0 → 1.1 → 1.2") emphasising per-unit value.
+- Withdrawal threshold — 200 TGC ($10 USDT). Wallet exposes `tgc_balance`, `tgc_balance_usdt_value`, `withdraw_threshold_tgc`, `withdraw_threshold_usdt`, `tgc_per_usdt`, `usdt_per_tgc`, `powered_up`, `power_up_seconds_remaining`, `device_tier`.
+- Admin Shield (`/api/admin/shield` GET/POST) — difficulty_factor (Pydantic-validated [0.5, 50.0]) auto-throttles TGC drip. Dashboard shows current_margin = 1 - 5/(7·factor), suggested_difficulty_factor = 1.0204 to hit the 30% profit floor, and a "below floor" UI warning.
+- P0 fix — restored missing `useState` hooks (`killing`, `killStatus`, `shield`, `shieldFactor`, `shieldSaving`) in `MiningOrchestrator.jsx`; Kill Switch + Resume buttons no longer crash the React tree.
+
 ## Architecture
 - FastAPI + MongoDB + JWT + deterministic mulberry32 PRNG.
 - React 19 + Tailwind + Shadcn + lucide-react + recharts.
@@ -71,5 +80,5 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - Native mobile worker (Kotlin/RN/Flutter) — Manifest+Gradle scaffolding shipped.
 
 ## Test Status
-- Backend: **102 / 103 collected, 0 failures, 1 intentional skip** across 5 test files (iter 1: 21, iter 2: 20, iter 3: 26, iter 4: 22, iter 5: 13).
-- Frontend: e2e screenshot validated — `/mobile` at 412×869 viewport showing greeting, live earnings, mode badge `AI / ENTERPRISE · EQUIHASH`, START button, Golden Rule toggles, device card with worker ID. Admin Mining tab with kill-switch + resume controls.
+- Backend: **115 / 116 collected, 0 failures, 1 intentional skip** across 6 test files (iter 1: 21, iter 2: 20, iter 3: 26, iter 4: 22, iter 5: 13, iter 6: 13 TGC suite).
+- Frontend: testing-agent iteration 6 — Mining tab loads without crash; Kill/Resume verified (P0 fixed); Admin Shield panel applies factor + reflects margin; Dashboard + /mobile show TGC counter, Power-Up card, Tier Forecast (flagship/mid/budget bars).

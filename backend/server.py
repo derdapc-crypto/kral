@@ -850,25 +850,34 @@ async def tier_forecast(tier: str = "mid", user: dict = Depends(get_current_user
     }
 
 
+class ShieldUpdateIn(BaseModel):
+    difficulty_factor: float = Field(ge=0.5, le=50.0)
+
+
 # ---------- Admin Shield (difficulty throttle) ----------
 @api.get("/admin/shield")
 async def get_admin_shield(user: dict = Depends(require_admin)):
     factor = await _get_difficulty_factor()
-    # Admin profitability snapshot
-    rev_agg = await db.jobs.aggregate([{"$group": {"_id": None, "total": {"$sum": "$spent_usdt"}}}]).to_list(1)
-    revenue = float(rev_agg[0]["total"] if rev_agg else 0.0)
+    # Worker TGC paid (USDT-equivalent) — exclude admin role from the aggregation
     user_owed = await db.users.aggregate([
-        {"$match": {"role": "user"}},
+        {"$match": {"role": {"$ne": "admin"}}},
         {"$group": {"_id": None, "tgc": {"$sum": "$tgc_total_earned"}}},
     ]).to_list(1)
     tgc_paid_value = float(user_owed[0]["tgc"] if user_owed else 0.0) * USDT_PER_TGC
-    # 7:5 implied admin real-mined revenue (admin Binance ID 117423210)
-    implied_real_mined = tgc_paid_value * (ADMIN_ARBITRAGE_REAL_USDT / ADMIN_ARBITRAGE_USER_USDT)
-    margin = (implied_real_mined - tgc_paid_value) / implied_real_mined if implied_real_mined > 0 else ADMIN_PROFIT_FLOOR
+    # 7:5 arbitrage rule × shield: factor > 1 throttles drip, widening admin margin.
+    # implied_real_mined = paid * (7/5) * factor   →   margin = 1 - 5/(7·factor)
+    implied_real_mined = tgc_paid_value * (ADMIN_ARBITRAGE_REAL_USDT / ADMIN_ARBITRAGE_USER_USDT) * factor
+    base_margin = 1.0 - (ADMIN_ARBITRAGE_USER_USDT / (ADMIN_ARBITRAGE_REAL_USDT * factor))
+    margin = round(base_margin, 4)
+    margin_below_floor = margin < ADMIN_PROFIT_FLOOR
+    # Suggested factor to hit the profit floor exactly: 5 / (7 · (1-floor))
+    suggested_factor = round(ADMIN_ARBITRAGE_USER_USDT / (ADMIN_ARBITRAGE_REAL_USDT * (1.0 - ADMIN_PROFIT_FLOOR)), 4)
     return {
         "difficulty_factor": factor,
         "profit_floor": ADMIN_PROFIT_FLOOR,
-        "current_margin": round(margin, 4),
+        "current_margin": margin,
+        "margin_below_floor": margin_below_floor,
+        "suggested_difficulty_factor": suggested_factor,
         "tgc_paid_to_users_usdt": round(tgc_paid_value, 4),
         "implied_real_mined_usdt": round(implied_real_mined, 4),
         "admin_binance_id": ADMIN_BINANCE_ID,
@@ -877,10 +886,8 @@ async def get_admin_shield(user: dict = Depends(require_admin)):
 
 
 @api.post("/admin/shield")
-async def set_admin_shield(payload: dict, user: dict = Depends(require_admin)):
-    factor = float(payload.get("difficulty_factor", 1.0))
-    if factor < 0.5 or factor > 50.0:
-        raise HTTPException(status_code=400, detail="difficulty_factor must be in [0.5, 50.0]")
+async def set_admin_shield(payload: ShieldUpdateIn, user: dict = Depends(require_admin)):
+    factor = float(payload.difficulty_factor)
     await db.config.update_one(
         {"key": "shield"},
         {"$set": {

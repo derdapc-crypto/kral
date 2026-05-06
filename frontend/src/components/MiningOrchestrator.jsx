@@ -249,7 +249,7 @@ export default function MiningOrchestrator() {
           </div>
           <div className="flex items-center gap-2">
             <input
-              type="number" step="0.1" min="0.5" max="50"
+              type="number" step="0.01" min="0.5" max="50"
               value={shieldFactor}
               onChange={(e) => setShieldFactor(e.target.value)}
               data-testid="shield-factor-input"
@@ -259,6 +259,13 @@ export default function MiningOrchestrator() {
               className="px-4 py-2 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black text-xs tracking-widest uppercase font-semibold disabled:opacity-50">
               {shieldSaving ? "Saving…" : "Apply"}
             </button>
+            {shield?.margin_below_floor && shield?.suggested_difficulty_factor && (
+              <button onClick={() => { setShieldFactor(String(shield.suggested_difficulty_factor)); }}
+                data-testid="shield-suggest-btn"
+                className="px-3 py-2 rounded-full border border-red-400/40 text-red-300 text-[10px] tracking-widest uppercase font-semibold">
+                Use ×{shield.suggested_difficulty_factor.toFixed(2)}
+              </button>
+            )}
           </div>
         </div>
         <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
@@ -270,8 +277,10 @@ export default function MiningOrchestrator() {
           </div>
           <div className="p-3 rounded-xl bg-black/40 border border-white/10">
             <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Current Margin</div>
-            <div className="mt-1 text-xl font-display font-black gold-text font-mono-num">
+            <div className={`mt-1 text-xl font-display font-black font-mono-num ${shield?.margin_below_floor ? "text-red-400" : "gold-text"}`}
+                 data-testid="shield-margin-value">
               {shield ? `${(shield.current_margin * 100).toFixed(1)}%` : "—"}
+              {shield?.margin_below_floor && <span className="ml-2 text-[10px] uppercase tracking-widest text-red-400/80">below floor</span>}
             </div>
           </div>
           <div className="p-3 rounded-xl bg-black/40 border border-white/10">

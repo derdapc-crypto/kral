@@ -320,9 +320,16 @@ class TestWallet:
         assert r.status_code == 200
         w = r.json()
         for k in ("balance_usdt", "total_earned", "withdraw_threshold",
-                  "can_withdraw", "payouts"):
-            assert k in w
-        assert w["withdraw_threshold"] == 5.0
+                  "can_withdraw", "payouts",
+                  "tgc_balance", "tgc_total_earned", "withdraw_threshold_tgc",
+                  "withdraw_threshold_usdt", "tgc_per_usdt", "usdt_per_tgc",
+                  "powered_up", "device_tier"):
+            assert k in w, f"missing wallet key: {k}"
+        # Prestige TGC economy: 200 TGC = $10 USDT minimum withdrawal
+        assert w["withdraw_threshold_tgc"] == 200.0
+        assert w["withdraw_threshold_usdt"] == 10.0
+        assert w["usdt_per_tgc"] == 0.05
+        assert w["tgc_per_usdt"] == 20.0
 
     def test_withdraw_below_threshold(self, user_token):
         r = requests.post(f"{API}/wallet/withdraw",
