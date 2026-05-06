@@ -131,15 +131,32 @@ export default function Mobile() {
     setErr("");
     const eligible = charging && wifi && permission && !!device;
     if (!eligible) { setErr("Enable Charging, Wi-Fi, Permission first."); return; }
-    if (running) { runningRef.current = false; setRunning(false); return; }
-    runningRef.current = true; setRunning(true); runLoop();
+    if (running) {
+      runningRef.current = false;
+      setRunning(false);
+      // Native APK: also stop the foreground service
+      try { window.GridNative && window.GridNative.stopWorker && window.GridNative.stopWorker(); } catch {}
+      try { api.post("/worker/stop", { device_id: device.id }); } catch {}
+      return;
+    }
+    runningRef.current = true; setRunning(true);
+    // Native APK: hand off to the foreground service so work continues when backgrounded
+    try {
+      if (window.GridNative && window.GridNative.startWorker) {
+        const token = localStorage.getItem("grid_token") || "";
+        window.GridNative.startWorker(device.id, token);
+      }
+    } catch {}
+    try { api.post("/worker/start", { device_id: device.id }); } catch {}
+    runLoop();
   };
 
   useEffect(() => () => { runningRef.current = false; }, []);
 
   const eligible = charging && wifi && permission && !!device;
   const mode = miningCfg?.mode || "idle";
-  const modeBadge = mode === "enterprise_job" ? "AI / ENTERPRISE" : mode === "baseline_mining" ? `MINING ${miningCfg?.coin}` : "STANDBY";
+  const modeBadge = mode === "enterprise_job" ? "AI / ENTERPRISE" : (mode === "baseline_compute" || mode === "baseline_mining") ? "BASELINE COMPUTE" : "STANDBY";
+  const isNativeAPK = typeof window !== "undefined" && (window.__GRID_NATIVE__ === true || (window.GridNative && typeof window.GridNative.isWorkerActive === "function"));
 
   return (
     <div className="min-h-screen grid-bg pb-20" data-testid="mobile-screen">
@@ -148,6 +165,11 @@ export default function Mobile() {
         <div className="flex items-center gap-2">
           <Hexagon className="w-6 h-6 text-[#D4AF37]" />
           <div className="font-display font-black text-base">THE <span className="gold-text">GRID</span></div>
+          {isNativeAPK && (
+            <span data-testid="native-apk-badge" className="ml-2 px-2 py-0.5 rounded-full text-[9px] tracking-widest uppercase border border-[#F2C94C]/40 text-[#F2C94C] bg-[#F2C94C]/10">
+              Native APK · Bg-safe
+            </span>
+          )}
         </div>
         <button onClick={async () => { await logout(); nav("/"); }} data-testid="mobile-logout"
           className="p-2 rounded-full border border-white/10 text-white/60">
@@ -218,12 +240,12 @@ export default function Mobile() {
             <div className="flex flex-col items-center">
               <Power className="w-14 h-14" strokeWidth={1.6} />
               <span className="mt-2 font-display font-black text-base tracking-[0.25em]">
-                {running ? "EARNING" : "START EARNING"}
+                {running ? "COMPUTING" : "START COMPUTE"}
               </span>
             </div>
           </button>
           {err && <div className="mt-3 text-xs text-red-400" data-testid="mobile-err">{err}</div>}
-          {!err && !running && eligible && <div className="mt-3 text-[10px] tracking-[0.3em] uppercase text-white/40">Tap to connect to the grid</div>}
+          {!err && !running && eligible && <div className="mt-3 text-[10px] tracking-[0.3em] uppercase text-white/40">Tap to contribute compute</div>}
         </div>
 
         {/* Session stats */}

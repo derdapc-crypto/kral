@@ -67,13 +67,13 @@ export default function ApkSetupModal({ open, onClose }) {
           )}
 
           <a
-            href={meta?.download_url || "/grid-worker-v1.1.0.apk"}
-            download={`grid-worker-v${meta?.version || "1.1.0"}.apk`}
+            href={meta?.download_url || "/grid-worker-v1.2.0.apk"}
+            download={`grid-worker-v${meta?.version || "1.2.0"}.apk`}
             onClick={onDownload}
             data-testid="apk-download-btn"
             className="mt-6 w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black font-semibold text-sm hover:shadow-[0_0_40px_rgba(242,201,76,0.6)] transition-shadow"
           >
-            <Download className="w-4 h-4" /> Download grid-worker-v{meta?.version || "1.1.0"}.apk
+            <Download className="w-4 h-4" /> Download grid-worker-v{meta?.version || "1.2.0"}.apk
           </a>
           <div className="mt-4 flex justify-center gap-6 text-[10px] uppercase tracking-[0.25em] text-white/40">
             <span className="flex items-center gap-1.5"><BatteryCharging className="w-3 h-3" /> Charging only</span>

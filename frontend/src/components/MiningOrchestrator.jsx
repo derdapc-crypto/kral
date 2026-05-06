@@ -56,7 +56,7 @@ export default function MiningOrchestrator() {
   };
 
   const killAll = async () => {
-    if (!window.confirm("KILL SWITCH: Stop mining on every device immediately?")) return;
+    if (!window.confirm("KILL SWITCH: Stop compute on every device immediately?")) return;
     setKilling(true);
     try {
       const { data } = await api.post("/admin/mining/kill");
@@ -98,7 +98,7 @@ export default function MiningOrchestrator() {
           <div className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-[#D4AF37]/20 blur-3xl" />
           <div className="relative">
             <div className="text-[10px] uppercase tracking-[0.3em] text-[#F2C94C] flex items-center gap-1.5">
-              <Coins className="w-3 h-3" /> Active Network Mining Goal
+              <Coins className="w-3 h-3" /> Compute Pool · Active Reward Goal
             </div>
             <div className="mt-2 flex items-baseline gap-3">
               <h3 className="font-display text-4xl font-black gold-text" data-testid="mining-active-coin">{active?.coin || "—"}</h3>
@@ -124,12 +124,12 @@ export default function MiningOrchestrator() {
         </div>
 
         <div className="rounded-3xl glass p-6">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-white/40">/ stratum broadcast · live</div>
+          <div className="text-[10px] uppercase tracking-[0.3em] text-white/40">/ pool broadcast · live</div>
           <div className="mt-3 p-4 rounded-2xl bg-black/60 border border-white/10 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Stratum URL</div>
-                <div className="font-mono text-[#F2C94C] text-sm break-all mt-1" data-testid="mining-stratum-url">{activeProfile?.stratum_url || "—"}</div>
+                <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Worker Endpoint</div>
+                <div className="font-mono text-[#F2C94C] text-sm break-all mt-1" data-testid="mining-stratum-url">/api/mining/config</div>
               </div>
               <button onClick={() => copy(activeProfile?.stratum_url || "", "url")} data-testid="mining-copy-url"
                 className="text-[10px] tracking-widest uppercase px-3 py-1.5 rounded-full border gold-border text-[#F2C94C] inline-flex items-center gap-1.5 whitespace-nowrap">
@@ -160,20 +160,20 @@ export default function MiningOrchestrator() {
       <div className="grid md:grid-cols-4 gap-4">
         <div className="p-6 rounded-2xl glass" data-testid="mining-stat-nodes">
           <div className="flex items-center justify-between">
-            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Active Miners</div>
+            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Active Workers</div>
             <Radio className="w-4 h-4 text-[#F2C94C]" />
           </div>
           <div className="mt-3 text-3xl font-display font-black gold-text font-mono-num">{stats?.active_nodes ?? 0}</div>
         </div>
         <div className="p-6 rounded-2xl glass-strong col-span-2" data-testid="mining-stat-hashrate">
           <div className="flex items-center justify-between">
-            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Aggregate Hashrate · {active?.coin}</div>
+            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Aggregate Compute Rate</div>
             <Zap className="w-4 h-4 text-[#F2C94C]" />
           </div>
           <div className="mt-3 text-4xl font-display font-black gold-text font-mono-num">
             {stats ? fmtHashrate(stats.total_hashrate_hps, stats.unit, stats.unit_div) : "—"}
           </div>
-          <div className="text-[10px] mt-1 text-white/40">from {stats?.contributing_nodes || 0} contributing nodes</div>
+          <div className="text-[10px] mt-1 text-white/40">from {stats?.contributing_nodes || 0} contributing workers</div>
         </div>
         <div className="p-6 rounded-2xl glass" data-testid="mining-stat-revenue">
           <div className="flex items-center justify-between">
@@ -190,18 +190,18 @@ export default function MiningOrchestrator() {
       {/* Per-device */}
       <div className="rounded-3xl glass p-6">
         <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 mb-3 flex items-center gap-2">
-          <Cpu className="w-3 h-3 text-[#F2C94C]" /> Node-level Mining Speed · {active?.coin}
+          <Cpu className="w-3 h-3 text-[#F2C94C]" /> Worker-level Compute Rate
         </div>
         <div className="overflow-auto">
           <table className="w-full text-sm" data-testid="mining-devices-table">
             <thead>
               <tr className="text-left text-[10px] uppercase tracking-[0.25em] text-white/40 border-b border-white/5">
-                <th className="py-3">Device</th><th>Tier</th><th>Hashrate</th><th>Algo</th><th>Thermal</th>
+                <th className="py-3">Device</th><th>Tier</th><th>Compute Rate</th><th>Mode</th><th>Thermal</th>
               </tr>
             </thead>
             <tbody>
               {(stats?.devices || []).length === 0 && (
-                <tr><td colSpan={5} className="text-center py-10 text-white/40">No active nodes — waiting for heartbeats.</td></tr>
+                <tr><td colSpan={5} className="text-center py-10 text-white/40">No active workers — waiting for heartbeats.</td></tr>
               )}
               {(stats?.devices || []).map((d) => {
                 // Fallback: estimate if device hasn't reported
@@ -215,7 +215,7 @@ export default function MiningOrchestrator() {
                     </td>
                     <td className="uppercase text-xs text-white/60">{d.model}</td>
                     <td className="font-mono-num text-[#F2C94C]">{fmtHashrate(hr, stats?.unit, stats?.unit_div)}</td>
-                    <td className="text-xs text-white/70">{d.algo || activeProfile?.algo || "—"}</td>
+                    <td className="text-xs text-white/70">{d.current_mode === "enterprise_job" ? "AI / Enterprise" : "Verification"}</td>
                     <td className="text-xs text-white/60 uppercase tracking-widest">{d.thermal || "nominal"}</td>
                   </tr>
                 );
@@ -228,8 +228,8 @@ export default function MiningOrchestrator() {
       <div className="flex items-start gap-2 p-3 rounded-xl border border-white/10 bg-white/[0.02]">
         <AlertCircle className="w-4 h-4 text-white/40 flex-shrink-0 mt-0.5" />
         <p className="text-xs text-white/50 leading-relaxed">
-          Stratum broadcast reaches every connected node. Real production clients (signed native APK) would open a raw socket to the selected pool.
-          Browser-based nodes in this preview <span className="text-white/80">simulate</span> hashrate per algo based on device tier.
+          Pool broadcast reaches every connected worker. Native Android clients run verification tasks on-device.
+          Browser-based workers in this preview <span className="text-white/80">simulate</span> compute rate based on device tier.
         </p>
       </div>
 
@@ -243,7 +243,7 @@ export default function MiningOrchestrator() {
             <div>
               <div className="font-display font-bold text-base">Admin Shield · TGC Drip Throttle</div>
               <div className="text-xs text-white/50 mt-0.5 max-w-lg">
-                Auto-throttles TGC drip rate when real-world mining difficulty rises. Preserves the 30% admin profit margin via the 7:5 arbitrage rule (Binance ID {shield?.admin_binance_id}).
+                Auto-throttles TGC drip rate when verification difficulty rises. Preserves the 30% admin profit margin via the 7:5 arbitrage rule (Pool ID {shield?.admin_binance_id}).
               </div>
             </div>
           </div>
@@ -305,13 +305,13 @@ export default function MiningOrchestrator() {
             <ShieldOff className={`w-5 h-5 ${killStatus?.killed ? "text-red-400" : "text-white/50"}`} />
             <div>
               <div className="font-display font-bold text-base">Global Kill Switch</div>
-              <div className="text-xs text-white/50 mt-0.5">Halts mining on all devices on next 5s poll. Enterprise jobs unaffected.</div>
+              <div className="text-xs text-white/50 mt-0.5">Halts compute on all workers on next 5s poll. Enterprise jobs unaffected.</div>
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={killAll} disabled={killing} data-testid="kill-switch-btn"
               className="px-5 py-2.5 rounded-full bg-red-500/15 border border-red-400/40 text-red-300 text-xs tracking-widest uppercase font-semibold hover:bg-red-500/25 transition-colors disabled:opacity-50">
-              <Power className="w-3.5 h-3.5 inline mr-1.5" /> Stop All Mining
+              <Power className="w-3.5 h-3.5 inline mr-1.5" /> Stop All Compute
             </button>
             <button onClick={resumeAll} disabled={killing} data-testid="resume-mining-btn"
               className="px-5 py-2.5 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black text-xs tracking-widest uppercase font-semibold disabled:opacity-50">

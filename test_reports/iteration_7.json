@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 7 — Native Android worker + APK v1.2.0 + 'Real Android' admin panel + compute-terminology rebrand. Backend: re-ran main agent's iter-7 suite (18 tests, all PASS) + added 4 supplementary tests in test_iteration7_supplement.py covering cross-user 409, legacy heartbeat back-compat, /admin/shield admin-only RBAC, and baseline_compute mode (all 4 PASS). Full regression of all 7 iterations: 136 passed, 1 skipped, 0 failed. Frontend Playwright runs: Admin /admin → Real Android tab renders RealAndroidDevices panel with all required testids (real-android-section, android-devices-table, android-filter-{active,offline,flagged}, android-real-only, android-app-version-filter, android-refresh-btn) and filters/refresh wired correctly; Compute (formerly Mining) tab still mounts MiningOrchestrator without crash, screenshot confirms 'COMPUTE' label, 'AGGREGATE COMPUTE RATE', 'WORKER ENDPOINT', 'WORKER-LEVEL COMPUTE RATE' rebrand. Mobile /mobile (420×900) shows 'START COMPUTE'/'COMPUTING' button, 'BASELINE COMPUTE' mode badge, TGC counter (mobile-tgc-balance), Power-Up and Tier Forecast cards. Dashboard contains no mining wording. APK metadata + HEAD on /grid-worker-v1.2.0.apk both verified (200, app/vnd.android.package-archive, 25658 bytes, sha256=cdf1109…1364f).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Mobile.jsx mode badge (right-side algo span)", "issue": "User-visible 'SHA-256' string still renders on /mobile via {miningCfg.algo} at line 228 of pages/Mobile.jsx. Test case #18 explicitly forbids 'SHA-256' (and 'mining'/'hashrate'/'PoW') in the worker UI. Recommend removing the {miningCfg.algo} span, replacing with a neutral label like 'Verified Compute' / mode hash-truncation, or gating it behind admin role.", "selector": "[data-testid='mobile-mode-badge'] span.text-[9px]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration7_native_apk.py",
+    "/app/backend/tests/test_iteration7_supplement.py",
+    "/app/test_reports/pytest/iter7_results.xml",
+    "/app/test_reports/pytest/iter7_sup_results.xml",
+    "/app/test_reports/pytest/iter7_full.xml"
+  ],
+  "action_items": [
+    "Hide or rebrand the algo display on /mobile mode badge (Mobile.jsx line 228) — currently leaks 'SHA-256' to the user UI in violation of test #18.",
+    "(Optional) Rename React component MiningOrchestrator.jsx and route /api/admin/mining/* once the freeze on identifiers ends; user-visible UI is already on the 'Compute' wording so the component+URL paths can follow in a future cleanup."
+  ],
+  "critical_code_review_comments": [
+    "server.py reached ~1820 lines. The split into auth/wallet/tier/shield/mining/jobs/admin/devices modules is now overdue — every iteration is touching the same monolith.",
+    "POST /api/devices/register correctly enforces device_id cross-bind via 409, and is_emulator → flagged=true is wired. However the user_id binding can be silently overwritten on owner re-registration (no check that platform/manufacturer match prior values). Consider locking immutable fields after first claim.",
+    "Suspicious heartbeat detection currently uses sub-1-second wall delta. Mobile networks can occasionally deliver buffered batches; consider a sliding-window count-per-minute threshold instead of last-delta to reduce false positives.",
+    "RealAndroidDevices.jsx auto-refreshes every 5s without backoff or visibility-pause; on long-open admin tabs this hits /admin/devices/live + /admin/telemetry every 5s indefinitely. Pause when document.hidden, and exponential backoff on errors.",
+    "Mobile.jsx still imports/uses fields named miningCfg/hashrate/algo internally and POSTs algo=cfg.algo to backend. Internal naming is out of scope per agent_to_agent_context_note, but the {miningCfg.algo} render in the mode-badge is the only USER-VISIBLE leak that breaks the rebrand contract — must be hidden.",
+    "Admin Compute tab kill-switch banner (data-testid='kill-status') still not asserted in DOM after click (carried over from iter-6). MiningOrchestrator click does not crash, but the persistent banner contract is unverified."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration7_supplement.py (new — 4 tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (136/137 tests; 1 pre-existing skip — 22 iter-7 tests including 4 new supplemental, all PASS)",
+    "frontend": "~95% — all required testids and rebrand strings render correctly except 1 SHA-256 leak in Mobile mode-badge"
+  },
+  "test_credentials": "admin@thegrid.io / Grid@Admin2026 + worker@thegrid.io / Worker@2026 (both seeded)",
+  "seed_data_creation": "test_iteration7_supplement.py registers a disposable user (TEST_iter7sup_*@thegrid.io) for cross-user 409 verification and a small handful of TEST_ devices via /devices/register. No teardown needed; devices are pruned by the offline cutoff and the test user is harmless.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter-7 backend suite is fully green (136/137; 1 pre-existing skip). New file: /app/backend/tests/test_iteration7_supplement.py covers cross-user 409, legacy heartbeat back-compat, admin-shield RBAC, and baseline_compute mode. Frontend: admin /admin → click [data-testid='admin-tab-android'] to render RealAndroidDevices (real-android-section, android-devices-table, android-filter-active/offline/flagged, android-real-only, android-app-version-filter, android-refresh-btn). Mobile /mobile uses [data-testid='mobile-tgc-balance'] for the TGC counter (NOT 'tgc-counter'); START button is [data-testid='mobile-start-btn'] with text 'START COMPUTE'/'COMPUTING'; mode badge is [data-testid='mobile-mode-badge'] with text 'BASELINE COMPUTE'. The single open issue is the SHA-256 string leaking from {miningCfg.algo} at Mobile.jsx:228 — main agent should remove that span or replace with a neutral label.",
+  "rca of the issue": "SHA-256 leak: Mobile.jsx renders the raw mining-config algo field (which is 'SHA-256' for the BTC pool) in a small grey span next to the mode badge. The compute rebrand renamed the surrounding labels (Mode → 'BASELINE COMPUTE') but missed this one trailing field. Single-line fix: either delete the <span>{miningCfg.algo}</span> at line 228, replace with a non-leaky string (e.g. 'verified hash · sealed'), or gate behind admin/dev mode."
+}

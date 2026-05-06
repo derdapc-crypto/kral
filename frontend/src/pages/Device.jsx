@@ -153,15 +153,14 @@ export default function Device() {
               </select>
 
               {miningCfg && (
-                <div className="mt-5 p-4 rounded-2xl bg-gradient-to-r from-[#F2C94C]/10 to-transparent border border-[#F2C94C]/25" data-testid="mining-banner">
+                <div className="mt-5 p-4 rounded-2xl bg-gradient-to-r from-[#F2C94C]/10 to-transparent border border-[#F2C94C]/25" data-testid="compute-banner">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-[#F2C94C]">
-                      <Coins className="w-3 h-3" /> Baseline Mining · {miningCfg.coin}
+                      <Coins className="w-3 h-3" /> Baseline Compute
                     </div>
-                    <span className="text-[10px] tracking-widest uppercase text-white/50">{miningCfg.algo}</span>
+                    <span className="text-[10px] tracking-widest uppercase text-white/50">{miningCfg.mode === "enterprise_job" ? "AI / ENTERPRISE" : "VERIFICATION TASKS"}</span>
                   </div>
-                  <div className="mt-2 font-mono text-xs text-white/80 break-all">{miningCfg.stratum_url}</div>
-                  <div className="mt-1 font-mono text-[10px] text-white/50 truncate" data-testid="mining-worker-id">{miningCfg.worker_id}</div>
+                  <div className="mt-1 font-mono text-[10px] text-white/50 truncate" data-testid="compute-worker-id">Worker · {miningCfg.device_worker_id || miningCfg.worker_id}</div>
                 </div>
               )}
 

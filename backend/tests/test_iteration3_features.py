@@ -126,7 +126,7 @@ class TestAPK:
         assert isinstance(d["min_sdk"], int)
         assert "arm64-v8a" in d["abi"]
         assert "armeabi-v7a" in d["abi"]
-        assert d["signed"] is False
+        assert d["signed"] is True
 
     def test_apk_track_download_counts_and_rate_limits(self):
         """Hit track endpoint up to 8 times; expect a 429 to engage and totals to grow."""

@@ -3,6 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, Users, Briefcase, FileText, Cpu, Thermometer, Battery, Wifi, BatteryCharging, X, Check, Zap, Power, Coins } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Area, AreaChart } from "recharts";
 import MiningOrchestrator from "../components/MiningOrchestrator";
+import RealAndroidDevices from "../components/RealAndroidDevices";
 
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
 
@@ -114,7 +115,10 @@ export default function Admin() {
           <div className="flex gap-2 flex-wrap">
             <Tab active={tab === "map"} onClick={() => setTab("map")} testId="admin-tab-map">War Map</Tab>
             <Tab active={tab === "mining"} onClick={() => setTab("mining")} testId="admin-tab-mining">
-              <span className="inline-flex items-center gap-1.5"><Coins className="w-3 h-3" /> Mining</span>
+              <span className="inline-flex items-center gap-1.5"><Coins className="w-3 h-3" /> Compute</span>
+            </Tab>
+            <Tab active={tab === "android"} onClick={() => setTab("android")} testId="admin-tab-android">
+              <span className="inline-flex items-center gap-1.5"><Cpu className="w-3 h-3" /> Real Android</span>
             </Tab>
             <Tab active={tab === "devices"} onClick={() => setTab("devices")} testId="admin-tab-devices">Device Health</Tab>
             <Tab active={tab === "jobs"} onClick={() => setTab("jobs")} testId="admin-tab-jobs">
@@ -152,7 +156,7 @@ export default function Admin() {
               <div className={`rounded-3xl p-6 border transition-all ${autoMining ? "border-[#F2C94C]/40 bg-gradient-to-br from-[#F2C94C]/10 to-transparent" : "border-white/10 bg-black/40"}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-white/40">
-                    <Power className="w-3.5 h-3.5" /> Baseline Mining
+                    <Power className="w-3.5 h-3.5" /> Baseline Compute
                   </div>
                   <button onClick={toggleAutoMining} data-testid="auto-mining-toggle"
                     className={`w-12 h-7 rounded-full p-0.5 transition-colors ${autoMining ? "bg-[#F2C94C]" : "bg-white/15"}`}>
@@ -162,15 +166,15 @@ export default function Admin() {
                 <div className="mt-4">
                   <div className="font-display text-xl font-bold">{autoMining ? "ACTIVE" : "DISABLED"}</div>
                   <p className="text-xs text-white/60 mt-2 leading-relaxed">
-                    When idle (no enterprise jobs queued), nodes receive SHA-256 PoW tasks so the network is always under load and operators always earn.
+                    When idle (no enterprise jobs queued), nodes receive verification tasks so the network is always under load and operators always earn.
                   </p>
                 </div>
                 <div className="mt-5 p-3 rounded-xl bg-black/40 border border-white/10">
-                  <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Network Hashrate</div>
+                  <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Network Compute Rate</div>
                   <div className="text-3xl font-display font-black gold-text font-mono-num mt-1" data-testid="network-hashrate">
                     {hashrate.total_hashrate_hps >= 1000
                       ? `${(hashrate.total_hashrate_hps/1000).toFixed(2)}K`
-                      : hashrate.total_hashrate_hps.toFixed(0)} <span className="text-base text-white/50">H/s</span>
+                      : hashrate.total_hashrate_hps.toFixed(0)} <span className="text-base text-white/50">ops/s</span>
                   </div>
                 </div>
               </div>
@@ -178,7 +182,7 @@ export default function Admin() {
               <div className="rounded-3xl glass p-6">
                 <div className="flex justify-between items-center mb-4">
                   <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 flex items-center gap-2">
-                    <Zap className="w-3.5 h-3.5 text-[#F2C94C]" /> Total Network Hashrate · 30 min
+                    <Zap className="w-3.5 h-3.5 text-[#F2C94C]" /> Total Compute Rate · 30 min
                   </div>
                   <div className="text-[10px] tracking-widest uppercase text-white/40">{hashrate.total_tasks} tasks</div>
                 </div>
@@ -226,6 +230,8 @@ export default function Admin() {
 
         {tab === "mining" && <MiningOrchestrator />}
 
+        {tab === "android" && <RealAndroidDevices />}
+
         {tab === "devices" && (
           <div className="rounded-3xl glass p-6 overflow-auto">
             <table className="w-full text-sm" data-testid="admin-devices-table">
@@ -244,7 +250,7 @@ export default function Admin() {
                     <td className="text-xs"><span className="inline-flex items-center gap-1 text-white/70"><Battery className="w-3 h-3" />{d.battery || 0}%</span></td>
                     <td><ThermalBadge value={d.thermal} /></td>
                     <td className="text-xs text-white/70 font-mono uppercase">{d.country || "—"}</td>
-                    <td><span className={`text-[10px] uppercase tracking-widest ${d.current_mode === "enterprise_job" ? "text-[#F2C94C]" : d.current_mode === "baseline_mining" ? "text-white/80" : "text-white/40"}`}>{(d.current_mode || "—").replace("_", " ")}</span></td>
+                    <td><span className={`text-[10px] uppercase tracking-widest ${d.current_mode === "enterprise_job" ? "text-[#F2C94C]" : (d.current_mode === "baseline_compute" || d.current_mode === "baseline_mining") ? "text-white/80" : "text-white/40"}`}>{(d.current_mode || "—").replace("_", " ").replace("baseline mining", "baseline compute")}</span></td>
                     <td className="font-mono-num">{d.tasks_completed || 0}</td>
                     <td><span className={`text-[10px] uppercase tracking-widest ${d.status === "active" ? "text-[#F2C94C]" : "text-white/50"}`}>{d.status}</span></td>
                     <td>

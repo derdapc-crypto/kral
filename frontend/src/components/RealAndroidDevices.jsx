@@ -1,0 +1,190 @@
+import React, { useEffect, useState } from "react";
+import { api, formatApiError } from "../lib/api";
+import { Smartphone, Wifi, BatteryCharging, Thermometer, ShieldAlert, RefreshCw, Filter } from "lucide-react";
+
+function relSec(s) {
+  if (s == null) return "—";
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  return `${Math.floor(s/3600)}h ago`;
+}
+
+function StateBadge({ state, online }) {
+  const isActive = state === "active" && online;
+  const cls = isActive
+    ? "bg-[#F2C94C]/15 border-[#F2C94C]/40 text-[#F2C94C]"
+    : state === "paused"
+    ? "bg-amber-500/10 border-amber-400/30 text-amber-300"
+    : online
+    ? "bg-white/5 border-white/15 text-white/60"
+    : "bg-white/[0.02] border-white/10 text-white/30";
+  const label = !online ? "OFFLINE" : (state || "idle").toUpperCase();
+  return (
+    <span className={`text-[9px] tracking-widest uppercase font-semibold px-2 py-1 rounded-full border ${cls}`}>
+      {isActive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#F2C94C] mr-1.5 dot-pulse align-middle" />}
+      {label}
+    </span>
+  );
+}
+
+export default function RealAndroidDevices() {
+  const [data, setData] = useState({ devices: [], counters: {} });
+  const [tel, setTel] = useState(null);
+  const [filter, setFilter] = useState({ state: "all", real_only: true, app_version: "" });
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    setBusy(true); setErr("");
+    try {
+      const params = new URLSearchParams();
+      if (filter.state && filter.state !== "all") params.set("state", filter.state);
+      if (filter.real_only) params.set("real_only", "true");
+      if (filter.app_version) params.set("app_version", filter.app_version);
+      const [d, t] = await Promise.all([
+        api.get(`/admin/devices/live?${params.toString()}`),
+        api.get("/admin/telemetry"),
+      ]);
+      setData(d.data); setTel(t.data);
+    } catch (e) { setErr(formatApiError(e)); }
+    finally { setBusy(false); }
+  };
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line
+  }, [filter.state, filter.real_only, filter.app_version]);
+
+  const c = data.counters || {};
+  const stats = [
+    { label: "Real Android · Total", val: tel?.real_android_total ?? c.real_android ?? 0 },
+    { label: "Real Android · Online", val: tel?.real_android_online ?? c.online ?? 0, accent: true },
+    { label: "Real Android · Active", val: tel?.real_android_active ?? c.active ?? 0, accent: true },
+    { label: "Flagged", val: tel?.flagged ?? c.flagged ?? 0, danger: true },
+  ];
+
+  return (
+    <div className="space-y-6" data-testid="real-android-section">
+      {/* Header + counters */}
+      <div className="grid md:grid-cols-4 gap-3">
+        {stats.map((s) => (
+          <div key={s.label} className={`p-5 rounded-2xl border ${s.danger ? "border-red-400/30 bg-red-500/5" : s.accent ? "border-[#F2C94C]/30 bg-gradient-to-br from-[#F2C94C]/10 to-transparent" : "border-white/10 bg-black/30"}`}>
+            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">{s.label}</div>
+            <div className={`mt-2 text-3xl font-display font-black font-mono-num ${s.danger ? "text-red-300" : "gold-text"}`}>{s.val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3 p-4 rounded-2xl glass" data-testid="android-filters">
+        <span className="text-[10px] uppercase tracking-[0.25em] text-white/40 inline-flex items-center gap-1.5">
+          <Filter className="w-3 h-3" /> Filter
+        </span>
+        {["all", "active", "offline", "flagged"].map((s) => (
+          <button key={s} onClick={() => setFilter((f) => ({ ...f, state: s }))}
+            data-testid={`android-filter-${s}`}
+            className={`px-3 py-1.5 rounded-full text-[10px] uppercase tracking-widest border transition-colors ${
+              filter.state === s
+                ? "border-[#F2C94C] text-[#F2C94C] bg-[#F2C94C]/10"
+                : "border-white/10 text-white/60 hover:border-white/30"
+            }`}>
+            {s}
+          </button>
+        ))}
+        <label className="ml-2 inline-flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/60 cursor-pointer">
+          <input type="checkbox" checked={filter.real_only}
+            onChange={(e) => setFilter((f) => ({ ...f, real_only: e.target.checked }))}
+            data-testid="android-real-only"
+            className="accent-[#F2C94C]" />
+          Real APK only
+        </label>
+        <input type="text" placeholder="App version filter (e.g. 1.2.0)"
+          value={filter.app_version}
+          onChange={(e) => setFilter((f) => ({ ...f, app_version: e.target.value }))}
+          data-testid="android-app-version-filter"
+          className="ml-2 bg-black/40 border border-white/10 rounded-full px-3 py-1.5 text-[11px] focus:border-[#D4AF37] focus:outline-none w-48" />
+        <button onClick={load} disabled={busy} data-testid="android-refresh-btn"
+          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/15 text-white/70 text-[10px] uppercase tracking-widest hover:border-[#D4AF37]">
+          <RefreshCw className={`w-3 h-3 ${busy ? "animate-spin" : ""}`} /> Refresh
+        </button>
+      </div>
+
+      {err && <div className="text-xs text-red-400" data-testid="android-error">{err}</div>}
+
+      {/* Table */}
+      <div className="rounded-3xl glass p-4 overflow-auto" data-testid="android-table-wrap">
+        <table className="w-full text-sm" data-testid="android-devices-table">
+          <thead>
+            <tr className="text-left text-[10px] uppercase tracking-[0.25em] text-white/40 border-b border-white/5">
+              <th className="py-3 pl-2">ID · User</th>
+              <th>Model</th>
+              <th>App ver</th>
+              <th>Android</th>
+              <th>State</th>
+              <th>Tasks · TGC</th>
+              <th>Battery</th>
+              <th>Temp</th>
+              <th>Conn</th>
+              <th>Last seen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data.devices || []).length === 0 && (
+              <tr><td colSpan={10} className="text-center py-10 text-white/40">No devices match the current filters.</td></tr>
+            )}
+            {(data.devices || []).map((d) => (
+              <tr key={d.id} className={`border-b border-white/5 ${d.flagged ? "bg-red-500/5" : ""}`} data-testid={`android-row-${d.id_short}`}>
+                <td className="py-3 pl-2">
+                  <div className="font-mono text-[11px] text-white/70">{d.id_short}</div>
+                  <div className="text-[10px] text-white/50 truncate max-w-[180px]">{d.user_email || "—"}</div>
+                </td>
+                <td>
+                  <div className="text-white text-xs flex items-center gap-1.5"><Smartphone className="w-3 h-3 text-white/40" /> {d.manufacturer || d.brand || "—"}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/40">{d.tier || d.model}</div>
+                </td>
+                <td className="text-[11px] font-mono text-white/70">{d.app_version || "—"}</td>
+                <td className="text-[11px] text-white/60">{d.android_version || d.os_version || "—"}</td>
+                <td><StateBadge state={d.worker_state} online={d.online} /></td>
+                <td className="text-xs">
+                  <div className="font-mono-num text-white">{d.session_tasks ?? 0}</div>
+                  <div className="font-mono-num text-[#F2C94C] text-[10px]">+{(d.session_tgc || 0).toFixed(2)} TGC</div>
+                </td>
+                <td className="text-xs text-white/70">
+                  <span className="inline-flex items-center gap-1">
+                    {d.charging && <BatteryCharging className="w-3 h-3 text-[#F2C94C]" />}
+                    {d.battery ?? "—"}%
+                  </span>
+                </td>
+                <td className="text-xs">
+                  {d.temperature_c != null ? (
+                    <span className={`inline-flex items-center gap-1 ${d.temperature_c > 45 ? "text-red-400" : "text-white/70"}`}>
+                      <Thermometer className="w-3 h-3" /> {d.temperature_c.toFixed(1)}°C
+                    </span>
+                  ) : <span className="text-white/40">—</span>}
+                </td>
+                <td className="text-xs text-white/70">
+                  <span className="inline-flex items-center gap-1">
+                    <Wifi className={`w-3 h-3 ${d.wifi ? "text-[#F2C94C]" : "text-white/30"}`} />
+                    {d.country || "—"}
+                  </span>
+                </td>
+                <td className="text-[11px] text-white/60">
+                  {relSec(d.last_seen_seconds)}
+                  {d.suspicious_heartbeat && (
+                    <ShieldAlert className="w-3 h-3 text-red-400 inline ml-1" title="Suspicious heartbeat frequency" />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="text-[10px] text-white/40 text-center">
+        Auto-refreshing every 5s · cutoff: {data.offline_cutoff_seconds || 45}s
+      </div>
+    </div>
+  );
+}

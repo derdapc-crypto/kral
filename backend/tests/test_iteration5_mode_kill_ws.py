@@ -121,7 +121,7 @@ class TestMiningConfigShape:
         assert c["device_worker_id"] == f"{MASTER_ID}.{worker['device_id']}"
         assert c["user_worker_id"] == f"{MASTER_ID}.{worker['user_id']}"
         assert c["master_id"] == MASTER_ID
-        assert c["mode"] in ("baseline_mining", "enterprise_job", "idle")
+        assert c["mode"] in ("baseline_compute", "enterprise_job", "idle")
 
 
 # Mode routing
@@ -133,7 +133,7 @@ class TestModeRouting:
                          headers=_bearer(worker["token"]),
                          params={"device_id": worker["device_id"]})
         assert r.status_code == 200
-        assert r.json()["mode"] == "baseline_mining"
+        assert r.json()["mode"] == "baseline_compute"
 
     def test_idle_after_kill_switch(self, worker, admin_token):
         _no_running_jobs(admin_token)
@@ -162,7 +162,7 @@ class TestModeRouting:
                           headers=_bearer(worker["token"]),
                           params={"device_id": worker["device_id"]})
         assert r2.status_code == 200
-        assert r2.json()["mode"] == "baseline_mining"
+        assert r2.json()["mode"] == "baseline_compute"
 
     def test_enterprise_job_supersedes_kill(self, worker, customer, admin_token):
         # ensure baseline first
@@ -231,7 +231,7 @@ class TestHeartbeatGeo:
                                "charging": True, "wifi": True, "permission": True,
                                "battery": 90, "thermal": "warm",
                                "country": "in", "lat": 12.9716, "lng": 77.5946,
-                               "current_mode": "baseline_mining",
+                               "current_mode": "baseline_compute",
                            })
         assert hb.status_code == 200, hb.text
         # verify persistence via /devices and admin /admin/devices
@@ -241,7 +241,7 @@ class TestHeartbeatGeo:
         assert d.get("country") == "IN"
         assert abs(d.get("lat") - 12.9716) < 1e-6
         assert abs(d.get("lng") - 77.5946) < 1e-6
-        assert d.get("current_mode") == "baseline_mining"
+        assert d.get("current_mode") == "baseline_compute"
 
         admin_rows = requests.get(f"{API}/admin/devices",
                                   headers=_bearer(admin_token)).json()
@@ -249,7 +249,7 @@ class TestHeartbeatGeo:
         assert ad.get("country") == "IN"
         assert ad.get("lat") is not None
         assert ad.get("lng") is not None
-        assert ad.get("current_mode") == "baseline_mining"
+        assert ad.get("current_mode") == "baseline_compute"
 
     def test_invalid_current_mode_does_not_crash_and_does_not_persist(self, worker):
         # First set a known current_mode
@@ -277,7 +277,7 @@ class TestHeartbeatGeo:
         assert d.get("current_mode") == "idle"  # unchanged
 
 
-# Auto-mining default on fresh start = True (baseline_mining)
+# Auto-mining default on fresh start = True (baseline_compute)
 class TestAutoMiningDefault:
     def test_auto_mining_default_true_means_baseline(self, worker, admin_token):
         # explicit reset; no /kill in effect
@@ -294,7 +294,7 @@ class TestAutoMiningDefault:
                          headers=_bearer(worker["token"]),
                          params={"device_id": worker["device_id"]})
         assert r.status_code == 200
-        assert r.json()["mode"] == "baseline_mining"
+        assert r.json()["mode"] == "baseline_compute"
 
 
 # WebSocket telemetry

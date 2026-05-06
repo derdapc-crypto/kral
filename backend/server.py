@@ -152,6 +152,12 @@ class DeviceRegisterIn(BaseModel):
     fingerprint: Optional[str] = None
     brand: Optional[str] = "Apple"
     os_version: Optional[str] = "iOS 17.4"
+    # Native client extras (Android worker v1.2+)
+    manufacturer: Optional[str] = None
+    android_version: Optional[str] = None
+    app_version: Optional[str] = None
+    device_id: Optional[str] = None  # client-generated stable device id
+    is_emulator: Optional[bool] = False
 
 
 class HeartbeatIn(BaseModel):
@@ -168,7 +174,14 @@ class HeartbeatIn(BaseModel):
     country: Optional[str] = None  # ISO-3166 alpha-2
     lat: Optional[float] = None
     lng: Optional[float] = None
-    current_mode: Optional[str] = None  # 'enterprise_job' | 'baseline_mining' | 'idle'
+    current_mode: Optional[str] = None  # 'enterprise_job' | 'baseline_compute' | 'idle'
+    # Native worker extras
+    worker_state: Optional[str] = None  # 'idle' | 'active' | 'paused' | 'stopped'
+    foreground: Optional[bool] = None
+    temperature_c: Optional[float] = None  # Celsius
+    app_version: Optional[str] = None
+    session_tasks: Optional[int] = None
+    session_tgc: Optional[float] = None
 
 
 class TaskSubmitIn(BaseModel):
@@ -196,9 +209,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.1.0"
-APK_PATH = "/grid-worker-v1.1.0.apk"
-APK_RELEASE_NOTES = "Real signed Android APK · WebView wrapper for /mobile · v2+v3 signed · arm64-v8a + armeabi-v7a"
+APK_VERSION = "1.2.0"
+APK_PATH = "/grid-worker-v1.2.0.apk"
+APK_RELEASE_NOTES = "Native foreground worker · background heartbeat + verification task loop · Golden Rule auto-pause · persistent state across restart · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -464,10 +477,21 @@ async def me(user: dict = Depends(get_current_user)):
 
 # ---------- Device Endpoints ----------
 @api.post("/devices/register")
-async def register_device(data: DeviceRegisterIn, user: dict = Depends(get_current_user)):
+async def register_device(data: DeviceRegisterIn, request: Request, user: dict = Depends(get_current_user)):
     if data.model not in MODEL_MULT:
         raise HTTPException(status_code=400, detail="Invalid model tier")
-    device_id = str(uuid.uuid4())
+    # Native client may pass a stable device_id (e.g. ANDROID_ID hash). If one is supplied
+    # AND already belongs to this user, return it idempotently.
+    if data.device_id:
+        existing = await db.devices.find_one({"id": data.device_id, "user_id": user["id"]}, {"_id": 0})
+        if existing:
+            return existing
+        # If a different user owns it: refuse to bind (anti-abuse: duplicate device_id)
+        cross = await db.devices.find_one({"id": data.device_id}, {"_id": 0, "user_id": 1})
+        if cross and cross["user_id"] != user["id"]:
+            raise HTTPException(status_code=409, detail="device_id already bound to another account")
+    device_id = data.device_id or str(uuid.uuid4())
+    ip = _client_ip(request)
     doc = {
         "id": device_id,
         "user_id": user["id"],
@@ -477,8 +501,13 @@ async def register_device(data: DeviceRegisterIn, user: dict = Depends(get_curre
         "fingerprint": data.fingerprint or secrets.token_hex(8),
         "brand": data.brand or "Apple",
         "os_version": data.os_version or "iOS 17.4",
+        "manufacturer": data.manufacturer,
+        "android_version": data.android_version,
+        "app_version": data.app_version,
+        "is_emulator": bool(data.is_emulator),
         "thermal": "nominal",
         "status": "idle",
+        "worker_state": "idle",
         "charging": False,
         "wifi": False,
         "permission": False,
@@ -487,7 +516,10 @@ async def register_device(data: DeviceRegisterIn, user: dict = Depends(get_curre
         "created_at": datetime.now(timezone.utc).isoformat(),
         "tasks_completed": 0,
         "total_flops": 0,
-        "flagged": False,
+        "flagged": bool(data.is_emulator),  # auto-flag emulators
+        "register_ip": ip,
+        "session_tasks": 0,
+        "session_tgc": 0.0,
     }
     await db.devices.insert_one(doc)
     doc.pop("_id", None)
@@ -500,25 +532,68 @@ async def list_devices(user: dict = Depends(get_current_user)):
     return rows
 
 
+@api.get("/devices/me")
+async def my_devices_summary(user: dict = Depends(get_current_user)):
+    """Compact summary of the caller's devices + worker state — for the native APK."""
+    rows = await db.devices.find(
+        {"user_id": user["id"]},
+        {"_id": 0, "id": 1, "name": 1, "model": 1, "status": 1, "worker_state": 1,
+         "tasks_completed": 1, "session_tasks": 1, "session_tgc": 1,
+         "last_heartbeat": 1, "flagged": 1, "app_version": 1, "thermal": 1},
+    ).to_list(50)
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "tgc_balance": 1, "tgc_total_earned": 1, "power_up_at": 1})
+    return {
+        "devices": rows,
+        "tgc_balance": (u or {}).get("tgc_balance", 0.0),
+        "tgc_total_earned": (u or {}).get("tgc_total_earned", 0.0),
+        "powered_up": _is_powered_up((u or {}).get("power_up_at")),
+    }
+
+
 @api.post("/devices/heartbeat")
-async def heartbeat(data: HeartbeatIn, user: dict = Depends(get_current_user)):
+async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(get_current_user)):
     dev = await db.devices.find_one({"id": data.device_id, "user_id": user["id"]}, {"_id": 0})
     if not dev:
         raise HTTPException(status_code=404, detail="Device not found")
-    # Golden Rule: only eligible when charging AND wifi AND permission
-    eligible = data.charging and data.wifi and data.permission
-    status_val = "active" if eligible else "idle"
+    # Anti-abuse: detect suspicious heartbeat frequency (>1 per 2s sustained)
+    last_ts = dev.get("last_heartbeat")
+    suspicious_freq = False
+    if last_ts:
+        try:
+            prev = datetime.fromisoformat(last_ts)
+            if prev.tzinfo is None:
+                prev = prev.replace(tzinfo=timezone.utc)
+            delta = (datetime.now(timezone.utc) - prev).total_seconds()
+            if delta < 1.0:
+                suspicious_freq = True
+        except Exception:
+            pass
+    # Golden Rule: only eligible when charging AND wifi AND permission AND temp ≤ 45°C
+    over_temp = (data.temperature_c is not None and float(data.temperature_c) > 45.0)
+    eligible = data.charging and data.wifi and data.permission and not over_temp
+    # Worker state from client; status = active iff worker is not explicitly stopped/paused AND eligible.
+    # Legacy clients that don't pass worker_state are treated as active when eligible.
+    ws = data.worker_state if data.worker_state in ("idle", "active", "paused", "stopped") else dev.get("worker_state", "idle")
+    is_running = ws not in ("stopped", "paused")
+    status_val = "active" if (is_running and eligible) else "idle"
     update_doc = {
         "charging": data.charging,
         "wifi": data.wifi,
         "permission": data.permission,
         "battery": data.battery,
-        "thermal": data.thermal or "nominal",
+        "thermal": "hot" if over_temp else (data.thermal or "nominal"),
         "status": status_val,
+        "worker_state": ws,
         "last_heartbeat": datetime.now(timezone.utc).isoformat(),
+        "last_ip": _client_ip(request),
     }
     if data.brand: update_doc["brand"] = data.brand
     if data.os_version: update_doc["os_version"] = data.os_version
+    if data.app_version: update_doc["app_version"] = data.app_version
+    if data.foreground is not None: update_doc["foreground"] = bool(data.foreground)
+    if data.temperature_c is not None: update_doc["temperature_c"] = float(data.temperature_c)
+    if data.session_tasks is not None: update_doc["session_tasks"] = int(data.session_tasks)
+    if data.session_tgc is not None: update_doc["session_tgc"] = float(data.session_tgc)
     if data.hashrate is not None: update_doc["hashrate_hps"] = float(data.hashrate)
     if data.algo: update_doc["algo"] = data.algo
     if data.country: update_doc["country"] = data.country.upper()[:2]
@@ -526,10 +601,62 @@ async def heartbeat(data: HeartbeatIn, user: dict = Depends(get_current_user)):
         update_doc["lat"] = float(data.lat)
     if data.lng is not None and -180 <= float(data.lng) <= 180:
         update_doc["lng"] = float(data.lng)
-    if data.current_mode in ("enterprise_job", "baseline_mining", "idle"):
-        update_doc["current_mode"] = data.current_mode
+    if data.current_mode in ("enterprise_job", "baseline_compute", "baseline_mining", "idle"):
+        # Normalise legacy "baseline_mining" → new "baseline_compute"
+        update_doc["current_mode"] = "baseline_compute" if data.current_mode == "baseline_mining" else data.current_mode
+    if suspicious_freq:
+        update_doc["suspicious_heartbeat"] = True
     await db.devices.update_one({"id": data.device_id}, {"$set": update_doc})
-    return {"eligible": eligible, "status": status_val}
+    return {
+        "eligible": eligible,
+        "status": status_val,
+        "worker_state": ws,
+        "auto_stop": (ws == "active" and not eligible),
+        "auto_stop_reasons": _golden_rule_reasons(data.charging, data.wifi, data.permission, over_temp),
+    }
+
+
+def _golden_rule_reasons(charging: bool, wifi: bool, permission: bool, over_temp: bool):
+    r = []
+    if not charging: r.append("not_charging")
+    if not wifi: r.append("not_on_wifi")
+    if not permission: r.append("permission_off")
+    if over_temp: r.append("over_temp")
+    return r
+
+
+# ---------- Worker control (native APK) ----------
+class WorkerControlIn(BaseModel):
+    device_id: str
+
+
+@api.post("/worker/start")
+async def worker_start(data: WorkerControlIn, user: dict = Depends(get_current_user)):
+    dev = await db.devices.find_one({"id": data.device_id, "user_id": user["id"]}, {"_id": 0})
+    if not dev:
+        raise HTTPException(status_code=404, detail="Device not found")
+    if dev.get("flagged"):
+        raise HTTPException(status_code=403, detail="Device flagged")
+    await db.devices.update_one({"id": data.device_id}, {"$set": {
+        "worker_state": "active",
+        "session_started_at": datetime.now(timezone.utc).isoformat(),
+        "session_tasks": 0,
+        "session_tgc": 0.0,
+    }})
+    return {"ok": True, "worker_state": "active"}
+
+
+@api.post("/worker/stop")
+async def worker_stop(data: WorkerControlIn, user: dict = Depends(get_current_user)):
+    dev = await db.devices.find_one({"id": data.device_id, "user_id": user["id"]}, {"_id": 0})
+    if not dev:
+        raise HTTPException(status_code=404, detail="Device not found")
+    await db.devices.update_one({"id": data.device_id}, {"$set": {
+        "worker_state": "stopped",
+        "status": "idle",
+        "session_ended_at": datetime.now(timezone.utc).isoformat(),
+    }})
+    return {"ok": True, "worker_state": "stopped"}
 
 
 # ---------- Task Endpoints ----------
@@ -657,6 +784,8 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
         await db.devices.update_one({"id": data.device_id}, {"$inc": {
             "tasks_completed": 1,
             "total_flops": task["flops"],
+            "session_tasks": 1,
+            "session_tgc": tgc_earned,
         }})
         await db.users.update_one({"id": user["id"]}, {"$inc": {
             "balance_usdt": earned,
@@ -935,6 +1064,132 @@ async def admin_devices(user: dict = Depends(require_admin)):
     return rows
 
 
+@api.get("/admin/devices/live")
+async def admin_devices_live(
+    user: dict = Depends(require_admin),
+    state: Optional[str] = None,            # 'active' | 'offline' | 'flagged' | 'all'
+    platform: Optional[str] = None,         # 'android' | 'mobile' | 'web'
+    android_version: Optional[str] = None,  # exact match
+    app_version: Optional[str] = None,
+    tier: Optional[str] = None,             # 'flagship' | 'mid' | 'budget'
+    real_only: bool = False,                # only native (Android APK) clients
+    limit: int = 200,
+):
+    """
+    Admin live device feed. Surfaces real Android workers (those with `app_version`
+    or `platform=='android'`) joined with their owner email. Last 200 by heartbeat.
+    """
+    now = datetime.now(timezone.utc)
+    offline_cutoff = (now - timedelta(seconds=45)).isoformat()
+
+    q: dict = {}
+    if real_only:
+        q["$or"] = [{"platform": "android"}, {"app_version": {"$exists": True, "$ne": None}}]
+    if platform: q["platform"] = platform
+    if android_version: q["android_version"] = android_version
+    if app_version: q["app_version"] = app_version
+    if tier: q["model"] = tier
+    if state == "active":
+        q["status"] = "active"
+        q["last_heartbeat"] = {"$gte": offline_cutoff}
+    elif state == "offline":
+        q["last_heartbeat"] = {"$lt": offline_cutoff}
+    elif state == "flagged":
+        q["flagged"] = True
+
+    rows = await db.devices.find(q, {"_id": 0}).sort("last_heartbeat", -1).to_list(min(max(1, limit), 500))
+
+    # Decorate with user email + online flag + age in seconds
+    user_ids = list({r.get("user_id") for r in rows if r.get("user_id")})
+    users = {}
+    if user_ids:
+        async for u in db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "email": 1, "name": 1}):
+            users[u["id"]] = u
+
+    def _age(ts: Optional[str]) -> int:
+        if not ts: return 99999
+        try:
+            t = datetime.fromisoformat(ts)
+            if t.tzinfo is None: t = t.replace(tzinfo=timezone.utc)
+            return int((now - t).total_seconds())
+        except Exception:
+            return 99999
+
+    out = []
+    for r in rows:
+        u = users.get(r.get("user_id"), {})
+        age = _age(r.get("last_heartbeat"))
+        online = age <= 45
+        out.append({
+            "id": r.get("id"),
+            "id_short": (r.get("id") or "")[:8],
+            "user_email": u.get("email"),
+            "user_name": u.get("name"),
+            "name": r.get("name"),
+            "model": r.get("model"),
+            "tier": r.get("model"),
+            "platform": r.get("platform"),
+            "manufacturer": r.get("manufacturer"),
+            "brand": r.get("brand"),
+            "android_version": r.get("android_version"),
+            "os_version": r.get("os_version"),
+            "app_version": r.get("app_version"),
+            "is_emulator": bool(r.get("is_emulator")),
+            "worker_state": r.get("worker_state", "idle"),
+            "status": r.get("status", "idle"),
+            "online": online,
+            "last_heartbeat": r.get("last_heartbeat"),
+            "last_seen_seconds": age,
+            "session_tasks": r.get("session_tasks", 0),
+            "session_tgc": round(float(r.get("session_tgc", 0.0)), 4),
+            "tasks_completed": r.get("tasks_completed", 0),
+            "battery": r.get("battery"),
+            "charging": bool(r.get("charging")),
+            "wifi": bool(r.get("wifi")),
+            "permission": bool(r.get("permission")),
+            "thermal": r.get("thermal"),
+            "temperature_c": r.get("temperature_c"),
+            "country": r.get("country"),
+            "lat": r.get("lat"),
+            "lng": r.get("lng"),
+            "flagged": bool(r.get("flagged")),
+            "suspicious_heartbeat": bool(r.get("suspicious_heartbeat")),
+            "last_ip": r.get("last_ip"),
+        })
+    # Aggregate counters
+    counters = {
+        "total": len(out),
+        "online": sum(1 for d in out if d["online"]),
+        "active": sum(1 for d in out if d["status"] == "active"),
+        "offline": sum(1 for d in out if not d["online"]),
+        "flagged": sum(1 for d in out if d["flagged"]),
+        "real_android": sum(1 for d in out if d.get("platform") == "android" or d.get("app_version")),
+    }
+    return {"devices": out, "counters": counters, "offline_cutoff_seconds": 45}
+
+
+@api.get("/admin/telemetry")
+async def admin_telemetry(user: dict = Depends(require_admin)):
+    """High-level telemetry snapshot — used by the Real Android Devices header."""
+    now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(seconds=45)).isoformat()
+    real_q = {"$or": [{"platform": "android"}, {"app_version": {"$exists": True, "$ne": None}}]}
+    real_total = await db.devices.count_documents(real_q)
+    real_online = await db.devices.count_documents({**real_q, "last_heartbeat": {"$gte": cutoff}})
+    real_active = await db.devices.count_documents({**real_q, "status": "active", "last_heartbeat": {"$gte": cutoff}})
+    flagged = await db.devices.count_documents({"flagged": True})
+    suspicious = await db.devices.count_documents({"suspicious_heartbeat": True})
+    return {
+        "real_android_total": real_total,
+        "real_android_online": real_online,
+        "real_android_active": real_active,
+        "flagged": flagged,
+        "suspicious_heartbeat": suspicious,
+        "offline_cutoff_seconds": 45,
+        "as_of": now.isoformat(),
+    }
+
+
 @api.get("/admin/users")
 async def admin_users(user: dict = Depends(require_admin)):
     rows = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(500)
@@ -1113,10 +1368,19 @@ async def apk_version():
         "abi": ["arm64-v8a", "armeabi-v7a", "x86_64", "x86"],
         "release_notes": APK_RELEASE_NOTES,
         "released_at": "2026-02-15",
-        "size_bytes": 17466,
-        "sha256": "81ff3b78a00781b42aff0b5d1ae53bf29441d6a9ae26e95acac7f12011beb13a",
+        "size_bytes": 25658,
+        "sha256": "cdf1109353344a06a84992789ef60211aca56a33a0c22c82dca2c27bf9e1364f",
         "signature_schemes": ["v2", "v3"],
         "signed": True,
+        "features": [
+            "foreground_service",
+            "background_heartbeat",
+            "background_compute",
+            "golden_rule_auto_pause",
+            "persistent_state",
+            "wake_lock",
+            "js_bridge",
+        ],
     }
 
 
@@ -1405,7 +1669,7 @@ async def mining_config_for_device(device_id: str, user: dict = Depends(get_curr
     if has_running_job:
         mode = "enterprise_job"
     elif auto_on:
-        mode = "baseline_mining"
+        mode = "baseline_compute"
     else:
         mode = "idle"
 
@@ -1424,6 +1688,7 @@ async def mining_config_for_device(device_id: str, user: dict = Depends(get_curr
         "user_worker_id": f"{MINING_MASTER_ID}.{user['id']}",
         "device_worker_id": f"{MINING_MASTER_ID}.{device_id}",
         "expected_hashrate_hps": expected_hashrate,
+        "expected_compute_rate_ops": expected_hashrate,
         "unit": p["unit"],
         "unit_div": p["unit_div"],
         "master_id": MINING_MASTER_ID,
@@ -1438,7 +1703,7 @@ async def admin_mining_stats(user: dict = Depends(require_admin)):
     active = await db.devices.find(
         {"status": "active"},
         {"_id": 0, "id": 1, "name": 1, "model": 1, "hashrate_hps": 1, "algo": 1, "thermal": 1, "brand": 1},
-    ).to_list(1000)
+    ).sort("last_heartbeat", -1).to_list(1000)
     total_hps = 0.0
     contributors = 0
     for d in active:

@@ -6,10 +6,9 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.View;
 import android.view.Window;
-import android.view.WindowManager;
 import android.webkit.CookieManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -17,17 +16,21 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 /**
- * THE GRID - Mobile Worker Node.
- * Thin Kotlin/Java native shell wrapping the production /mobile React PWA.
- * Loads https://grid-supercomputer.preview.emergentagent.com/mobile
- * - Cookies enabled (JWT auth via httpOnly cookies)
- * - JavaScript + DOM storage (localStorage fallback token)
- * - Hardware acceleration for crypto.subtle SHA-256 task execution
- * - Edge-to-edge dark theme matching cyber-gold/obsidian aesthetic
+ * THE GRID — Mobile Worker (native shell + foreground service).
+ *
+ * MainActivity hosts a WebView for the user-facing /mobile UI.
+ * A JavaScript bridge (window.GridNative) lets the React app:
+ *   - notify the native layer when the user taps START / STOP
+ *   - persist the user's JWT for the background service
+ *   - retrieve worker state on resume
+ *
+ * The actual heartbeat + task loop runs in {@link GridWorkerService},
+ * a foreground service that survives backgrounding, screen-off, and
+ * task-switch. The service starts/stops based on JS bridge calls.
  */
 public class MainActivity extends Activity {
 
-    private static final String GRID_URL =
+    static final String GRID_URL =
         "https://grid-supercomputer.preview.emergentagent.com/mobile";
 
     private WebView webView;
@@ -36,13 +39,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Edge-to-edge obsidian black status bar.
         Window window = getWindow();
         window.setStatusBarColor(Color.parseColor("#070707"));
         window.setNavigationBarColor(Color.parseColor("#070707"));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            window.getDecorView().setSystemUiVisibility(0);
-        }
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.parseColor("#070707"));
@@ -58,17 +57,18 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.1.0 Android");
+        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.2.0 Android");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
         cm.setAcceptThirdPartyCookies(webView, true);
 
+        webView.addJavascriptInterface(new JsBridge(this), "GridNative");
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 if (url == null) return false;
-                // Keep auth + grid host in-app; spawn external browser for everything else.
                 if (url.contains("grid-supercomputer.preview.emergentagent.com")
                         || url.contains("thegrid.io")) {
                     view.loadUrl(url);
@@ -81,6 +81,13 @@ public class MainActivity extends Activity {
                 } catch (Exception ignored) {}
                 return true;
             }
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                // Inject a tiny shim so the React UI knows it is running inside the native APK.
+                view.evaluateJavascript(
+                    "window.__GRID_NATIVE__=true;" +
+                    "window.dispatchEvent(new CustomEvent('grid-native-ready'));", null);
+            }
         });
         webView.setWebChromeClient(new WebChromeClient());
 
@@ -89,6 +96,11 @@ public class MainActivity extends Activity {
             FrameLayout.LayoutParams.MATCH_PARENT);
         root.addView(webView, lp);
         setContentView(root);
+
+        // Restart background worker if a session was previously active.
+        if (WorkerState.wasActive(this)) {
+            GridWorkerService.start(this);
+        }
 
         webView.loadUrl(GRID_URL);
     }
@@ -110,5 +122,47 @@ public class MainActivity extends Activity {
             webView = null;
         }
         super.onDestroy();
+    }
+
+    /** JavaScript bridge exposed to the React /mobile page as window.GridNative.* */
+    public static class JsBridge {
+        private final MainActivity host;
+        public JsBridge(MainActivity host) { this.host = host; }
+
+        @JavascriptInterface
+        public String getInfo() {
+            return "{\"version\":\"1.2.0\",\"native\":true,\"manufacturer\":\"" +
+                Build.MANUFACTURER + "\",\"model\":\"" + Build.MODEL +
+                "\",\"androidVersion\":\"" + Build.VERSION.RELEASE + "\",\"sdk\":" +
+                Build.VERSION.SDK_INT + "}";
+        }
+
+        @JavascriptInterface
+        public void setAuthToken(String token, String deviceId) {
+            WorkerState.setAuth(host, token, deviceId);
+        }
+
+        @JavascriptInterface
+        public void startWorker(String deviceId, String token) {
+            WorkerState.setAuth(host, token, deviceId);
+            WorkerState.setActive(host, true);
+            GridWorkerService.start(host);
+        }
+
+        @JavascriptInterface
+        public void stopWorker() {
+            WorkerState.setActive(host, false);
+            GridWorkerService.stop(host);
+        }
+
+        @JavascriptInterface
+        public boolean isWorkerActive() {
+            return WorkerState.wasActive(host);
+        }
+
+        @JavascriptInterface
+        public String getWorkerStats() {
+            return WorkerState.statsJson(host);
+        }
     }
 }
