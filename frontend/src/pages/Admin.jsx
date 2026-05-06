@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, Users, Briefcase, FileText, Cpu, Thermometer, Battery, Wifi, BatteryCharging, X, Check, Zap, Power, Coins } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Area, AreaChart } from "recharts";
-import MiningOrchestrator from "../components/MiningOrchestrator";
+import ComputeOrchestrator from "../components/ComputeOrchestrator";
 import RealAndroidDevices from "../components/RealAndroidDevices";
 
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
@@ -228,7 +228,7 @@ export default function Admin() {
           </div>
         )}
 
-        {tab === "mining" && <MiningOrchestrator />}
+        {tab === "mining" && <ComputeOrchestrator />}
 
         {tab === "android" && <RealAndroidDevices />}
 

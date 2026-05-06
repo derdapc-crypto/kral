@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { Smartphone, Wifi, BatteryCharging, Thermometer, ShieldAlert, RefreshCw, Filter } from "lucide-react";
+import ApkQrCard from "./ApkQrCard";
 
 function relSec(s) {
   if (s == null) return "—";
@@ -72,6 +73,9 @@ export default function RealAndroidDevices() {
 
   return (
     <div className="space-y-6" data-testid="real-android-section">
+      {/* Hardware-farm deployment QR */}
+      <ApkQrCard size={170} testId="admin-apk-qr" />
+
       {/* Header + counters */}
       <div className="grid md:grid-cols-4 gap-3">
         {stats.map((s) => (

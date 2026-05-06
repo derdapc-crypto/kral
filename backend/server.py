@@ -209,9 +209,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.2.0"
-APK_PATH = "/grid-worker-v1.2.0.apk"
-APK_RELEASE_NOTES = "Native foreground worker · background heartbeat + verification task loop · Golden Rule auto-pause · persistent state across restart · v2+v3 signed"
+APK_VERSION = "1.2.1"
+APK_PATH = "/grid-worker-v1.2.1.apk"
+APK_SIZE = 29754
+APK_SHA256 = "0d5f2481340afe6e406b13a94e9b7288aa89bc3383949a9dff9733f254c654b3"
+APK_RELEASE_NOTES = "Boot-completed auto-restart · daily session digest + Power-Up reminder · sliding-window fraud detection · native matrix task support · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -528,7 +530,7 @@ async def register_device(data: DeviceRegisterIn, request: Request, user: dict =
 
 @api.get("/devices")
 async def list_devices(user: dict = Depends(get_current_user)):
-    rows = await db.devices.find({"user_id": user["id"]}, {"_id": 0}).to_list(100)
+    rows = await db.devices.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(500)
     return rows
 
 
@@ -555,24 +557,35 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
     dev = await db.devices.find_one({"id": data.device_id, "user_id": user["id"]}, {"_id": 0})
     if not dev:
         raise HTTPException(status_code=404, detail="Device not found")
-    # Anti-abuse: detect suspicious heartbeat frequency (>1 per 2s sustained)
-    last_ts = dev.get("last_heartbeat")
-    suspicious_freq = False
-    if last_ts:
+    now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
+    # ---- Sliding-window fraud detection ----
+    # Track timestamps of last N heartbeats; flag only if abnormal frequency persists
+    # over a rolling 60-second window. Tolerates mobile network bursts/buffering.
+    HB_WINDOW_SEC = 60
+    HB_MAX_PER_WINDOW = 12       # cadence is 10–12s ⇒ ~6 hb/min normal; allow 2× margin
+    HB_TRACK_LIMIT = 30          # cap stored timestamps
+    raw_window = dev.get("hb_window") or []
+    cutoff_dt = now_dt - timedelta(seconds=HB_WINDOW_SEC)
+    fresh_window = []
+    for ts in raw_window:
         try:
-            prev = datetime.fromisoformat(last_ts)
-            if prev.tzinfo is None:
-                prev = prev.replace(tzinfo=timezone.utc)
-            delta = (datetime.now(timezone.utc) - prev).total_seconds()
-            if delta < 1.0:
-                suspicious_freq = True
+            t = datetime.fromisoformat(ts)
+            if t.tzinfo is None: t = t.replace(tzinfo=timezone.utc)
+            if t >= cutoff_dt:
+                fresh_window.append(ts)
         except Exception:
             pass
+    fresh_window.append(now_iso)
+    # Persistence guard (only flag when burst seen in 2 consecutive windows)
+    burst_now = len(fresh_window) > HB_MAX_PER_WINDOW
+    prior_burst = bool(dev.get("hb_burst_pending"))
+    suspicious_freq = burst_now and prior_burst
+    fresh_window = fresh_window[-HB_TRACK_LIMIT:]
     # Golden Rule: only eligible when charging AND wifi AND permission AND temp ≤ 45°C
     over_temp = (data.temperature_c is not None and float(data.temperature_c) > 45.0)
     eligible = data.charging and data.wifi and data.permission and not over_temp
     # Worker state from client; status = active iff worker is not explicitly stopped/paused AND eligible.
-    # Legacy clients that don't pass worker_state are treated as active when eligible.
     ws = data.worker_state if data.worker_state in ("idle", "active", "paused", "stopped") else dev.get("worker_state", "idle")
     is_running = ws not in ("stopped", "paused")
     status_val = "active" if (is_running and eligible) else "idle"
@@ -584,8 +597,10 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
         "thermal": "hot" if over_temp else (data.thermal or "nominal"),
         "status": status_val,
         "worker_state": ws,
-        "last_heartbeat": datetime.now(timezone.utc).isoformat(),
+        "last_heartbeat": now_iso,
         "last_ip": _client_ip(request),
+        "hb_window": fresh_window,
+        "hb_burst_pending": burst_now,
     }
     if data.brand: update_doc["brand"] = data.brand
     if data.os_version: update_doc["os_version"] = data.os_version
@@ -1368,8 +1383,8 @@ async def apk_version():
         "abi": ["arm64-v8a", "armeabi-v7a", "x86_64", "x86"],
         "release_notes": APK_RELEASE_NOTES,
         "released_at": "2026-02-15",
-        "size_bytes": 25658,
-        "sha256": "cdf1109353344a06a84992789ef60211aca56a33a0c22c82dca2c27bf9e1364f",
+        "size_bytes": APK_SIZE,
+        "sha256": APK_SHA256,
         "signature_schemes": ["v2", "v3"],
         "signed": True,
         "features": [
@@ -1380,7 +1395,57 @@ async def apk_version():
             "persistent_state",
             "wake_lock",
             "js_bridge",
+            "boot_completed_restart",
+            "daily_digest_notification",
+            "power_up_expiry_reminder",
+            "sliding_window_fraud_detection",
+            "native_matrix_task",
         ],
+    }
+
+
+@api.get("/notifications/digest")
+async def notifications_digest(user: dict = Depends(get_current_user)):
+    """
+    Daily session digest payload + Power-Up expiry reminder for the native worker.
+    Worker polls this once per ~6h and posts a local notification when due.
+    """
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0}) or {}
+    # Aggregate today's verified tasks for this user across all devices
+    start_of_day = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    today_agg = await db.tasks.aggregate([
+        {"$match": {"user_id": user["id"], "status": "verified", "completed_at": {"$gte": start_of_day}}},
+        {"$group": {"_id": None, "tasks": {"$sum": 1}, "tgc": {"$sum": "$earned_tgc"}}},
+    ]).to_list(1)
+    tasks_today = int(today_agg[0]["tasks"]) if today_agg else 0
+    tgc_today = round(float(today_agg[0]["tgc"]), 4) if today_agg else 0.0
+    pu_seconds = _power_up_remaining_seconds(u.get("power_up_at"))
+    pu_hours = round(pu_seconds / 3600, 1)
+    powered_up = _is_powered_up(u.get("power_up_at"))
+    digest_title = "THE GRID · Daily Compute Digest"
+    if tasks_today > 0:
+        digest_body = (f"Today you completed {tasks_today} verification "
+                       f"task{'s' if tasks_today != 1 else ''} · earned {tgc_today:.2f} TGC")
+    else:
+        digest_body = "No compute today · tap Power Up to start earning TGC"
+    if powered_up and pu_hours > 0:
+        digest_body += f" · Power-Up expires in {pu_hours}h"
+    elif not powered_up:
+        digest_body += " · Power-Up has expired"
+    # Power-Up warning: <3h remaining
+    pu_warning = None
+    if powered_up and 0 < pu_seconds <= 3 * 3600:
+        pu_warning = {
+            "title": "Power-Up expiring soon",
+            "body": f"Tap Power Up — only {pu_hours}h left to keep your worker connected.",
+            "expires_in_seconds": pu_seconds,
+        }
+    return {
+        "digest": {"title": digest_title, "body": digest_body,
+                   "tasks_today": tasks_today, "tgc_today": tgc_today,
+                   "powered_up": powered_up, "power_up_hours_remaining": pu_hours},
+        "power_up_warning": pu_warning,
+        "as_of": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -1751,7 +1816,43 @@ async def admin_mining_revenue(user: dict = Depends(require_admin)):
     }
 
 
+# ---------- /api/admin/compute/* aliases (rebrand backward-compat) ----------
+# Old frontend calls and tests still hit /api/admin/mining/* — keep both.
+@api.post("/admin/compute/select")
+async def compute_select_alias(payload: dict, user: dict = Depends(require_admin)):
+    return await select_mining(payload, user)
+
+@api.post("/admin/compute/kill")
+async def compute_kill_alias(user: dict = Depends(require_admin)):
+    return await kill_switch(user)
+
+@api.post("/admin/compute/resume")
+async def compute_resume_alias(user: dict = Depends(require_admin)):
+    return await resume_mining(user)
+
+@api.get("/admin/compute/stats")
+async def compute_stats_alias(user: dict = Depends(require_admin)):
+    return await admin_mining_stats(user)
+
+@api.get("/admin/compute/revenue")
+async def compute_revenue_alias(user: dict = Depends(require_admin)):
+    return await admin_mining_revenue(user)
+
+@api.get("/compute/profiles")
+async def compute_profiles_alias():
+    return await list_mining_profiles()
+
+@api.get("/compute/active")
+async def compute_active_alias():
+    return await get_active_mining()
+
+@api.get("/compute/config")
+async def compute_config_alias(device_id: str, user: dict = Depends(get_current_user)):
+    return await mining_config_for_device(device_id, user)
+
+
 app.include_router(api)
+
 
 # ---------- WebSocket: live admin telemetry ----------
 from fastapi import WebSocket, WebSocketDisconnect

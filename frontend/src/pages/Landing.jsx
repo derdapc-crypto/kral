@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { ArrowRight, Cpu, Globe2, Zap, Shield, Lock, Sparkles, Smartphone, BatteryCharging, Wifi, CheckCircle2, Download, Briefcase } from "lucide-react";
 import ApkSetupModal from "../components/ApkSetupModal";
+import ApkQrCard from "../components/ApkQrCard";
 
 const HERO_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/de66970575fd0c962a0ae5998fbd3ca1fb71b7d5fc3bbccec837805a15b80cb7.png";
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
@@ -361,6 +362,22 @@ export default function Landing() {
               Launch My Node
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* APK QR — hardware farm deployment */}
+      <section className="px-6 py-16 border-t border-white/5">
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-[1fr_auto] gap-10 items-center">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.3em] text-[#F2C94C]">Deploy at scale</div>
+            <h3 className="mt-2 font-display text-3xl sm:text-4xl font-black leading-tight">
+              Roll out THE GRID to your <span className="gold-text">entire hardware farm</span> with one scan.
+            </h3>
+            <p className="mt-4 text-white/60 max-w-lg leading-relaxed">
+              The QR code links directly to the latest signed APK. Walk the rack, scan once per device, install — no Play Store, no manual file transfer. Works on every Android 7.0+ phone.
+            </p>
+          </div>
+          <ApkQrCard size={220} testId="landing-apk-qr" />
         </div>
       </section>
 

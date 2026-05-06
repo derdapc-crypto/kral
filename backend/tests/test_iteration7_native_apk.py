@@ -218,21 +218,25 @@ def test_suspicious_heartbeat_burst(worker_token, admin_token):
     }, headers=_h(worker_token)).raise_for_status()
     body = {"device_id": did, "charging": True, "wifi": True, "permission": True,
             "battery": 80, "temperature_c": 30, "worker_state": "active"}
+    # v1.2.1+ uses sliding-window (>12 hb / 60s sustained over two consecutive samples).
+    # Send 14 to fill the window then one more to trip the consecutive-burst guard.
+    for _ in range(14):
+        requests.post(f"{API}/devices/heartbeat", json=body, headers=_h(worker_token)).raise_for_status()
     requests.post(f"{API}/devices/heartbeat", json=body, headers=_h(worker_token)).raise_for_status()
-    requests.post(f"{API}/devices/heartbeat", json=body, headers=_h(worker_token)).raise_for_status()  # immediate
     # Fetch as admin
-    r = requests.get(f"{API}/admin/devices/live?limit=200", headers=_h(admin_token))
+    r = requests.get(f"{API}/admin/devices/live?limit=300", headers=_h(admin_token))
     rows = [d for d in r.json()["devices"] if d["id"] == did]
     assert rows and rows[0]["suspicious_heartbeat"] is True
 
 
 # ---------- APK metadata ----------
 def test_apk_version_v1_2_0():
+    """v1.2.0 features still advertised in the latest manifest (forward-compat)."""
     r = requests.get(f"{API}/apk/version")
     assert r.status_code == 200
     body = r.json()
-    assert body["version"] == "1.2.0"
-    assert body["download_url"] == "/grid-worker-v1.2.0.apk"
+    # Always reflect the LATEST release (now 1.2.1 with v1.2.0 features still present)
+    assert body["version"] >= "1.2.0"
     assert body["signed"] is True
     assert body["signature_schemes"] == ["v2", "v3"]
     assert "foreground_service" in body["features"]

@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 8 stabilization pass — backend 149/149 + 1 pre-existing skip, all 13 new iter-8 tests PASS. APK v1.2.1 metadata + HEAD correct (29754 bytes, sha256 0d5f24813…, signed v2+v3, full feature list). /api/notifications/digest returns the documented schema with no user-visible mining/hashrate/PoW/SHA-256 literals. Compute aliases (/api/admin/compute/{stats,revenue,kill,resume,select} + /api/compute/{profiles,active,config}) mirror the legacy mining endpoints with admin RBAC enforced (200 admin / 401 anon / 403 worker). Sliding-window fraud tests pass: single sub-1s burst NOT flagged, persistent 14+/60s consecutive bursts ARE flagged. Frontend Landing: V1.2.1 AVAILABLE banner + 'Roll out THE GRID to your entire hardware farm' section with ApkQrCard ([data-testid=landing-apk-qr], landing-apk-qr-svg visible, landing-apk-qr-url ends with /grid-worker-v1.2.1.apk, SVG has 3 children = real QR render). Admin → Real Android tab: admin-apk-qr + admin-apk-qr-svg both present, all existing testids (real-android-section, android-devices-table, android-filter-active|offline|flagged, android-real-only, android-app-version-filter, android-refresh-btn) intact. Admin Compute tab still works post-rename (admin-tab-mining present, kill/resume/shield panels render). Mobile /mobile (420×900): mobile-start-btn ('START COMPUTE'), mobile-tgc-balance, mobile-mode-badge ('BASELINE COMPUTE / verification · sealed' — iter-7 SHA-256 leak is FIXED). Mobile + Dashboard pass terminology hygiene with ZERO forbidden words. ONE finding: Admin Compute tab leaks 'SHA-256' (pool algo subtitles for BTC/BCH + Pool-Broadcast-Live ALGO field) and '/api/mining/config' (worker endpoint label shown verbatim) — the rebrand on this surface is incomplete vs. the iter-8 hygiene contract.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ComputeOrchestrator.jsx (Admin → Compute tab)",
+        "issue": "User-visible 'SHA-256' literal still rendered as the algo subtitle on BTC/BCH pool tiles AND in the 'POOL BROADCAST · LIVE' card (ALGO: SHA-256). Worker endpoint label also shows verbatim '/api/mining/config'. Test case #11 forbids 'mining'/'hashrate'/'PoW'/'SHA-256' on landing+admin+mobile+dashboard. Recommend: rename the algo subtitle to a neutral compute-class string ('Verified Hash · Class A', 'Compute Class · CPU/GPU', or simply hide the algo line for non-dev admins), and switch the displayed Worker Endpoint to the new '/api/compute/config' alias (it already exists and returns the same payload).",
+        "selector": "[data-testid='admin-tab-mining'] (ComputeOrchestrator panel — pool tiles and pool-broadcast block)",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration8_stabilization.py",
+    "/app/test_reports/pytest/iter8_results.xml",
+    "/app/test_reports/pytest/iter8_full.xml"
+  ],
+  "action_items": [
+    "ComputeOrchestrator.jsx: replace user-visible 'SHA-256' algo subtitles on pool tiles + 'ALGO: SHA-256' field in Pool Broadcast Live with a neutral compute-class label, and switch the displayed worker endpoint from '/api/mining/config' to '/api/compute/config' to complete the iter-8 rebrand contract."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now ~1860 lines and growing every iteration — split into routers (auth/wallet/tier/shield/compute/jobs/admin/devices/notifications/apk) is overdue.",
+    "Compute aliases were added but the legacy /api/mining/* endpoints are kept too — duplicated route surface area without a deprecation header. Recommend tagging the legacy paths with a deprecation warning or a 308 redirect to the canonical /api/compute/* path so clients migrate.",
+    "ComputeOrchestrator.jsx still references the legacy '/api/mining/config' string in its UI body — pure-rename without auditing the strings the component renders. Searching for /mining/ literals in /app/frontend/src is recommended as a guard.",
+    "Sliding-window fraud detector now correctly avoids single-burst false positives, but the threshold (>12 hb/60s sustained over 2 consecutive samples) is hardcoded — consider lifting to env/config so SRE can tune in production without a redeploy.",
+    "RealAndroidDevices.jsx still polls every 5s with no document.hidden pause / no exponential backoff (carried over from iter-7) — admin tabs left open all day will keep hitting the API."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (149 passed + 1 pre-existing skip + 0 failed across 8 iterations; 13/13 new iter-8 tests pass)",
+    "frontend": "~95% — every required testid renders + APK QR + Real Android + Mobile + Dashboard all clean; 1 terminology leak remaining on Admin Compute tab (SHA-256 + /api/mining/config strings)"
+  },
+  "test_credentials": "admin@thegrid.io / Grid@Admin2026 + worker@thegrid.io / Worker@2026 (both seeded; bcrypt $2b$, httpOnly cookies set, JWT in body+cookie, brute-force lockout in place per /app/memory/test_credentials.md)",
+  "seed_data_creation": "test_iteration8_stabilization.py uses the existing seeded admin/worker accounts + creates a small handful of TEST_-prefixed devices for the sliding-window heartbeat assertions; no manual cleanup needed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter-8 backend is fully green (149+1skip). Frontend is 95% clean — Landing ApkQrCard and Admin Real Android ApkQrCard both render with all required testids ([data-testid=landing-apk-qr|landing-apk-qr-svg|landing-apk-qr-url] and [data-testid=admin-apk-qr|admin-apk-qr-svg]). Mobile mode-badge SHA-256 leak from iter-7 is fixed. The single remaining hygiene leak is in ComputeOrchestrator.jsx (Admin /admin → Compute tab): the BTC/BCH pool tiles render an 'SHA-256' subtitle and the Pool Broadcast block shows 'ALGO: SHA-256' and 'WORKER ENDPOINT: /api/mining/config' — these are user-visible strings the iter-8 rebrand contract forbids. Suggest replacing the algo subtitle with a neutral compute-class label and switching the displayed endpoint to the new /api/compute/config alias. Admin login → /admin → click [data-testid='admin-tab-mining'] to reproduce.",
+  "rca of the issue": "ComputeOrchestrator.jsx was renamed from MiningOrchestrator.jsx and the surrounding labels were rebranded ('AGGREGATE COMPUTE RATE', 'WORKER-LEVEL COMPUTE RATE'), but the component body still hardcodes the cryptocurrency algorithm names ('SHA-256', 'SCRYPT', 'EQUIHASH', etc.) on the pool selector tiles AND echoes the legacy '/api/mining/config' string in the Pool-Broadcast worker-endpoint card + 'ALGO: SHA-256' in the same card. Single-file fix: in ComputeOrchestrator.jsx (a) replace the algo subtitle with a neutral 'Compute Class · A/B/C' or 'Verified Hash' label (or hide entirely), (b) change the displayed worker endpoint string from '/api/mining/config' to '/api/compute/config', and (c) replace the 'ALGO' label/value in the live broadcast card with 'CLASS' / 'VERIFIED'. No backend change needed — /api/compute/config is already wired as a 1:1 alias of /api/mining/config."
+}

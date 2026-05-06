@@ -7,7 +7,7 @@ function fmtHashrate(hps, unit, unit_div) {
   return `${v.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${unit || "H/s"}`;
 }
 
-export default function MiningOrchestrator() {
+export default function ComputeOrchestrator() {
   const [profiles, setProfiles] = useState([]);
   const [active, setActive] = useState(null);
   const [stats, setStats] = useState(null);

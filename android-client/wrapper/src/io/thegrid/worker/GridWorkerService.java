@@ -135,17 +135,6 @@ public class GridWorkerService extends Service {
                     Thread.sleep(ERROR_BACKOFF_MS);
                     continue;
                 }
-                // Native worker currently executes only verification (hash) tasks.
-                // Matrix tasks would require an exact JS-Mulberry32 port; backend rotates
-                // randomly, so we just discard matrix tasks (mark not-verified by submitting
-                // a wrong result) and let the next request return a hash task.
-                if (!"hash".equals(kind)) {
-                    String dummy = "{\"task_id\":\"" + taskId + "\",\"device_id\":\"" + WorkerState.deviceId(ctx) +
-                        "\",\"result\":\"skip\",\"compute_ms\":1}";
-                    try { GridApi.post(ctx, "/api/tasks/submit", dummy); } catch (Exception ignored) {}
-                    Thread.sleep(TASK_GAP_MS);
-                    continue;
-                }
 
                 long t0 = System.currentTimeMillis();
                 String result = executeTask(kind, payload);
@@ -182,6 +171,10 @@ public class GridWorkerService extends Service {
             String nonce = GridApi.pluck(payload, "nonce");
             int diff = Integer.parseInt(GridApi.pluck(payload, "difficulty"));
             return hashSignature(nonce, diff);
+        } else if ("matrix".equals(kind)) {
+            int seed = (int) Long.parseLong(GridApi.pluck(payload, "seed"));
+            int size = Integer.parseInt(GridApi.pluck(payload, "size"));
+            return matrixSignature(seed, size);
         }
         throw new Exception("unknown task kind: " + kind);
     }
@@ -198,6 +191,41 @@ public class GridWorkerService extends Service {
             if (hex.startsWith(prefix)) return i + ":" + hex;
         }
         return "0:0";
+    }
+
+    /**
+     * Mulberry32 PRNG — exactly matches the JS reference in
+     * /app/frontend/src/lib/compute.js and the Python port in
+     * server.py::_mulberry32. Java int arithmetic naturally
+     * implements Math.imul + (|0) wrap-around since int is 32-bit signed.
+     */
+    static double mulberry32Next(int[] state) {
+        state[0] = state[0] + 0x6D2B79F5;
+        int a = state[0];
+        int t = (a ^ (a >>> 15)) * (1 | a);              // Math.imul
+        t = ((t + ((t ^ (t >>> 7)) * (61 | t))) ^ t);
+        long unsigned = ((long) (t ^ (t >>> 14))) & 0xFFFFFFFFL;
+        return unsigned / 4294967296.0;
+    }
+
+    static String matrixSignature(int seed, int size) {
+        int[] state = new int[]{seed};
+        int n = size * size;
+        int[] a = new int[n];
+        int[] b = new int[n];
+        for (int i = 0; i < n; i++) a[i] = (int) Math.floor(mulberry32Next(state) * 10);
+        for (int i = 0; i < n; i++) b[i] = (int) Math.floor(mulberry32Next(state) * 10);
+        long sum = 0L, trace = 0L;
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                int s = 0;
+                int row = i * size;
+                for (int k = 0; k < size; k++) s += a[row + k] * b[k * size + j];
+                sum += s;
+                if (i == j) trace += s;
+            }
+        }
+        return sum + ":" + trace;
     }
 
     private static final java.nio.charset.Charset StandardCharsets_UTF_8 = java.nio.charset.Charset.forName("UTF-8");
@@ -219,7 +247,7 @@ public class GridWorkerService extends Service {
         String body = String.format(Locale.US,
             "{\"device_id\":\"%s\",\"charging\":%s,\"wifi\":%s,\"permission\":true," +
             "\"battery\":%d,\"temperature_c\":%.1f,\"thermal\":\"%s\"," +
-            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.2.0\"}",
+            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.2.1\"}",
             deviceId, charging, onWifi, batteryPct, tempC,
             (tempC > TEMP_LIMIT_C ? "hot" : "nominal"),
             (eligible ? "active" : "paused"));
