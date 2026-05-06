@@ -25,6 +25,20 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - Backend `/api/apk/version` updated to advertise version, size, sha256, signature_schemes, signed=true. Landing page banner + modal now show real metadata; download link points to the new file.
 - Build pipeline + reproducible commands documented in `/app/android-client/README.md`.
 
+**Iter 7 (2026-02-15)** — **Native Android worker (v1.2.0) + Compute rebrand + Real Android admin panel**
+- **APK v1.2.0** (25,658 bytes, SHA-256 `cdf1109353344a06a84992789ef60211aca56a33a0c22c82dca2c27bf9e1364f`, v2+v3 signed) with a real Android Foreground Service (`GridWorkerService`) that:
+  - Continues heartbeating + executing verification tasks while app is backgrounded / screen-off / task-switched.
+  - Persistent low-importance notification ("THE GRID Worker active — Contributing compute securely").
+  - Acquires partial WAKE_LOCK only while service is running.
+  - Auto-pauses on Golden Rule failure (not charging / not on Wi-Fi / permission off / battery temp ≥ 45°C); auto-resumes when conditions clear.
+  - Persistent state via `SharedPreferences` (active flag, JWT, device_id, session counters); restarts on cold-launch.
+  - JS bridge (`window.GridNative.startWorker / stopWorker / getInfo / getWorkerStats`) so `/mobile` React page hands off START/STOP to the native service.
+- **New backend endpoints**: `POST /api/worker/start`, `POST /api/worker/stop`, `GET /api/devices/me`, `GET /api/admin/devices/live` (with state/platform/app_version/tier/real_only filters + counters), `GET /api/admin/telemetry`. Heartbeat `auto_stop` + `auto_stop_reasons` returned to the client.
+- **Anti-abuse signals**: emulator auto-flag, duplicate device_id cross-bind 409, suspicious heartbeat frequency (<1s delta), idempotent re-register on same user, JWT enforced on every device endpoint.
+- **Admin "Real Android" tab** (`RealAndroidDevices.jsx`) with auto-refresh every 5s (visibility-aware pause), filters for active/offline/flagged + app version + real-APK-only, per-device row showing model, app_version, Android version, worker_state, session tasks/TGC, battery+charging, temperature with overheat alert, Wi-Fi+country, last-seen, suspicious-heartbeat indicator, flagged badge.
+- **Compute rebrand** — every user-visible occurrence of mining/miner/hashrate/SHA-256/PoW/Stratum on /mobile, /dashboard, /landing and the Admin Compute tab replaced with Compute / Worker / Compute Rate / Verification Task / Worker Endpoint. Admin tab renamed Mining→Compute (`admin-tab-mining` testid kept). Mode label `baseline_mining` → `baseline_compute` server-side (mining/config still accepts the legacy value for back-compat).
+- **Tests**: 18 new `test_iteration7_native_apk.py` + 4 supplementary tests = 22 new, all green. Full regression: **136 passed, 1 skipped, 0 failed** across 7 iterations.
+
 ## Architecture
 - FastAPI + MongoDB + JWT + deterministic mulberry32 PRNG.
 - React 19 + Tailwind + Shadcn + lucide-react + recharts.

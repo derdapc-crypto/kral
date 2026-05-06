@@ -52,8 +52,13 @@ export default function RealAndroidDevices() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 5000);
-    return () => clearInterval(t);
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      if (typeof document === "undefined" || !document.hidden) load();
+    };
+    const t = setInterval(tick, 5000);
+    return () => { cancelled = true; clearInterval(t); };
     // eslint-disable-next-line
   }, [filter.state, filter.real_only, filter.app_version]);
 

@@ -225,7 +225,7 @@ export default function Mobile() {
               <span className="text-[10px] uppercase tracking-[0.25em] text-white/50">Mode</span>
               <span className="text-xs font-semibold text-[#F2C94C]">{modeBadge}</span>
             </div>
-            <span className="text-[9px] tracking-widest uppercase text-white/40">{miningCfg.algo}</span>
+            <span className="text-[9px] tracking-widest uppercase text-white/40">verification · sealed</span>
           </div>
         )}
 
