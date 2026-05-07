@@ -222,7 +222,7 @@ APK_VERSION = "1.2.4"
 APK_PATH = "/grid-worker-v1.2.4.apk"
 APK_SIZE = 29754
 APK_SHA256 = "632091acbde778617f9a46b722d6b942614580045fe200e4495ad9db631f1586"
-APK_RELEASE_NOTES = "v1.2.4 hardening · server-side hashrate sanity cap · stratum URL redaction · live pool connection badge · auth/wallet/devices/admin/pool router split · v2+v3 signed"
+APK_RELEASE_NOTES = "v1.2.4 hardening · server-side ops/s sanity cap · pool URL redaction · live pool connection badge · auth/wallet/devices/admin/pool router split · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -651,6 +651,8 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
         else:
             update_doc["hashrate_hps"] = max(0.0, hr)
             update_doc["hashrate_capped"] = False
+            # Clear any stale raw value from a previous over-cap heartbeat
+            update_doc["hashrate_reported_raw"] = None
     if data.algo: update_doc["algo"] = data.algo
     if data.country: update_doc["country"] = data.country.upper()[:2]
     if data.lat is not None and -90 <= float(data.lat) <= 90:

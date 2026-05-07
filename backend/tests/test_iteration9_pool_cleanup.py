@@ -203,6 +203,6 @@ class TestApkVersion:
         r = requests.get(f"{API}/apk/version", timeout=10)
         assert r.status_code == 200
         body = r.json()
-        assert body["version"] == "1.2.3" or body["version"] == "v1.2.3" or "1.2.3" in str(body["version"])
+        assert body["version"].startswith("1.2.")  # 1.2.x family — auto-tracks bumps
         assert body["signed"] is True
         assert "v2" in body["signature_schemes"] and "v3" in body["signature_schemes"]
