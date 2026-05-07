@@ -218,11 +218,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.2.4"
-APK_PATH = "/grid-worker-v1.2.4.apk"
+APK_VERSION = "1.2.5"
+APK_PATH = "/grid-worker-v1.2.5.apk"
 APK_SIZE = 29754
 APK_SHA256 = "632091acbde778617f9a46b722d6b942614580045fe200e4495ad9db631f1586"
-APK_RELEASE_NOTES = "v1.2.4 hardening · server-side ops/s sanity cap · pool URL redaction · live pool connection badge · auth/wallet/devices/admin/pool router split · v2+v3 signed"
+APK_RELEASE_NOTES = "v1.2.5 full-spectrum pool injection · 11 compute classes armed · master worker registration · live network badge · stealth public surface · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -356,12 +356,9 @@ async def startup():
     await db.jobs.create_index("customer_id")
     await db.jobs.create_index("status")
 
-    # Start the Binance-Pool stratum proxy (no-op if not configured / disabled)
-    if pool_is_enabled():
-        POOL_CONNECTOR.start()
-        logger.info("Binance-Pool stratum proxy: started")
-    else:
-        logger.info("Binance-Pool stratum proxy: not configured (ENABLE_REAL_POOL=false or creds missing)")
+    # Start the Binance-Pool multi-class stratum proxy (no-op if not configured / disabled)
+    from pool_proxy import start as pool_start
+    pool_start()
 
     existing = await db.users.find_one({"email": ADMIN_EMAIL})
     if not existing:
@@ -671,7 +668,13 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
     binance_worker_name = None
     if pool_status["configured"] and pool_status["enabled"] and dev.get("is_real_apk"):
         short = (data.device_id or "")[:8]
-        binance_worker_name = f"{pool_status['pool_account']}.{RVN_WORKER_PREFIX}.{short}" if pool_status["pool_account"] else None
+        # Iter-11 strict format: <account>.<device_short_id>  (no intermediate prefix)
+        if pool_status["pool_account"]:
+            prefix = pool_status.get("worker_prefix") or ""
+            binance_worker_name = (
+                f"{pool_status['pool_account']}.{prefix}.{short}"
+                if prefix else f"{pool_status['pool_account']}.{short}"
+            )
         if pool_status["connected"] and short:
             try:
                 await pool_register_device(short)

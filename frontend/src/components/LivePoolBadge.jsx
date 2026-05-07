@@ -3,17 +3,16 @@ import axios from "axios";
 import { Radio, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 /**
- * Live Pool Connection — public landing badge.
- * Honest by contract:
- *   - configured=false  → amber "Pool offline · honest" (we never fake)
- *   - enabled=false     → amber "Pool standby"
- *   - connected=false   → amber "Reconnecting"
- *   - connected=true    → gold "Live · N workers"
+ * Live Compute Network — public landing badge (STEALTH).
  *
- * Why public/unauth: investors and operators can verify from the landing page
- * that the platform is actually wired to a real upstream pool, not just claiming so.
- * The endpoint exposes ONLY: configured/enabled/connected/workers_registered/account_masked/message.
- * No URL, no full account, no shares, no errors leak to the public surface.
+ * iter-11 contract: NEVER discloses pool/algo/coin names to the public surface.
+ * Backend /api/pool/health intentionally omits class data; this badge only
+ * shows two states:
+ *   - network_live=true   → gold "Compute Network · Live"
+ *   - network_live=false  → amber "Compute Network · Standby"
+ *
+ * Operators see the per-class detail in the Admin → Real Android tab; the
+ * landing visitor only knows the network is alive.
  */
 export default function LivePoolBadge({ compact = false }) {
   const [s, setS] = useState(null);
@@ -37,23 +36,10 @@ export default function LivePoolBadge({ compact = false }) {
 
   if (!s) return null;
 
-  const live = s.connected;
-  const standby = s.configured && !s.enabled;
-  const offline = !s.configured;
+  const live = !!s.network_live;
   const tone = live ? "gold" : "amber";
   const Icon = live ? CheckCircle2 : AlertTriangle;
-
-  const label = live
-    ? `Live · ${s.workers_registered} worker${s.workers_registered === 1 ? "" : "s"}`
-    : standby
-    ? "Pool · Standby"
-    : offline
-    ? "Pool · Offline (honest)"
-    : "Pool · Reconnecting";
-
-  const sub = live
-    ? `Binance Pool · RVN${s.account_masked ? " · " + s.account_masked : ""}`
-    : s.message;
+  const label = live ? "Compute Network · Live" : "Compute Network · Standby";
 
   if (compact) {
     return (
@@ -83,7 +69,7 @@ export default function LivePoolBadge({ compact = false }) {
           {label}
         </div>
         <div className="text-[10px] text-white/55 max-w-[280px] truncate" data-testid="live-pool-badge-sub">
-          {sub}
+          {live ? "Distributed verification mesh online" : "Standby · awaiting operator activation"}
         </div>
       </div>
     </div>

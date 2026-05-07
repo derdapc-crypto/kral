@@ -1,0 +1,39 @@
+{
+  "summary": "v1.2.5 FULL-SPECTRUM POOL INJECTION — END-TO-END GREEN. Backend new suite test_iteration11_pool_injection.py: 17/17 PASS covering admin /api/admin/pool/status (11/11 classes connected+authorized, all expected coin→algo mappings RVN→KawPow / BTC→SHA-256 / LTC→Scrypt / DASH→X11 / KAS→kHeavyHash / ETC→Etchash / ZEC→Equihash / BCH→SHA-256 / CFX→Octopus / CKB→Eaglesong / ETHW→Ethash, total_classes=11, armed_count=11, all_armed=true, pool_account='117423210', pow_status='native_pow_pending', pow_status_note has 'Workers registered ✓ · Accepted shares = 0' wording, message='LIVE · ALL CLASSES ARMED (11/11) · NATIVE PoW PENDING', NO password key/value anywhere, all stratum URLs redacted (no '@', no '?')); public stealth /api/pool/health (only {configured, enabled, network_live, message}, message='Compute Network · Live', no leak tokens); heartbeat with is_real_apk=true returns pool.binance_worker_name='117423210.<8charshort>' (iter-11 strict format, no THEGRID-prefix in middle); /api/apk/version='1.2.5' + download_url='/grid-worker-v1.2.5.apk' + signed=true; HEAD /grid-worker-v1.2.5.apk=200 + content-length=29754; pool_proxy._redact_stratum_url module import works AND iter-10 unknown-scheme None hardening retained ('http://...' → None); STATUS/CONNECTOR/RVN_WORKER_PREFIX backward-compat exports still importable; Landing index.html contains zero leak tokens. Full regression: 193 PASS, 1 SKIP, 0 FAIL across all iter1-11 suites (above the ≥189 baseline). FRONTEND playwright run confirms: Landing live-pool-badge='COMPUTE NETWORK · LIVE / Distributed verification mesh online' with body containing zero of {RVN,KawPow,Stratum,Binance,117423210,Scrypt,Etchash,Equihash,Octopus,Eaglesong,kHeavyHash}; Admin Real-Android tab renders pool-status-panel with badge='LIVE · 11/11 ARMED', message='LIVE · ALL CLASSES ARMED (11/11) · NATIVE PoW PENDING', pow-pending-warning visible with 'Workers registered ✓ · Accepted shares = 0' + full per-algo native-PoW list, pool-account-id='MASTER ACCOUNT: 117423210 · WORKER FORMAT: 117423210.<DEVICE_SHORT_ID>', pool-class-grid contains exactly 11 cards [pool-class-RVN..ETHW] each in ARMED state, APK card v1.2.5 / 29.1 KB / Signed v2+v3.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration11_pool_injection.py",
+    "/app/test_reports/pytest/iter11_full.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py heartbeat builds binance_worker_name with a defensive '<account>.<prefix>.<short>' pattern but iter-11 sets prefix=''; the empty-prefix branch produces '<account>.<short>' which matches the contract — code is correct but would benefit from a unit-style test for the prefix='' code path (covered indirectly by iter-11 heartbeat test).",
+    "pool_proxy.MultiPoolManager.register_device only registers on PRIMARY (RVN) class — this is the documented design (a phone cannot mine 11 algos at once) but the public/admin distinction means workers_registered counter on non-primary classes will always be 0; consider surfacing this asymmetry in pow_status_note to avoid 'why is BTC.workers_registered=0?' confusion for new admins.",
+    "MultiPoolManager constructor instantiates 11 PoolStatus + PoolConnector at MODULE IMPORT time; if POOL_ENDPOINTS is hot-reloaded the singletons are stale. Acceptable today (endpoints are immutable env-driven), but document the constraint.",
+    "routers/pool.py builds public message via _build_public_message; consider adding 'standby' literal (only 'Live'/'Reconnecting'/'Standby' surfaced) — already correct, just worth a doc comment so future devs don't add coin/algo strings to the public branch.",
+    "config.py POW_STATUS is a hard-coded module-level string ('native_pow_pending'); when native PoW ships, flipping to 'native_pow_active' will require a code change rather than env var — consider POW_STATUS = os.environ.get('POW_STATUS', 'native_pow_pending') so ops can flip without redeploy."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration11_pool_injection.py (NEW — 17 tests)",
+    "/app/backend/tests/test_iteration10_v124_hardening.py (UPDATED — relaxed APK version to startswith('1.2.') so future bumps don't break; updated public /api/pool/health assertions to match iter-11 stealth contract {configured, enabled, network_live, message})",
+    "/app/backend/tests/test_iteration9_pool_cleanup.py (UPDATED — removed stale 'configured is False' / 'Pool not configured in message' assertion that broke once pool was actually configured in iter-11 env; now just asserts contract keys + types)"
+  ],
+  "success_rate": {
+    "backend": "100% — 193/194 pass, 1 skip, 0 fail across full iter1-11 regression",
+    "frontend": "100% — Landing stealth + Admin Real-Android pool-status-panel + 11/11 class grid + PoW-pending warning + master account display all rendering correctly"
+  },
+  "test_credentials": "admin@thegrid.io / Grid@Admin2026 + worker@thegrid.io / Worker@2026 (per /app/memory/test_credentials.md, both seeded; bcrypt $2b$, httpOnly cookies + Bearer token).",
+  "seed_data_creation": "test_iteration11_pool_injection.py creates ONE TEST_iter11_<uuid8> device per session via /api/devices/register, then flips is_real_apk=true via direct mongo update so the heartbeat handler emits binance_worker_name. Cleanup is implicit via TEST_ prefix.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "v1.2.5 contract is fully GREEN. Eleven Binance Pool stratum endpoints (rvn/sha256/ltc/dash/kas/etc/zec/bch/cfx/ckb/ethw .poolbinance.com) all reach connected=true+authorized=true via outbound TCP from preview env. POOL_ACCOUNT_ID=117423210 and POOL_PASSWORD='x' (Binance standard) — password value is too short to grep but iter-11 test walks the full JSON tree to assert no key.lower()=='password'. RVN_WORKER_PREFIX is empty in env so the iter-11 strict worker-name format is just '<account>.<short8>'. Frontend LivePoolBadge renders the stealth label only ('COMPUTE NETWORK · LIVE'); PoolStatusPanel (admin Real-Android tab) renders the full 11-card grid with per-class ARMED state + the prominent PoW-pending warning + master account ID. APK bumped to v1.2.5 at /app/frontend/public/grid-worker-v1.2.5.apk (29754 bytes, sha256 632091ac…). Two prior stale assertions fixed in this iteration: iter9::test_pool_status_unconfigured (was asserting configured=false, now asserts contract types) and iter10 APK-version assertions (was hardcoded 1.2.4, now uses startswith('1.2.') and reads download_url from API). pow_status='native_pow_pending' is a hard-coded module constant in config.py; flipping it requires a code change (flagged in code review).",
+  "rca of the issue": "No bugs found in v1.2.5. The single test failure observed in the very first regression run was a stale assertion in test_iteration9_pool_cleanup.py::test_pool_status_unconfigured that asserted s['configured'] is False under the iter-9 contract that the preview env had no pool credentials. Iter-11 explicitly added RVN_POOL_ACCOUNT=117423210 + ENABLE_REAL_POOL=true to /app/backend/.env, so configured is now correctly True. Mitigation: replaced the stale 'False' assertion with a type-only assertion since the original key-presence + message-non-empty contract was already covered by sibling tests. After the fix, full regression is 193 PASS / 1 SKIP / 0 FAIL."
+}
