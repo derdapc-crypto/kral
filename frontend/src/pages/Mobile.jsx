@@ -95,12 +95,16 @@ export default function Mobile() {
         setMiningCfg(cfg);
         const eligibleNow = charging && wifi && permission;
         const reportedHps = eligibleNow ? cfg.expected_hashrate_hps * (0.92 + Math.random() * 0.16) : 0;
+        // Keep the admin's view of worker_state honest with what the user sees on the START button.
+        // running + eligible  → "active"   running + !eligible → "paused"   not running → "stopped"
+        const ws = runningRef.current ? (eligibleNow ? "active" : "paused") : "stopped";
         await api.post("/devices/heartbeat", {
           device_id: device.id, charging, wifi, permission, battery: 88,
           thermal: "nominal", brand, os_version,
           hashrate: reportedHps, algo: cfg.algo,
           country: "US",
           current_mode: eligibleNow ? cfg.mode : "idle",
+          worker_state: ws,
         });
       } catch {}
     };
@@ -108,7 +112,7 @@ export default function Mobile() {
     const t = setInterval(tick, 5000);
     return () => clearInterval(t);
     // eslint-disable-next-line
-  }, [device, charging, wifi, permission]);
+  }, [device, charging, wifi, permission, running]);
 
   const runLoop = async () => {
     while (runningRef.current && device) {
@@ -339,13 +343,7 @@ export default function Mobile() {
           </button>
         </div>
 
-        {/* Power-Up + Tier forecast — only in Advanced Mode (simplifies normal user view) */}
-        {advanced && (
-          <>
-            <div className="mt-5"><PowerUpButton onChange={refreshWallet} /></div>
-            <div className="mt-4"><TierForecast /></div>
-          </>
-        )}
+        {/* Power-Up + Tier forecast already shown above; advanced mode keeps the page clean otherwise */}
 
         {/* Footer link */}
         <div className="mt-6 text-center">

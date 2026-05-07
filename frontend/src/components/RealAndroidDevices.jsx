@@ -72,6 +72,9 @@ export default function RealAndroidDevices() {
 
   return (
     <div className="space-y-6" data-testid="real-android-section">
+      {/* Live Binance Pool status — honest connection state, never fakes */}
+      <PoolStatusPanel />
+
       {/* Hardware-farm deployment QR */}
       <ApkQrCard size={170} testId="admin-apk-qr" />
 
@@ -107,6 +110,13 @@ export default function RealAndroidDevices() {
             data-testid="android-real-only"
             className="accent-[#F2C94C]" />
           Real APK only
+        </label>
+        <label className="ml-2 inline-flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/60 cursor-pointer">
+          <input type="checkbox" checked={filter.show_demo}
+            onChange={(e) => setFilter((f) => ({ ...f, show_demo: e.target.checked }))}
+            data-testid="android-show-demo"
+            className="accent-[#F2C94C]" />
+          Show demo / seeded
         </label>
         <input type="text" placeholder="App version filter (e.g. 1.2.0)"
           value={filter.app_version}

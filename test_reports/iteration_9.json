@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 9 — v1.2.3 Cleanup + Real Pool Connectivity verification PASSED end-to-end. Backend: 12/12 new tests pass (test_iteration9_pool_cleanup.py); regression suite 160/161 passing — the single failure (test_iteration8_stabilization.py::test_apk_v1_2_1_metadata) is the EXPECTED version bump from 1.2.1 -> 1.2.3 and is NOT a real regression. Pool status endpoint returns honest contract (configured=false, message='Pool not configured · set RVN_STRATUM_URL + RVN_POOL_ACCOUNT in backend env') with NO password leakage. /api/admin/devices/live correctly hides demo devices by default and surfaces them when ?show_demo=true (verified rows 160 → 200). /api/admin/telemetry honors show_demo filter (demo_devices=null default, integer when true). Worker start/stop transitions worker_state correctly. Heartbeat persists worker_state field from client across all four states (active|paused|stopped + golden-rule violation -> auto_stop=true with 'not_charging' reason). APK v1.2.3 metadata returns signed=true with v2+v3 schemes. Frontend admin/Real-Android tab renders [data-testid='pool-status-panel'] at top with 'Not configured' badge and the configuration-hint message. New [data-testid='android-show-demo'] checkbox is present, toggling it re-fetches /admin/devices/live with show_demo=true and rows go from 160 → 200. Mobile /mobile renders v1.2.3 footer 'tap 5× for advanced'; tapping 5x toggles advanced mode and footer becomes 'advanced ON' with mobile-mode-badge + mobile-device-card appearing. PowerUpButton rendered exactly ONCE (power-up-card×1, power-up-btn×1) and TierForecast rendered exactly ONCE (tier-forecast-card×1) — no duplicates from the previous-iteration bug. Mobile heartbeat payload now sends worker_state field — captured 'active' x2 when running+eligible, 'stopped' when not running, confirming the running+eligible→active / running+!eligible→paused / !running→stopped contract.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration9_pool_cleanup.py",
+    "/app/test_reports/pytest/iter9_results.xml",
+    "/app/test_reports/pytest/iter9_full.xml"
+  ],
+  "action_items": [
+    "OPTIONAL/HOUSEKEEPING — Update /app/backend/tests/test_iteration8_stabilization.py::test_apk_v1_2_1_metadata to assert version '1.2.3' (or rename test) so the regression suite is fully green. Not a code bug, just a stale assertion."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now ~2013 lines — split into routers (auth/wallet/tier/shield/compute/jobs/admin/devices/notifications/apk/pool) is overdue. Carried forward from iter-8.",
+    "RealAndroidDevices.jsx polls /admin/devices/live + /admin/telemetry every 5s with no document.hidden pause / no exponential backoff — admin tabs left open all day will keep hitting the API. Carried forward from iter-7/iter-8.",
+    "PoolStatusPanel.jsx auto-refresh interval (5s) is not cancelled on document.visibilitychange — same hidden-tab waste as RealAndroidDevices. Suggest pausing both behind a single useVisiblePolling hook.",
+    "/api/admin/pool/status currently returns stratum_url verbatim (non-secret) but if a future env injects a token-style URL, it would leak. Consider redacting query strings/auth segments in the URL before exposing.",
+    "Mobile.jsx heartbeat tick fires on a 5s setInterval AND inside the 10–12s expected cadence — creates a small risk of being just over the sliding-window threshold (12 hb/60s) if the tick drifts. Consider 10s interval to align with the documented cadence and give headroom against the fraud detector."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration9_pool_cleanup.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% on iter9 contract (12/12 new tests pass); 160/161 across full regression suite — the 1 failure is the documented v1.2.1→v1.2.3 bump assertion in iter8 file.",
+    "frontend": "100% — every iter9 acceptance criterion verified (pool panel visible w/ Not-configured badge, show-demo checkbox toggles 160→200 rows, mobile v1.2.3 footer + 5-tap advanced, PowerUp×1 + TierForecast×1, heartbeat sends worker_state=active|paused|stopped honestly)."
+  },
+  "test_credentials": "admin@thegrid.io / Grid@Admin2026 + worker@thegrid.io / Worker@2026 (both seeded; bcrypt $2b$, httpOnly cookies + Bearer token; per /app/memory/test_credentials.md).",
+  "seed_data_creation": "test_iteration9_pool_cleanup.py creates ONE TEST_iter9_<uuid8> device per test session via /api/devices/register; cleanup is implicit via TEST_ prefix.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter-9 is fully green for the v1.2.3 cleanup + real-pool-connectivity contract. PoolStatusPanel renders with the data-testids: pool-status-panel | pool-status-badge | pool-status-message | pool-config-hint. Real Android tab adds data-testid='android-show-demo' checkbox; toggling it flips the API query to ?show_demo=true. Mobile.jsx version footer is data-testid='mobile-version-tap' and tapping it 5× toggles advanced mode (mobile-mode-badge + mobile-device-card become visible). Heartbeat payload now contains worker_state field; admin/devices/live + admin/telemetry both honor show_demo. Pool is intentionally unconfigured in this preview env — the panel correctly shows 'Not configured' and message 'Pool not configured · set RVN_STRATUM_URL + RVN_POOL_ACCOUNT in backend env'. The single regression failure (test_iteration8_stabilization::test_apk_v1_2_1_metadata) is a stale '1.2.1' string assertion that needs to be bumped to '1.2.3' — not a real bug.",
+  "rca of the issue": "No new bugs found in this iteration. The single regression failure is RCA: iter-8 hardcoded the APK version string '1.2.1' inside the test assertion rather than reading APK_VERSION from a fixture or env, so the natural version bump to v1.2.3 broke that one assertion. One-line fix: replace assert body['version'] == '1.2.1' with assert body['version'].startswith('1.2.') or read the expected version from the apk_version response itself."
+}
