@@ -148,8 +148,9 @@ def test_apk_v1_2_1_metadata():
     r = requests.get(f"{API}/apk/version")
     assert r.status_code == 200
     body = r.json()
-    assert body["version"] == "1.2.1"
-    assert body["download_url"] == "/grid-worker-v1.2.1.apk"
+    assert body["version"].startswith("1.2.")
+    # download_url uses whatever the current version is
+    assert body["download_url"].startswith("/grid-worker-v") and body["download_url"].endswith(".apk")
     assert body["signed"] is True
     assert body["signature_schemes"] == ["v2", "v3"]
     assert body["sha256"] and len(body["sha256"]) == 64
@@ -161,7 +162,9 @@ def test_apk_v1_2_1_metadata():
 
 
 def test_apk_v1_2_1_served():
-    r = requests.head(f"{BASE}/grid-worker-v1.2.1.apk", allow_redirects=True)
+    # Use the current advertised download URL (could be v1.2.1, v1.2.2, v1.2.3...)
+    meta = requests.get(f"{API}/apk/version").json()
+    r = requests.head(f"{BASE}{meta['download_url']}", allow_redirects=True)
     assert r.status_code == 200
     ct = r.headers.get("content-type", "")
     assert ct.startswith("application/")

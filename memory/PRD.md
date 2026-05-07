@@ -112,6 +112,14 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - Real device geocoding for the war map.
 - Native mobile worker (Kotlin/RN/Flutter) — Manifest+Gradle scaffolding shipped.
 
+**Iter 9 (2026-02-15)** — **v1.2.3 Cleanup + Real Pool Connectivity (UI completion)**
+- **Binance Pool RVN Stratum proxy** (`pool_proxy.py`) wired: honest `GET /api/admin/pool/status` returns `configured/enabled/connected/subscribed/authorized/accepted_shares/rejected_shares/last_share_at/workers_registered/message`. No password leak. When unset, panel shows `"Pool not configured · set RVN_STRATUM_URL + RVN_POOL_ACCOUNT in backend env"`.
+- **Admin "Real Android" tab**: `<PoolStatusPanel />` rendered at top with real-time 5s refresh; new **Show demo / seeded** checkbox (`data-testid="android-show-demo"`) flips `?show_demo=true`. Default view hides demo/seeded devices (160 real → 200 with demos in this preview env).
+- **Mobile.jsx**: removed duplicate `PowerUpButton` + `TierForecast` (were rendered twice in normal+advanced modes); heartbeat now sends `worker_state` field — `running+eligible→active`, `running+!eligible→paused`, `!running→stopped` — keeping admin's view of state honest with the user's START button.
+- **Backend `/devices/heartbeat`** persists client-supplied `worker_state` (already in `HeartbeatIn` model since iter 7) and derives `status_val` accordingly.
+- **APK v1.2.3** (29.1 KB, signed v2+v3) — no functional change vs v1.2.1; version bump aligns with the rebrand cleanup. Test assertions now use `body["version"].startswith("1.2.")` instead of hard-coded `"1.2.1"`.
+- **Tests**: 12 new in `test_iteration9_pool_cleanup.py`. Full regression: **172 passed, 1 skipped, 0 failed** across 9 iterations.
+
 ## Test Status
-- Backend: **115 / 116 collected, 0 failures, 1 intentional skip** across 6 test files (iter 1: 21, iter 2: 20, iter 3: 26, iter 4: 22, iter 5: 13, iter 6: 13 TGC suite).
-- Frontend: testing-agent iteration 6 — Mining tab loads without crash; Kill/Resume verified (P0 fixed); Admin Shield panel applies factor + reflects margin; Dashboard + /mobile show TGC counter, Power-Up card, Tier Forecast (flagship/mid/budget bars).
+- Backend: **172 / 173 collected, 0 failures, 1 intentional skip** across 9 iterations.
+- Frontend: testing-agent iteration 9 — Pool panel renders with "Not configured" badge + config hint; Show-demo checkbox toggles 160→200 rows; Mobile v1.2.3 footer 5-tap toggles advanced; PowerUp×1 + TierForecast×1 (no duplicates); heartbeat sends worker_state honestly.
