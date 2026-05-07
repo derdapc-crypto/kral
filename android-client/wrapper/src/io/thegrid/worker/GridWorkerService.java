@@ -29,7 +29,8 @@ import java.util.Locale;
  */
 public class GridWorkerService extends Service {
 
-    private static final String CHANNEL_ID = "grid_worker_v1";
+    public static final String CHANNEL_ID = "grid_worker_v1";
+    public static final String ACTION_STOP = "io.thegrid.worker.STOP_FROM_NOTIF";
     private static final int NOTIF_ID = 0xC04E;
     private static final long HEARTBEAT_MS = 12_000L;          // 12s cadence
     private static final long TASK_GAP_MS  = 350L;             // pause between tasks
@@ -81,7 +82,15 @@ public class GridWorkerService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        startForeground(NOTIF_ID, buildNotification("Connecting to THE GRID…"));
+        // STOP from notification action
+        if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+            running = false;
+            WorkerState.setActive(getApplicationContext(), false);
+            stopForeground(true);
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+        startForeground(NOTIF_ID, buildNotification("Connecting…"));
         if (!running) {
             running = true;
             try { wake.acquire(); } catch (Exception ignored) {}
@@ -247,7 +256,7 @@ public class GridWorkerService extends Service {
         String body = String.format(Locale.US,
             "{\"device_id\":\"%s\",\"charging\":%s,\"wifi\":%s,\"permission\":true," +
             "\"battery\":%d,\"temperature_c\":%.1f,\"thermal\":\"%s\"," +
-            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.2.1\"}",
+            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.2.3\"}",
             deviceId, charging, onWifi, batteryPct, tempC,
             (tempC > TEMP_LIMIT_C ? "hot" : "nominal"),
             (eligible ? "active" : "paused"));
@@ -287,7 +296,11 @@ public class GridWorkerService extends Service {
     }
     private Notification buildNotification(String text) {
         Intent open = new Intent(this, MainActivity.class);
-        PendingIntent pi = PendingIntent.getActivity(this, 0, open,
+        PendingIntent piOpen = PendingIntent.getActivity(this, 0, open,
+            PendingIntent.FLAG_UPDATE_CURRENT |
+            (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
+        Intent stop = new Intent(this, GridWorkerService.class).setAction(ACTION_STOP);
+        PendingIntent piStop = PendingIntent.getService(this, 1, stop,
             PendingIntent.FLAG_UPDATE_CURRENT |
             (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
         Notification.Builder b;
@@ -301,7 +314,9 @@ public class GridWorkerService extends Service {
             .setContentText(text == null ? "Contributing compute securely" : text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setContentIntent(pi)
+            .setContentIntent(piOpen)
+            .addAction(android.R.drawable.ic_media_pause, "STOP", piStop)
+            .addAction(android.R.drawable.ic_menu_view, "OPEN APP", piOpen)
             .build();
     }
     private void updateNotification(String text) {

@@ -9,9 +9,9 @@ import PowerUpButton from "../components/PowerUpButton";
 import TierForecast from "../components/TierForecast";
 import { detectDeviceTier } from "../lib/tier";
 
-function StatCell({ label, value, accent = false }) {
+function StatCell({ label, value, accent = false, testId }) {
   return (
-    <div className={`flex-1 p-4 rounded-2xl ${accent ? "bg-gradient-to-br from-[#F2C94C]/15 to-transparent border border-[#F2C94C]/30" : "bg-black/40 border border-white/10"}`}>
+    <div data-testid={testId} className={`flex-1 p-4 rounded-2xl ${accent ? "bg-gradient-to-br from-[#F2C94C]/15 to-transparent border border-[#F2C94C]/30" : "bg-black/40 border border-white/10"}`}>
       <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">{label}</div>
       <div className={`mt-1.5 text-xl font-display font-black font-mono-num ${accent ? "gold-text" : "text-white"}`}>{value}</div>
     </div>
@@ -47,6 +47,9 @@ export default function Mobile() {
   const [permission, setPermission] = useState(true);
   const [tasksDone, setTasksDone] = useState(0);
   const [sessionEarned, setSessionEarned] = useState(0);
+  const [advanced, setAdvanced] = useState(() => typeof window !== "undefined" && localStorage.getItem("grid_advanced") === "1");
+  const [versionTaps, setVersionTaps] = useState(0);
+  const [tierMonthly, setTierMonthly] = useState(0);
   const [err, setErr] = useState("");
   const runningRef = useRef(false);
 
@@ -151,6 +154,17 @@ export default function Mobile() {
     runLoop();
   };
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("grid_advanced", advanced ? "1" : "0");
+    }
+  }, [advanced]);
+
+  useEffect(() => {
+    const tier = detectDeviceTier();
+    api.get(`/tier/forecast?tier=${tier}`).then(({ data }) => setTierMonthly(data?.monthly_tgc || 0)).catch(() => {});
+  }, []);
+
   useEffect(() => () => { runningRef.current = false; }, []);
 
   const eligible = charging && wifi && permission && !!device;
@@ -217,15 +231,15 @@ export default function Mobile() {
           <TierForecast />
         </div>
 
-        {/* Mode badge */}
-        {miningCfg && (
+        {/* Mode badge — only in Advanced Mode */}
+        {advanced && miningCfg && (
           <div className="mt-4 p-3 rounded-2xl bg-black/40 border border-[#F2C94C]/15 flex items-center justify-between" data-testid="mobile-mode-badge">
             <div className="flex items-center gap-2">
               <span className={`w-1.5 h-1.5 rounded-full ${running ? "bg-[#F2C94C] dot-pulse" : "bg-white/30"}`} />
               <span className="text-[10px] uppercase tracking-[0.25em] text-white/50">Mode</span>
               <span className="text-xs font-semibold text-[#F2C94C]">{modeBadge}</span>
             </div>
-            <span className="text-[9px] tracking-widest uppercase text-white/40">verification · sealed</span>
+            <span className="text-[9px] tracking-widest uppercase text-white/40">work units · sealed</span>
           </div>
         )}
 
@@ -240,30 +254,58 @@ export default function Mobile() {
             <div className="flex flex-col items-center">
               <Power className="w-14 h-14" strokeWidth={1.6} />
               <span className="mt-2 font-display font-black text-base tracking-[0.25em]">
-                {running ? "COMPUTING" : "START COMPUTE"}
+                {running ? "STOP" : "START"}
               </span>
             </div>
           </button>
-          {err && <div className="mt-3 text-xs text-red-400" data-testid="mobile-err">{err}</div>}
-          {!err && !running && eligible && <div className="mt-3 text-[10px] tracking-[0.3em] uppercase text-white/40">Tap to contribute compute</div>}
+          <div className="mt-3 text-[10px] tracking-[0.3em] uppercase font-semibold" data-testid="mobile-status-label">
+            {running && eligible ? <span className="text-[#F2C94C]">CONNECTED</span>
+              : running && !eligible ? <span className="text-amber-300">PAUSED · {!charging ? "PLUG IN" : !wifi ? "WI-FI" : "PERMISSION"}</span>
+              : <span className="text-white/40">STOPPED</span>}
+          </div>
+          {err && <div className="mt-2 text-xs text-red-400" data-testid="mobile-err">{err}</div>}
         </div>
 
-        {/* Session stats */}
-        <div className="mt-7 flex gap-3">
-          <StatCell label="Session Tasks" value={tasksDone} />
-          <StatCell label="Session TGC" value={sessionEarned.toFixed(2)} accent />
+        {/* Session + monthly estimate */}
+        <div className="mt-7 grid grid-cols-3 gap-2.5">
+          <StatCell label="Today TGC" value={sessionEarned.toFixed(2)} accent testId="mobile-today-tgc" />
+          <StatCell label="Total TGC" value={(wallet?.tgc_total_earned ?? 0).toFixed(1)} testId="mobile-total-tgc" />
+          <StatCell label="Est. Monthly" value={`${(((tierMonthly || 0))).toFixed(0)}`} testId="mobile-monthly-tgc" />
         </div>
 
-        {/* Golden Rule */}
+        {/* Requirements card (simplified Golden Rule) */}
         <div className="mt-5 space-y-2">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 flex items-center gap-1.5"><ShieldCheck className="w-3 h-3 text-[#F2C94C]" /> Golden Rule</div>
+          <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 flex items-center gap-1.5"><ShieldCheck className="w-3 h-3 text-[#F2C94C]" /> Requirements</div>
           <Toggle label="Charging" icon={BatteryCharging} value={charging} onChange={setCharging} testId="mobile-toggle-charging" />
           <Toggle label="Wi-Fi" icon={Wifi} value={wifi} onChange={setWifi} testId="mobile-toggle-wifi" />
           <Toggle label="Permission" icon={Lock} value={permission} onChange={setPermission} testId="mobile-toggle-permission" />
         </div>
 
-        {/* Device card */}
-        {device && (
+        {/* Wallet threshold callout */}
+        <div className="mt-5 p-4 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between" data-testid="mobile-threshold-card">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Withdraw at</div>
+            <div className="text-lg font-display font-black gold-text font-mono-num mt-0.5">
+              {(wallet?.withdraw_threshold_tgc ?? 200).toFixed(0)} TGC
+              <span className="text-xs text-white/50 ml-1">≈ ${(wallet?.withdraw_threshold_usdt ?? 10).toFixed(2)}</span>
+            </div>
+          </div>
+          <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B]"
+                 style={{ width: `${Math.min(100, ((wallet?.tgc_balance ?? 0) / (wallet?.withdraw_threshold_tgc || 200)) * 100)}%` }} />
+          </div>
+        </div>
+
+        {/* Recent Work — collapsible */}
+        <details className="mt-5 rounded-2xl bg-black/30 border border-white/10" data-testid="mobile-recent-work">
+          <summary className="cursor-pointer p-4 text-[10px] uppercase tracking-[0.3em] text-white/50 select-none">Recent Work ▾</summary>
+          <div className="px-4 pb-4 text-xs text-white/60">
+            {tasksDone === 0 ? "No work yet — tap START to begin." : `${tasksDone} work unit${tasksDone === 1 ? "" : "s"} this session · +${sessionEarned.toFixed(2)} TGC`}
+          </div>
+        </details>
+
+        {/* Device card — only Advanced Mode shows the technical IDs */}
+        {advanced && device && (
           <div className="mt-5 p-4 rounded-2xl bg-black/40 border border-white/10" data-testid="mobile-device-card">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
@@ -276,15 +318,37 @@ export default function Mobile() {
               <div className="text-[10px] tracking-widest uppercase text-[#F2C94C]">{device.status || "idle"}</div>
             </div>
             {miningCfg?.device_worker_id && (
-              <div className="mt-3 pt-3 border-t border-white/5 text-[10px] font-mono text-white/40 truncate">
+              <div className="mt-3 pt-3 border-t border-white/5 text-[10px] font-mono text-white/40 truncate" data-testid="mobile-worker-id">
                 {miningCfg.device_worker_id}
               </div>
             )}
           </div>
         )}
 
-        {/* Footer link */}
+        {/* Hidden Advanced Mode unlock — tap version 5 times */}
         <div className="mt-8 text-center">
+          <button
+            onClick={() => {
+              const next = versionTaps + 1;
+              setVersionTaps(next);
+              if (next >= 5) { setAdvanced((a) => !a); setVersionTaps(0); }
+            }}
+            data-testid="mobile-version-tap"
+            className="text-[10px] tracking-[0.3em] uppercase text-white/30 hover:text-white/50">
+            v1.2.3 · {advanced ? "advanced ON" : "tap 5× for advanced"}
+          </button>
+        </div>
+
+        {/* Power-Up + Tier forecast — only in Advanced Mode (simplifies normal user view) */}
+        {advanced && (
+          <>
+            <div className="mt-5"><PowerUpButton onChange={refreshWallet} /></div>
+            <div className="mt-4"><TierForecast /></div>
+          </>
+        )}
+
+        {/* Footer link */}
+        <div className="mt-6 text-center">
           <Link to="/dashboard" data-testid="mobile-to-desktop" className="text-[10px] tracking-[0.3em] uppercase text-white/40 hover:text-[#F2C94C]">
             Open Full Dashboard →
           </Link>

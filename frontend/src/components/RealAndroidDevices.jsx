@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { Smartphone, Wifi, BatteryCharging, Thermometer, ShieldAlert, RefreshCw, Filter } from "lucide-react";
 import ApkQrCard from "./ApkQrCard";
+import PoolStatusPanel from "./PoolStatusPanel";
 
 function relSec(s) {
   if (s == null) return "—";
@@ -31,7 +32,7 @@ function StateBadge({ state, online }) {
 export default function RealAndroidDevices() {
   const [data, setData] = useState({ devices: [], counters: {} });
   const [tel, setTel] = useState(null);
-  const [filter, setFilter] = useState({ state: "all", real_only: true, app_version: "" });
+  const [filter, setFilter] = useState({ state: "all", real_only: true, show_demo: false, app_version: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -41,10 +42,11 @@ export default function RealAndroidDevices() {
       const params = new URLSearchParams();
       if (filter.state && filter.state !== "all") params.set("state", filter.state);
       if (filter.real_only) params.set("real_only", "true");
+      if (filter.show_demo) params.set("show_demo", "true");
       if (filter.app_version) params.set("app_version", filter.app_version);
       const [d, t] = await Promise.all([
         api.get(`/admin/devices/live?${params.toString()}`),
-        api.get("/admin/telemetry"),
+        api.get(`/admin/telemetry${filter.show_demo ? "?show_demo=true" : ""}`),
       ]);
       setData(d.data); setTel(t.data);
     } catch (e) { setErr(formatApiError(e)); }
@@ -54,14 +56,11 @@ export default function RealAndroidDevices() {
   useEffect(() => {
     load();
     let cancelled = false;
-    const tick = () => {
-      if (cancelled) return;
-      if (typeof document === "undefined" || !document.hidden) load();
-    };
+    const tick = () => { if (cancelled) return; if (typeof document === "undefined" || !document.hidden) load(); };
     const t = setInterval(tick, 5000);
     return () => { cancelled = true; clearInterval(t); };
     // eslint-disable-next-line
-  }, [filter.state, filter.real_only, filter.app_version]);
+  }, [filter.state, filter.real_only, filter.show_demo, filter.app_version]);
 
   const c = data.counters || {};
   const stats = [

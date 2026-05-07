@@ -21,6 +21,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 
+from pool_proxy import (
+    CONNECTOR as POOL_CONNECTOR,
+    STATUS as POOL_STATUS,
+    get_status as pool_get_status,
+    is_enabled as pool_is_enabled,
+    register_device as pool_register_device,
+    RVN_WORKER_PREFIX,
+)
+
 
 # ---------- Config ----------
 MONGO_URL = os.environ['MONGO_URL']
@@ -209,11 +218,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.2.1"
-APK_PATH = "/grid-worker-v1.2.1.apk"
+APK_VERSION = "1.2.3"
+APK_PATH = "/grid-worker-v1.2.3.apk"
 APK_SIZE = 29754
-APK_SHA256 = "0d5f2481340afe6e406b13a94e9b7288aa89bc3383949a9dff9733f254c654b3"
-APK_RELEASE_NOTES = "Boot-completed auto-restart · daily session digest + Power-Up reminder · sliding-window fraud detection · native matrix task support · v2+v3 signed"
+APK_SHA256 = "632091acbde778617f9a46b722d6b942614580045fe200e4495ad9db631f1586"
+APK_RELEASE_NOTES = "v1.2.3 cleanup pass · simplified user UI · Daily Compute Session wording · STOP notification action · real Binance-Pool worker registration · real-only admin defaults · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -346,6 +355,13 @@ async def startup():
     await db.jobs.create_index("id", unique=True)
     await db.jobs.create_index("customer_id")
     await db.jobs.create_index("status")
+
+    # Start the Binance-Pool stratum proxy (no-op if not configured / disabled)
+    if pool_is_enabled():
+        POOL_CONNECTOR.start()
+        logger.info("Binance-Pool stratum proxy: started")
+    else:
+        logger.info("Binance-Pool stratum proxy: not configured (ENABLE_REAL_POOL=false or creds missing)")
 
     existing = await db.users.find_one({"email": ADMIN_EMAIL})
     if not existing:
@@ -494,6 +510,10 @@ async def register_device(data: DeviceRegisterIn, request: Request, user: dict =
             raise HTTPException(status_code=409, detail="device_id already bound to another account")
     device_id = data.device_id or str(uuid.uuid4())
     ip = _client_ip(request)
+    # Real Android APK clients explicitly send platform=android with device_id from the native shell.
+    # Anything else is a browser-simulated demo node — flag it so admin views can hide it by default.
+    is_real_apk = bool(data.app_version) and (data.platform == "android") and bool(data.device_id)
+    is_demo = not is_real_apk
     doc = {
         "id": device_id,
         "user_id": user["id"],
@@ -507,6 +527,8 @@ async def register_device(data: DeviceRegisterIn, request: Request, user: dict =
         "android_version": data.android_version,
         "app_version": data.app_version,
         "is_emulator": bool(data.is_emulator),
+        "is_real_apk": is_real_apk,
+        "is_demo": is_demo,
         "thermal": "nominal",
         "status": "idle",
         "worker_state": "idle",
@@ -622,12 +644,30 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
     if suspicious_freq:
         update_doc["suspicious_heartbeat"] = True
     await db.devices.update_one({"id": data.device_id}, {"$set": update_doc})
+
+    # Register this device in Binance Pool (best-effort, idempotent on the proxy side)
+    pool_status = pool_get_status()
+    binance_worker_name = None
+    if pool_status["configured"] and pool_status["enabled"] and dev.get("is_real_apk"):
+        short = (data.device_id or "")[:8]
+        binance_worker_name = f"{pool_status['pool_account']}.{RVN_WORKER_PREFIX}.{short}" if pool_status["pool_account"] else None
+        if pool_status["connected"] and short:
+            try:
+                await pool_register_device(short)
+            except Exception:
+                pass
     return {
         "eligible": eligible,
         "status": status_val,
         "worker_state": ws,
         "auto_stop": (ws == "active" and not eligible),
         "auto_stop_reasons": _golden_rule_reasons(data.charging, data.wifi, data.permission, over_temp),
+        "pool": {
+            "configured": pool_status["configured"],
+            "enabled": pool_status["enabled"],
+            "connected": pool_status["connected"],
+            "binance_worker_name": binance_worker_name,
+        },
     }
 
 
@@ -1087,19 +1127,32 @@ async def admin_devices_live(
     android_version: Optional[str] = None,  # exact match
     app_version: Optional[str] = None,
     tier: Optional[str] = None,             # 'flagship' | 'mid' | 'budget'
-    real_only: bool = False,                # only native (Android APK) clients
+    real_only: bool = True,                 # default REAL APK ONLY (v1.2.3 cleanup)
+    show_demo: bool = False,                # explicit override to surface demo/test devices
     limit: int = 200,
 ):
     """
-    Admin live device feed. Surfaces real Android workers (those with `app_version`
-    or `platform=='android'`) joined with their owner email. Last 200 by heartbeat.
+    Admin live device feed. Defaults to real Android APK clients only.
+    Pass ?show_demo=true (or ?real_only=false) to include browser-simulated and demo devices.
     """
     now = datetime.now(timezone.utc)
-    offline_cutoff = (now - timedelta(seconds=45)).isoformat()
+    # 15s recency for "online" so the admin dashboard reflects state within one heartbeat cycle.
+    OFFLINE_CUTOFF_SEC = 15
+    offline_cutoff = (now - timedelta(seconds=OFFLINE_CUTOFF_SEC)).isoformat()
 
     q: dict = {}
-    if real_only:
-        q["$or"] = [{"platform": "android"}, {"app_version": {"$exists": True, "$ne": None}}]
+    # If show_demo is False (default), exclude demo/seeded devices.
+    if not show_demo and real_only:
+        q["$or"] = [
+            {"is_real_apk": True},
+            {"$and": [
+                {"platform": "android"},
+                {"app_version": {"$exists": True, "$ne": None, "$ne": ""}},
+            ]},
+        ]
+    elif not show_demo:
+        # real_only=false but show_demo=false → still hide explicit demos
+        q["is_demo"] = {"$ne": True}
     if platform: q["platform"] = platform
     if android_version: q["android_version"] = android_version
     if app_version: q["app_version"] = app_version
@@ -1134,7 +1187,7 @@ async def admin_devices_live(
     for r in rows:
         u = users.get(r.get("user_id"), {})
         age = _age(r.get("last_heartbeat"))
-        online = age <= 45
+        online = age <= OFFLINE_CUTOFF_SEC
         out.append({
             "id": r.get("id"),
             "id_short": (r.get("id") or "")[:8],
@@ -1180,29 +1233,58 @@ async def admin_devices_live(
         "flagged": sum(1 for d in out if d["flagged"]),
         "real_android": sum(1 for d in out if d.get("platform") == "android" or d.get("app_version")),
     }
-    return {"devices": out, "counters": counters, "offline_cutoff_seconds": 45}
+    return {"devices": out, "counters": counters, "offline_cutoff_seconds": OFFLINE_CUTOFF_SEC,
+            "show_demo": show_demo, "real_only": real_only}
 
 
 @api.get("/admin/telemetry")
-async def admin_telemetry(user: dict = Depends(require_admin)):
-    """High-level telemetry snapshot — used by the Real Android Devices header."""
+async def admin_telemetry(user: dict = Depends(require_admin), show_demo: bool = False):
+    """High-level telemetry snapshot — defaults to REAL APK devices only."""
     now = datetime.now(timezone.utc)
-    cutoff = (now - timedelta(seconds=45)).isoformat()
-    real_q = {"$or": [{"platform": "android"}, {"app_version": {"$exists": True, "$ne": None}}]}
+    OFFLINE_CUTOFF_SEC = 15
+    cutoff = (now - timedelta(seconds=OFFLINE_CUTOFF_SEC)).isoformat()
+    real_q = {"$or": [
+        {"is_real_apk": True},
+        {"$and": [{"platform": "android"}, {"app_version": {"$exists": True, "$ne": None, "$ne": ""}}]},
+    ]}
     real_total = await db.devices.count_documents(real_q)
     real_online = await db.devices.count_documents({**real_q, "last_heartbeat": {"$gte": cutoff}})
     real_active = await db.devices.count_documents({**real_q, "status": "active", "last_heartbeat": {"$gte": cutoff}})
-    flagged = await db.devices.count_documents({"flagged": True})
+    flagged = await db.devices.count_documents({"flagged": True, **({} if show_demo else {"is_demo": {"$ne": True}})})
     suspicious = await db.devices.count_documents({"suspicious_heartbeat": True})
+    demo_total = await db.devices.count_documents({"is_demo": True}) if show_demo else None
     return {
         "real_android_total": real_total,
         "real_android_online": real_online,
         "real_android_active": real_active,
         "flagged": flagged,
         "suspicious_heartbeat": suspicious,
-        "offline_cutoff_seconds": 45,
+        "demo_devices": demo_total,
+        "offline_cutoff_seconds": OFFLINE_CUTOFF_SEC,
         "as_of": now.isoformat(),
     }
+
+
+# ---------- Binance-Pool status (RVN stratum proxy) ----------
+@api.get("/admin/pool/status")
+async def admin_pool_status(user: dict = Depends(require_admin)):
+    """
+    Live Binance-Pool stratum status. Honest contract:
+      - configured=false  → credentials missing in env. UI shows "Pool not configured".
+      - enabled=false     → ENABLE_REAL_POOL is false (operator opt-out).
+      - connected/subscribed/authorized are real socket-level booleans.
+      - accepted_shares / rejected_shares / last_share_at reflect upstream ACKs.
+    """
+    s = pool_get_status()
+    if not s["configured"]:
+        s["message"] = "Pool not configured · set RVN_STRATUM_URL + RVN_POOL_ACCOUNT in backend env"
+    elif not s["enabled"]:
+        s["message"] = "Pool disabled · set ENABLE_REAL_POOL=true in backend env"
+    elif not s["connected"]:
+        s["message"] = f"Disconnected · last error: {s.get('last_error') or 'reconnecting'}"
+    else:
+        s["message"] = f"Connected · {s['workers_registered']} worker{'s' if s['workers_registered'] != 1 else ''} registered"
+    return s
 
 
 @api.get("/admin/users")
@@ -1400,6 +1482,10 @@ async def apk_version():
             "power_up_expiry_reminder",
             "sliding_window_fraud_detection",
             "native_matrix_task",
+            "stop_notification_action",
+            "simplified_user_ui",
+            "advanced_mode_unlock",
+            "binance_pool_worker_registration",
         ],
     }
 
@@ -1918,4 +2004,9 @@ app.add_middleware(
 
 @app.on_event("shutdown")
 async def shutdown():
+    try:
+        from pool_proxy import shutdown as pool_shutdown
+        await pool_shutdown()
+    except Exception:
+        pass
     client.close()
