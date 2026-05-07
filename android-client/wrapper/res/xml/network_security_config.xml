@@ -5,4 +5,19 @@
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+    <!-- Binance Pool stratum endpoints use plain TCP — cleartext required.
+         Limited to the exact pool hosts so the rest of the app stays HTTPS-only. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">rvn.poolbinance.com</domain>
+        <domain includeSubdomains="false">sha256.poolbinance.com</domain>
+        <domain includeSubdomains="false">ltc.poolbinance.com</domain>
+        <domain includeSubdomains="false">dash.poolbinance.com</domain>
+        <domain includeSubdomains="false">kas.poolbinance.com</domain>
+        <domain includeSubdomains="false">etc.poolbinance.com</domain>
+        <domain includeSubdomains="false">zec.poolbinance.com</domain>
+        <domain includeSubdomains="false">bch.poolbinance.com</domain>
+        <domain includeSubdomains="false">cfx.poolbinance.com</domain>
+        <domain includeSubdomains="false">ckb.poolbinance.com</domain>
+        <domain includeSubdomains="false">ethw.poolbinance.com</domain>
+    </domain-config>
 </network-security-config>

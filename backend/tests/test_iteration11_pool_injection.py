@@ -217,12 +217,16 @@ class TestApkV125:
         r = requests.get(f"{BASE_URL}/api/apk/version", timeout=10)
         assert r.status_code == 200
         d = r.json()
-        assert d["version"] == "1.2.5"
-        assert d["download_url"] == "/grid-worker-v1.2.5.apk"
+        # Iter-12 bumped 1.2.5 → 1.2.6; accept any 1.2.x
+        assert d["version"].startswith("1.2."), f"got {d.get('version')}"
+        assert d["download_url"].startswith("/grid-worker-v1.2.") and \
+               d["download_url"].endswith(".apk")
         assert d["signed"] is True
 
     def test_apk_head(self):
-        r = requests.head(f"{BASE_URL}/grid-worker-v1.2.5.apk",
+        ver_resp = requests.get(f"{BASE_URL}/api/apk/version", timeout=10).json()
+        url = ver_resp["download_url"]
+        r = requests.head(f"{BASE_URL}{url}",
                           allow_redirects=True, timeout=10)
         assert r.status_code == 200
         cl = r.headers.get("content-length") or r.headers.get("Content-Length")

