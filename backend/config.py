@@ -48,5 +48,5 @@ PRIMARY_COIN: str = next((c for c, e in POOL_ENDPOINTS.items() if e.get("primary
 # Native PoW status: the Android worker currently solves THE GRID's internal
 # verification tasks (Mulberry32 + low-difficulty SHA-256). Real per-algo PoW
 # requires native libraries (KawPow, Scrypt, Etchash…) — P2 backlog.
-# This flag flips to "native_pow_active" once the on-device PoW shipping is shipped.
-POW_STATUS: str = "native_pow_pending"
+# Flip via env (POW_STATUS=native_pow_active) once on-device PoW ships — no redeploy needed.
+POW_STATUS: str = os.environ.get("POW_STATUS", "native_pow_pending").strip() or "native_pow_pending"
