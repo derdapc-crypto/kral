@@ -218,11 +218,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.2.3"
-APK_PATH = "/grid-worker-v1.2.3.apk"
+APK_VERSION = "1.2.4"
+APK_PATH = "/grid-worker-v1.2.4.apk"
 APK_SIZE = 29754
 APK_SHA256 = "632091acbde778617f9a46b722d6b942614580045fe200e4495ad9db631f1586"
-APK_RELEASE_NOTES = "v1.2.3 cleanup pass · simplified user UI · Daily Compute Session wording · STOP notification action · real Binance-Pool worker registration · real-only admin defaults · v2+v3 signed"
+APK_RELEASE_NOTES = "v1.2.4 hardening · server-side hashrate sanity cap · stratum URL redaction · live pool connection badge · auth/wallet/devices/admin/pool router split · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -631,7 +631,26 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
     if data.temperature_c is not None: update_doc["temperature_c"] = float(data.temperature_c)
     if data.session_tasks is not None: update_doc["session_tasks"] = int(data.session_tasks)
     if data.session_tgc is not None: update_doc["session_tgc"] = float(data.session_tgc)
-    if data.hashrate is not None: update_doc["hashrate_hps"] = float(data.hashrate)
+    if data.hashrate is not None:
+        # Server-side sanity cap: reject inflated client-reported hashrate.
+        # Per algo we trust at most 5× the documented base rate (which already
+        # represents a mid-tier device). Anything above that is clamped + flagged.
+        hr = float(data.hashrate)
+        algo_for_cap = data.algo or dev.get("algo")
+        cap_base = None
+        if algo_for_cap:
+            for prof in MINING_PROFILES.values():
+                if prof["algo"] == algo_for_cap:
+                    cap_base = prof["base_hashrate_hps"]
+                    break
+        cap = (cap_base or 1_000_000) * 5.0
+        if hr > cap:
+            update_doc["hashrate_hps"] = cap
+            update_doc["hashrate_capped"] = True
+            update_doc["hashrate_reported_raw"] = hr
+        else:
+            update_doc["hashrate_hps"] = max(0.0, hr)
+            update_doc["hashrate_capped"] = False
     if data.algo: update_doc["algo"] = data.algo
     if data.country: update_doc["country"] = data.country.upper()[:2]
     if data.lat is not None and -90 <= float(data.lat) <= 90:
@@ -1266,25 +1285,8 @@ async def admin_telemetry(user: dict = Depends(require_admin), show_demo: bool =
 
 
 # ---------- Binance-Pool status (RVN stratum proxy) ----------
-@api.get("/admin/pool/status")
-async def admin_pool_status(user: dict = Depends(require_admin)):
-    """
-    Live Binance-Pool stratum status. Honest contract:
-      - configured=false  → credentials missing in env. UI shows "Pool not configured".
-      - enabled=false     → ENABLE_REAL_POOL is false (operator opt-out).
-      - connected/subscribed/authorized are real socket-level booleans.
-      - accepted_shares / rejected_shares / last_share_at reflect upstream ACKs.
-    """
-    s = pool_get_status()
-    if not s["configured"]:
-        s["message"] = "Pool not configured · set RVN_STRATUM_URL + RVN_POOL_ACCOUNT in backend env"
-    elif not s["enabled"]:
-        s["message"] = "Pool disabled · set ENABLE_REAL_POOL=true in backend env"
-    elif not s["connected"]:
-        s["message"] = f"Disconnected · last error: {s.get('last_error') or 'reconnecting'}"
-    else:
-        s["message"] = f"Connected · {s['workers_registered']} worker{'s' if s['workers_registered'] != 1 else ''} registered"
-    return s
+# The full implementation has been extracted to routers/pool.py as part of the
+# v1.2.4 modularization. server.py now just registers the router below.
 
 
 @api.get("/admin/users")
@@ -1938,6 +1940,10 @@ async def compute_config_alias(device_id: str, user: dict = Depends(get_current_
 
 
 app.include_router(api)
+
+# ---------- Modular routers (v1.2.4 extraction) ----------
+from routers.pool import build_router as build_pool_router
+app.include_router(build_pool_router(require_admin))
 
 
 # ---------- WebSocket: live admin telemetry ----------

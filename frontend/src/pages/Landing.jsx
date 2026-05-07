@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { ArrowRight, Cpu, Globe2, Zap, Shield, Lock, Sparkles, Smartphone, BatteryCharging, Wifi, CheckCircle2, Download, Briefcase } from "lucide-react";
 import ApkSetupModal from "../components/ApkSetupModal";
 import ApkQrCard from "../components/ApkQrCard";
+import LivePoolBadge from "../components/LivePoolBadge";
 
 const HERO_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/de66970575fd0c962a0ae5998fbd3ca1fb71b7d5fc3bbccec837805a15b80cb7.png";
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
@@ -143,9 +144,12 @@ export default function Landing() {
 
         <div className="relative max-w-7xl mx-auto px-6 sm:px-10 pt-20 pb-28 grid lg:grid-cols-[1.2fr_1fr] gap-16 items-center">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border gold-border text-[11px] tracking-[0.25em] uppercase text-[#F2C94C] mb-8">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F2C94C] dot-pulse" />
-              Series-A Class Infrastructure · Live
+            <div className="inline-flex items-center gap-3 flex-wrap mb-8">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border gold-border text-[11px] tracking-[0.25em] uppercase text-[#F2C94C]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F2C94C] dot-pulse" />
+                Series-A Class Infrastructure · Live
+              </div>
+              <LivePoolBadge />
             </div>
             <h1 className="font-display font-black text-5xl sm:text-6xl lg:text-7xl leading-[0.95] tracking-tighter">
               Own a Piece of the

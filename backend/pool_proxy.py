@@ -43,6 +43,30 @@ def _is_configured() -> bool:
     return bool(RVN_STRATUM_URL and RVN_POOL_ACCOUNT)
 
 
+def _redact_stratum_url(url: str) -> Optional[str]:
+    """
+    Sanitise a stratum URL before exposing it via the API.
+    Strips:
+      - userinfo (user:password@host)  →  host
+      - query string / fragment        →  drops them entirely
+    Keeps:  scheme + host + :port  (e.g. stratum+tcp://rvn.poolbinance.com:3334)
+    """
+    if not url:
+        return None
+    s = url.strip()
+    # Drop fragment + query
+    s = s.split("#", 1)[0].split("?", 1)[0]
+    # Split scheme
+    if "://" in s:
+        scheme, rest = s.split("://", 1)
+    else:
+        scheme, rest = "stratum+tcp", s
+    # Drop userinfo
+    if "@" in rest:
+        rest = rest.rsplit("@", 1)[1]
+    return f"{scheme}://{rest}"
+
+
 def _parse_url(url: str):
     # stratum+tcp://host:port  or  stratum+ssl://host:port
     if "://" in url:
@@ -88,7 +112,7 @@ class PoolStatus:
             "connected": self.connected,
             "subscribed": self.subscribed,
             "authorized": self.authorized,
-            "stratum_url": RVN_STRATUM_URL or None,
+            "stratum_url": _redact_stratum_url(RVN_STRATUM_URL) if RVN_STRATUM_URL else None,
             "pool_account": RVN_POOL_ACCOUNT or None,
             "worker_prefix": RVN_WORKER_PREFIX,
             "accepted_shares": self.accepted_shares,
