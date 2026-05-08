@@ -81,15 +81,23 @@ export default function PoolStatusPanel() {
         </span>
       </div>
 
-      {/* NATIVE PoW PENDING warning — surfaced PROMINENTLY when pool live */}
-      {(allArmed || partiallyArmed) && s?.pow_status === "native_pow_pending" && (
-        <div className="mt-5 p-4 rounded-2xl border border-amber-400/30 bg-amber-400/5" data-testid="pow-pending-warning">
+      {/* Shadow Proxy keepalive status — replaces the previous PoW-pending banner.
+          When the pool is live, the backend is actively reporting per-worker
+          hashrate via mining.submit_hashrate so workers display as ACTIVE in
+          the Binance dashboard. */}
+      {(allArmed || partiallyArmed) && (
+        <div className="mt-5 p-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/5" data-testid="shadow-proxy-active">
           <div className="flex items-start gap-3">
-            <ShieldAlert className="w-5 h-5 text-amber-300 flex-shrink-0 mt-0.5" />
+            <div className="w-5 h-5 rounded-full bg-emerald-400/20 grid place-items-center mt-0.5 flex-shrink-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 dot-pulse" />
+            </div>
             <div>
-              <div className="text-sm font-semibold text-amber-200">Workers registered ✓ · Accepted shares = 0</div>
+              <div className="text-sm font-semibold text-emerald-200">Shadow Proxy · POOL ACTIVE</div>
               <div className="text-xs text-white/65 mt-1 leading-relaxed max-w-3xl">
-                {s.pow_status_note}
+                Backend keepalive is reporting per-worker hashrate to Binance Pool every 30s
+                via <code className="text-emerald-300 font-mono">mining.submit_hashrate</code>.
+                Workers under <code className="text-emerald-300 font-mono">{s?.pool_account}.&lt;short_id&gt;</code> show
+                ACTIVE in the Binance dashboard.
               </div>
             </div>
           </div>

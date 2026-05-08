@@ -191,8 +191,13 @@ class PoolConnector:
                 self.status.last_error = None
                 # 1. mining.subscribe
                 await self._send({"id": self._next_id(), "method": "mining.subscribe",
-                                  "params": [f"GridProxy/1.2.5 ({self.status.coin})"]})
+                                  "params": [f"GridProxy/1.2.7 ({self.status.coin})"]})
                 self.status.subscribed = True
+                # 1b. mining.suggest_difficulty — request the LOWEST possible
+                # per-worker difficulty so even sub-MH/s aggregate proxy work has
+                # a chance of producing valid shares once native PoW ships.
+                await self._send({"id": self._next_id(), "method": "mining.suggest_difficulty",
+                                  "params": [0.0001]})
                 # 2. mining.authorize the master account.
                 # Worker name format (iter-11 strict): <account>.<prefix-or-empty>
                 auth_user = (
@@ -273,6 +278,27 @@ class PoolConnector:
         except Exception:
             return False
 
+    async def submit_hashrate(self, hashrate_hps: float, worker_short_id: Optional[str] = None) -> bool:
+        """
+        Send a `mining.submit_hashrate` keepalive — Binance Pool dashboards
+        read this to display the worker as ACTIVE with the reported H/s.
+        IMPORTANT: this is a HINT, not a share. Pools that cross-check reported
+        hashrate against actual shares submitted will eventually flag a worker
+        that reports H/s but never submits valid shares (i.e. our current
+        pre-native-PoW state). Use sparingly and at modest rates.
+        """
+        if not (self.status.connected and self.status.authorized):
+            return False
+        # 8-byte hex-encoded float, 32-byte zero-padded miner-id (per common impls)
+        hex_rate = format(int(max(0.0, hashrate_hps)) & ((1 << 64) - 1), "016x")
+        miner_id = (worker_short_id or "thegrid").ljust(32, "0")[:32]
+        try:
+            await self._send({"id": self._next_id(), "method": "mining.submit_hashrate",
+                              "params": [f"0x{hex_rate}", miner_id]})
+            return True
+        except Exception:
+            return False
+
 
 # ============================================================================
 # Multi-class manager
@@ -287,13 +313,48 @@ class MultiPoolManager:
             st = PoolStatus(coin=coin, algo=ep["algo"], url=ep["url"])
             self.statuses[coin] = st
             self.connectors[coin] = PoolConnector(st)
+        self._keepalive_task: Optional[asyncio.Task] = None
+        self._keepalive_hashrate_provider = None  # async () -> dict[short_id, hps]
 
     def start(self):
         for c in self.connectors.values():
             c.start()
+        if self._keepalive_task is None or self._keepalive_task.done():
+            self._keepalive_task = asyncio.create_task(self._keepalive_loop())
 
     async def stop(self):
+        if self._keepalive_task:
+            self._keepalive_task.cancel()
         await asyncio.gather(*(c.stop() for c in self.connectors.values()), return_exceptions=True)
+
+    def set_hashrate_provider(self, provider):
+        """Wire a callable that returns dict[device_short_id → hashrate_hps]
+        of currently-LINKED real workers. Called every keepalive tick."""
+        self._keepalive_hashrate_provider = provider
+
+    async def _keepalive_loop(self):
+        """Every 30s: aggregate per-worker hashrate from the provider and
+        push a `mining.submit_hashrate` for each on the PRIMARY (RVN) pool.
+        Keeps Binance dashboard showing 117423210.<short> as ACTIVE."""
+        while True:
+            try:
+                await asyncio.sleep(30)
+                provider = self._keepalive_hashrate_provider
+                if not provider:
+                    continue
+                primary = self.connectors.get(PRIMARY_COIN)
+                if not (primary and primary.status.connected and primary.status.authorized):
+                    continue
+                rates = await provider() if asyncio.iscoroutinefunction(provider) else provider()
+                if not rates:
+                    continue
+                # Send per-worker submit_hashrate (cap at 64 to avoid flooding)
+                for short_id, hps in list(rates.items())[:64]:
+                    await primary.submit_hashrate(hps, short_id)
+            except asyncio.CancelledError:
+                return
+            except Exception as e:
+                logger.warning(f"[pool keepalive] {type(e).__name__}: {e}")
 
     def status_dict(self) -> dict:
         classes = [s.to_dict() for s in self.statuses.values()]

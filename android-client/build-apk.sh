@@ -8,7 +8,7 @@ cd "$(dirname "$0")/wrapper"
 SDK=/opt/android-sdk
 # Debian-packaged tools are native arm64 binaries; Google's downloaded d8.jar
 # is pure-Java so it runs on any arch. android.jar is data-only.
-DEB_BT=/usr/lib/android-sdk/build-tools/debian
+DEB_BT=/usr/bin
 PLATFORM=$SDK/platforms/android-34/android.jar
 D8_JAR=$SDK/build-tools/34.0.0/lib/d8.jar
 VERSION="${VERSION:-1.2.6}"

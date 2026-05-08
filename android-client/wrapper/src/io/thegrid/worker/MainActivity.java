@@ -1,11 +1,14 @@
 package io.thegrid.worker;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.view.Window;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
@@ -57,7 +60,7 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.2.3 Android");
+        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.2.7 Android");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
@@ -102,7 +105,30 @@ public class MainActivity extends Activity {
             GridWorkerService.start(this);
         }
 
+        // iter-13 / v1.2.7: nudge user to disable battery optimization for THE GRID.
+        // This is the SINGLE most important Android 14/15 fix to keep the
+        // foreground service alive when the screen is off and the device is idle.
+        requestBatteryOptimizationExemption();
+
         webView.loadUrl(GRID_URL);
+    }
+
+    private void requestBatteryOptimizationExemption() {
+        try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm == null) return;
+            String pkg = getPackageName();
+            if (pm.isIgnoringBatteryOptimizations(pkg)) return;
+            Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+            i.setData(Uri.parse("package:" + pkg));
+            startActivity(i);
+        } catch (Exception ignored) {
+            // If the OEM blocks this intent, fall back to the manual settings screen.
+            try {
+                startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+            } catch (Exception ignored2) {}
+        }
     }
 
     @Override
@@ -131,7 +157,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String getInfo() {
-            return "{\"version\":\"1.2.3\",\"native\":true,\"manufacturer\":\"" +
+            return "{\"version\":\"1.2.7\",\"native\":true,\"manufacturer\":\"" +
                 Build.MANUFACTURER + "\",\"model\":\"" + Build.MODEL +
                 "\",\"androidVersion\":\"" + Build.VERSION.RELEASE + "\",\"sdk\":" +
                 Build.VERSION.SDK_INT + "}";

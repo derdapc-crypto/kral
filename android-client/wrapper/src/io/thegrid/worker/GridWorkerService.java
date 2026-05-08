@@ -32,7 +32,7 @@ public class GridWorkerService extends Service {
     public static final String CHANNEL_ID = "grid_worker_v1";
     public static final String ACTION_STOP = "io.thegrid.worker.STOP_FROM_NOTIF";
     private static final int NOTIF_ID = 0xC04E;
-    private static final long HEARTBEAT_MS = 12_000L;          // 12s cadence
+    private static final long HEARTBEAT_MS = 10_000L;          // 10s cadence — real-time TGC sync
     private static final long TASK_GAP_MS  = 350L;             // pause between tasks
     private static final long ERROR_BACKOFF_MS = 4_000L;
     private static final float TEMP_LIMIT_C = 45.0f;
@@ -132,6 +132,7 @@ public class GridWorkerService extends Service {
     // ---------- main loop ----------
     private void workerLoop() {
         long lastHb = 0;
+        long lastWakeRefresh = 0;
         Context ctx = getApplicationContext();
 
         while (running) {
@@ -145,8 +146,22 @@ public class GridWorkerService extends Service {
                     sendHeartbeat(ctx, eligible);
                     lastHb = now;
                     updateNotification(eligible
-                        ? "Contributing compute · " + WorkerState.statsJson(ctx)
+                        ? "Computing · " + WorkerState.statsJson(ctx)
                         : autoStopReason());
+                }
+
+                // iter-13 / v1.2.7: refresh PARTIAL_WAKE_LOCK every 5s.
+                // Some Android 14/15 OEMs invalidate idle wake-locks; an explicit
+                // release+acquire cycle keeps the OS-level reference alive even
+                // when Doze/App-Standby tries to reclaim it.
+                if (now - lastWakeRefresh >= 5_000) {
+                    try {
+                        if (wake != null) {
+                            if (wake.isHeld()) wake.release();
+                            wake.acquire(10 * 60 * 1000L);  // 10 min ceiling
+                        }
+                    } catch (Exception ignored) {}
+                    lastWakeRefresh = now;
                 }
 
                 if (!eligible) {
@@ -276,7 +291,7 @@ public class GridWorkerService extends Service {
         String body = String.format(Locale.US,
             "{\"device_id\":\"%s\",\"charging\":%s,\"wifi\":%s,\"permission\":true," +
             "\"battery\":%d,\"temperature_c\":%.1f,\"thermal\":\"%s\"," +
-            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.2.6\"," +
+            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.2.7\"," +
             "\"stratum_linked\":%s}",
             deviceId, charging, onWifi, batteryPct, tempC,
             (tempC > TEMP_LIMIT_C ? "hot" : "nominal"),

