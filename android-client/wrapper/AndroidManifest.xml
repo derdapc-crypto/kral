@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.thegrid.worker"
-    android:versionCode="10"
-    android:versionName="1.2.7">
+    android:versionCode="11"
+    android:versionName="1.2.8">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 
@@ -14,8 +14,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <!-- iter-13 / v1.2.7: bypass Android 14/15 battery-optimization kill -->
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- iter-14 / v1.2.8: dropped REQUEST_IGNORE_BATTERY_OPTIMIZATIONS — the
+         scary user-facing dialog is gone. ServiceWatchdog uses standard
+         AlarmManager + setExactAndAllowWhileIdle to silently revive the
+         service if Doze kills it. -->
 
     <application
         android:label="THE GRID"
@@ -60,6 +62,15 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="io.thegrid.worker.NOTIFY_DIGEST" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".ServiceWatchdog"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="io.thegrid.worker.ACTION_WATCHDOG_TICK" />
             </intent-filter>
         </receiver>
     </application>

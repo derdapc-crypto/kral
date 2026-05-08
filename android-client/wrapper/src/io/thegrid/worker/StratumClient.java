@@ -86,7 +86,7 @@ public class StratumClient {
 
                 // 1) mining.subscribe
                 send(out, "{\"id\":" + (++reqId) + ",\"method\":\"mining.subscribe\","
-                    + "\"params\":[\"GridWorker/1.2.7\"]}\n");
+                    + "\"params\":[\"GridWorker/1.2.8\"]}\n");
                 subscribed = true;
 
                 // 2) mining.authorize  (THIS is what makes the worker appear in Binance worker list)

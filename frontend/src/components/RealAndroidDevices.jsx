@@ -99,6 +99,26 @@ export default function RealAndroidDevices() {
     } catch (e) { setErr(formatApiError(e)); }
   };
 
+  const totalPurge = async () => {
+    if (!window.confirm(
+      "TOTAL PURGE — wipe every demo, seeded, and outdated device. " +
+      "Devices with stratum_first_linked_at OR app_version >= 1.2.5 SURVIVE. " +
+      "This cannot be undone. Proceed?"
+    )) return;
+    try {
+      const { data: r } = await api.post("/admin/devices/wipe-all-fake");
+      alert(`Total Purge complete · ${r.deleted} device(s) deleted.`);
+      load();
+    } catch (e) { setErr(formatApiError(e)); }
+  };
+
+  const assignClass = async (deviceId, coin) => {
+    try {
+      await api.post(`/admin/devices/${deviceId}/assign-class`, { coin });
+      load();
+    } catch (e) { alert(formatApiError(e)); }
+  };
+
   return (
     <div className="space-y-6" data-testid="real-android-section">
       {/* "First Real Worker" — historic milestone card. Awaiting state by default;
@@ -163,8 +183,12 @@ export default function RealAndroidDevices() {
           <RefreshCw className={`w-3 h-3 ${busy ? "animate-spin" : ""}`} /> Refresh
         </button>
         <button onClick={wipeDemo} data-testid="wipe-demo-btn"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-red-400/30 text-red-300/80 text-[10px] uppercase tracking-widest hover:border-red-400 hover:text-red-300 hover:bg-red-500/5">
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-400/30 text-amber-300/80 text-[10px] uppercase tracking-widest hover:border-amber-400 hover:text-amber-300 hover:bg-amber-500/5">
           <Trash2 className="w-3 h-3" /> Wipe Demo
+        </button>
+        <button onClick={totalPurge} data-testid="total-purge-btn"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-red-500/40 text-red-300 text-[10px] uppercase tracking-widest hover:border-red-400 hover:bg-red-500/10 font-bold">
+          <Trash2 className="w-3 h-3" /> Total Purge
         </button>
       </div>
 
@@ -181,6 +205,7 @@ export default function RealAndroidDevices() {
               <th>Android</th>
               <th>State</th>
               <th>Stratum</th>
+              <th>Class</th>
               <th>Tasks · TGC</th>
               <th>Battery</th>
               <th>Temp</th>
@@ -190,7 +215,7 @@ export default function RealAndroidDevices() {
           </thead>
           <tbody>
             {(data.devices || []).length === 0 && (
-              <tr><td colSpan={11} className="text-center py-10 text-white/40">No devices match the current filters.</td></tr>
+              <tr><td colSpan={12} className="text-center py-10 text-white/40">No physical devices yet · awaiting installer.</td></tr>
             )}
             {(data.devices || []).map((d) => (
               <tr key={d.id} className={`border-b border-white/5 ${d.flagged ? "bg-red-500/5" : ""}`} data-testid={`android-row-${d.id_short}`}>
@@ -206,6 +231,26 @@ export default function RealAndroidDevices() {
                 <td className="text-[11px] text-white/60">{d.android_version || d.os_version || "—"}</td>
                 <td><StateBadge state={d.worker_state} online={d.online} /></td>
                 <td><StratumBadge linked={d.stratum_linked} /></td>
+                <td>
+                  <select
+                    data-testid={`assign-class-${d.id_short}`}
+                    value={d.assigned_coin || "AUTO"}
+                    onChange={(e) => assignClass(d.id, e.target.value)}
+                    className="bg-black/40 border border-white/10 hover:border-[#F2C94C]/40 text-[10px] uppercase tracking-widest text-white/80 px-2 py-1 rounded-full font-mono cursor-pointer focus:outline-none focus:border-[#F2C94C]">
+                    <option value="AUTO">AUTO</option>
+                    <option value="RVN">RVN</option>
+                    <option value="BTC">BTC</option>
+                    <option value="LTC">LTC</option>
+                    <option value="DASH">DASH</option>
+                    <option value="KAS">KAS</option>
+                    <option value="ETC">ETC</option>
+                    <option value="ZEC">ZEC</option>
+                    <option value="BCH">BCH</option>
+                    <option value="CFX">CFX</option>
+                    <option value="CKB">CKB</option>
+                    <option value="ETHW">ETHW</option>
+                  </select>
+                </td>
                 <td className="text-xs">
                   <div className="font-mono-num text-white">{d.session_tasks ?? 0}</div>
                   <div className="font-mono-num text-[#F2C94C] text-[10px]">+{(d.session_tgc || 0).toFixed(2)} TGC</div>

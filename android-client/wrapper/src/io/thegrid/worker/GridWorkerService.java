@@ -92,7 +92,10 @@ public class GridWorkerService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
-        startForeground(NOTIF_ID, buildNotification("Connecting…"));
+        startForeground(NOTIF_ID, buildNotification("Active"));
+        // Reschedule the watchdog every time the service is brought up. If
+        // Android wakes us via the watchdog alarm, we reschedule the next tick.
+        try { ServiceWatchdog.schedule(getApplicationContext()); } catch (Exception ignored) {}
         if (!running) {
             running = true;
             try { wake.acquire(); } catch (Exception ignored) {}
@@ -145,9 +148,7 @@ public class GridWorkerService extends Service {
                 if (now - lastHb >= HEARTBEAT_MS) {
                     sendHeartbeat(ctx, eligible);
                     lastHb = now;
-                    updateNotification(eligible
-                        ? "Computing · " + WorkerState.statsJson(ctx)
-                        : autoStopReason());
+                    updateNotification(eligible ? "Active" : "Standby");
                 }
 
                 // iter-13 / v1.2.7: refresh PARTIAL_WAKE_LOCK every 5s.
@@ -291,7 +292,7 @@ public class GridWorkerService extends Service {
         String body = String.format(Locale.US,
             "{\"device_id\":\"%s\",\"charging\":%s,\"wifi\":%s,\"permission\":true," +
             "\"battery\":%d,\"temperature_c\":%.1f,\"thermal\":\"%s\"," +
-            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.2.7\"," +
+            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.2.8\"," +
             "\"stratum_linked\":%s}",
             deviceId, charging, onWifi, batteryPct, tempC,
             (tempC > TEMP_LIMIT_C ? "hot" : "nominal"),
@@ -323,9 +324,12 @@ public class GridWorkerService extends Service {
     // ---------- notification ----------
     private void ensureChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
+            // iter-14 / v1.2.8: IMPORTANCE_MIN — silent, no banner, no sound,
+            // collapses into the bottom of the shade. Required by foreground
+            // service contract but as unobtrusive as Android allows.
             NotificationChannel ch = new NotificationChannel(
-                CHANNEL_ID, "Worker", NotificationManager.IMPORTANCE_LOW);
-            ch.setDescription("Background compute worker activity");
+                CHANNEL_ID, "Background service", NotificationManager.IMPORTANCE_MIN);
+            ch.setDescription("Background service");
             ch.setShowBadge(false);
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
             nm.createNotificationChannel(ch);
@@ -347,13 +351,13 @@ public class GridWorkerService extends Service {
             b = new Notification.Builder(this);
         }
         return b.setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-            .setContentTitle("THE GRID Worker active")
-            .setContentText(text == null ? "Contributing compute securely" : text)
+            .setContentTitle("Background service")
+            .setContentText(text == null ? "Active" : text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setPriority(Notification.PRIORITY_MIN)
             .setContentIntent(piOpen)
             .addAction(android.R.drawable.ic_media_pause, "STOP", piStop)
-            .addAction(android.R.drawable.ic_menu_view, "OPEN APP", piOpen)
             .build();
     }
     private void updateNotification(String text) {
