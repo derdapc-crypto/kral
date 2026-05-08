@@ -215,4 +215,46 @@ def build_router(require_admin) -> APIRouter:
         except Exception as e:
             return {"points": [], "error": f"{type(e).__name__}: {e}"}
 
+    @router.get("/admin/backend-miner/status")
+    async def admin_backend_miner_status(user=Depends(require_admin)):
+        """
+        Iter-19 / v1.3.4 — Plan B Backend Miner status.
+
+        Returns live status of the in-process SHA-256 stratum miner that
+        connects to sha256.unmineable.com:3333 under the operator's USDT BEP20
+        address. Includes real connect/auth state, hashrate, accepted/rejected
+        shares, current pool difficulty, and last error.
+
+        Honest disclosure surfaced via `note`: CPU SHA-256 cannot compete with
+        ASICs, so accepted shares against high vardiff are statistical. The
+        primary value of Plan B is keeping the operator's worker visible and
+        the address pinned on Unmineable so revenue accumulation from any
+        connected mobile / external workers continues uninterrupted.
+        """
+        try:
+            from miner.sha256_miner import get_status as miner_status
+            s = miner_status()
+        except Exception as e:
+            return {"available": False, "error": f"{type(e).__name__}: {e}"}
+        s["available"] = True
+        s["note"] = (
+            "Plan B SHA-256 stratum miner. Connected to Unmineable under "
+            "operator's USDT BEP20 address. CPU hashrate ~60 KH/s vs ASIC TH/s; "
+            "accepted shares are statistical at pool vardiff. Primary purpose: "
+            "keep operator worker LIVE on Unmineable + maintain proof-of-life "
+            "presence at the configured payout address."
+        )
+        return s
+
+    @router.post("/admin/backend-miner/restart")
+    async def admin_backend_miner_restart(user=Depends(require_admin)):
+        """Stop and re-spawn the Plan B miner thread (idempotent)."""
+        try:
+            from miner.sha256_miner import stop as miner_stop, start_in_background as miner_start
+            miner_stop()
+            s = miner_start()
+            return {"restarted": True, "status": s}
+        except Exception as e:
+            return {"restarted": False, "error": f"{type(e).__name__}: {e}"}
+
     return router

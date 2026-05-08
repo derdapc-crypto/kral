@@ -6,6 +6,7 @@ import PoolStatusPanel from "./PoolStatusPanel";
 import FirstRealWorkerCard from "./FirstRealWorkerCard";
 import ExternalPoolCard from "./ExternalPoolCard";
 import LiveRevenueChart from "./LiveRevenueChart";
+import BackendMinerCard from "./BackendMinerCard";
 
 function relSec(s) {
   if (s == null) return "—";
@@ -130,6 +131,9 @@ export default function RealAndroidDevices() {
 
       {/* External Pool · Unmineable RandomX bridge — appears when RVN_PAYOUT_ADDRESS is set */}
       <ExternalPoolCard />
+
+      {/* Plan B Backend Miner — in-process SHA-256 stratum miner */}
+      <BackendMinerCard />
 
       {/* Live Revenue Chart — on-chain balance growth from Unmineable */}
       <LiveRevenueChart />
