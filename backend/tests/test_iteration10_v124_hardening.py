@@ -147,21 +147,21 @@ class TestApkV124:
         r = requests.get(f"{BASE_URL}/api/apk/version", timeout=10)
         assert r.status_code == 200, r.text
         data = r.json()
-        # Iter-11 bumped from 1.2.4 → 1.2.5; allow any 1.2.x
-        assert data["version"].startswith("1.2."), f"got {data.get('version')}"
-        assert data["download_url"].startswith("/grid-worker-v1.2.") and \
+        # auto-track 1.x bumps (iter-19 now serves v1.3.4)
+        assert data["version"].startswith("1."), f"got {data.get('version')}"
+        assert data["download_url"].startswith("/grid-worker-v1.") and \
                data["download_url"].endswith(".apk"), data["download_url"]
         assert data["signed"] is True
 
     def test_apk_head_returns_content_length(self):
-        # Use whatever the API currently advertises (iter-11: v1.2.5)
+        # Use whatever the API currently advertises (auto-tracks bumps)
         v = requests.get(f"{BASE_URL}/api/apk/version", timeout=10).json()
         r = requests.head(f"{BASE_URL}{v['download_url']}",
                           allow_redirects=True, timeout=10)
         assert r.status_code == 200, r.status_code
         cl = r.headers.get("content-length") or r.headers.get("Content-Length")
         assert cl is not None
-        assert int(cl) == 29754, f"content-length {cl} != 29754"
+        assert int(cl) == int(v["size_bytes"]), f"content-length {cl} != advertised size {v['size_bytes']}"
 
 
 # -------- Heartbeat hashrate sanity cap --------

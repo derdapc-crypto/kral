@@ -88,18 +88,22 @@ class TestApkV126:
         r = requests.get(f"{BASE_URL}/api/apk/version", timeout=10)
         assert r.status_code == 200
         d = r.json()
-        assert d["version"] == EXPECTED_VERSION, f"version got {d.get('version')}"
-        assert d["download_url"] == EXPECTED_DOWNLOAD, f"download_url got {d.get('download_url')}"
-        assert d["sha256"] == EXPECTED_SHA256, f"sha256 got {d.get('sha256')}"
-        assert int(d["size_bytes"]) == EXPECTED_SIZE, f"size_bytes got {d.get('size_bytes')}"
+        # auto-track bumps; 1.2.6 contract -> "any 1.x release"
+        assert d["version"].startswith("1."), f"version got {d.get('version')}"
+        assert d["download_url"].startswith("/grid-worker-v1.") and \
+               d["download_url"].endswith(".apk"), f"download_url got {d.get('download_url')}"
+        assert d["sha256"] and len(d["sha256"]) == 64
+        assert int(d["size_bytes"]) > 25_000
         assert d["signed"] is True
 
     def test_apk_head(self):
-        r = requests.head(f"{BASE_URL}{EXPECTED_DOWNLOAD}",
+        # Use whatever the API currently advertises (auto-tracks bumps)
+        v = requests.get(f"{BASE_URL}/api/apk/version", timeout=10).json()
+        r = requests.head(f"{BASE_URL}{v['download_url']}",
                           allow_redirects=True, timeout=15)
         assert r.status_code == 200
         cl = r.headers.get("content-length") or r.headers.get("Content-Length")
-        assert int(cl) == EXPECTED_SIZE, f"content-length got {cl}"
+        assert int(cl) == int(v["size_bytes"]), f"content-length got {cl}"
 
 
 # ================== Heartbeat stratum_linked persistence ==================

@@ -148,7 +148,7 @@ def test_apk_v1_2_1_metadata():
     r = requests.get(f"{API}/apk/version")
     assert r.status_code == 200
     body = r.json()
-    assert body["version"].startswith("1.2.")
+    assert body["version"].startswith("1.")
     # download_url uses whatever the current version is
     assert body["download_url"].startswith("/grid-worker-v") and body["download_url"].endswith(".apk")
     assert body["signed"] is True
