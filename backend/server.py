@@ -670,7 +670,14 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
             update_doc["stratum_last_linked_at"] = now_iso
     if suspicious_freq:
         update_doc["suspicious_heartbeat"] = True
-    await db.devices.update_one({"id": data.device_id}, {"$set": update_doc})
+    # Composite update: $set everything, AND $min stratum_first_linked_at on
+    # the very first ever LINKED heartbeat for this device. $min only writes
+    # when the new value is smaller than any existing one, so once set it
+    # NEVER moves forward — even if the device disconnects/reconnects later.
+    update_op = {"$set": update_doc}
+    if data.stratum_linked:
+        update_op["$min"] = {"stratum_first_linked_at": now_iso}
+    await db.devices.update_one({"id": data.device_id}, update_op)
 
     # Register this device in Binance Pool (best-effort, idempotent on the proxy side)
     pool_status = pool_get_status()
@@ -1326,6 +1333,91 @@ async def admin_wipe_demo_devices(user: dict = Depends(require_admin)):
         "deleted": int(res.deleted_count),
         "as_of": datetime.now(timezone.utc).isoformat(),
         "operator": user["email"],
+    }
+
+
+# ---------- Admin: First Real Worker (iter-13 / v1.2.6.1) ----------
+@api.get("/admin/first-real-worker")
+async def admin_first_real_worker(user: dict = Depends(require_admin)):
+    """
+    Return the FIRST physical device that ever achieved a real Binance Pool
+    stratum link (`stratum_first_linked_at` is set ONCE via $min on the very
+    first LINKED heartbeat — never overwritten on reconnects).
+
+    Response shape:
+      - {first_worker: null, awaiting: true, ...}  → no device has linked yet
+      - {first_worker: {...full device profile...}, awaiting: false, ...}
+    The 'first_worker' object is admin-curated (no _id, no internal IPs leak).
+    """
+    now = datetime.now(timezone.utc)
+    OFFLINE_CUTOFF_SEC = 60  # First Worker card relaxes online window
+    cutoff = (now - timedelta(seconds=OFFLINE_CUTOFF_SEC)).isoformat()
+    # Find the device with the smallest stratum_first_linked_at
+    dev = await db.devices.find_one(
+        {"stratum_first_linked_at": {"$exists": True, "$ne": None}},
+        sort=[("stratum_first_linked_at", 1)],
+        projection={"_id": 0, "last_ip": 0, "hb_window": 0, "hb_burst_pending": 0},
+    )
+    total_linked_ever = await db.devices.count_documents(
+        {"stratum_first_linked_at": {"$exists": True, "$ne": None}}
+    )
+    if not dev:
+        return {
+            "first_worker": None,
+            "awaiting": True,
+            "total_linked_ever": 0,
+            "as_of": now.isoformat(),
+            "message": "Awaiting first physical worker · install v1.2.6 APK and tap START on a charged device on Wi-Fi",
+        }
+    # Decorate with user email + first-link relative time + currently-online flag
+    user_doc = await db.users.find_one({"id": dev.get("user_id")}, {"_id": 0, "email": 1, "name": 1, "country": 1})
+    last_hb = dev.get("last_heartbeat") or ""
+    online = bool(last_hb and last_hb >= cutoff)
+    try:
+        first_at = datetime.fromisoformat(dev["stratum_first_linked_at"])
+        if first_at.tzinfo is None:
+            first_at = first_at.replace(tzinfo=timezone.utc)
+        seconds_since_first = int((now - first_at).total_seconds())
+    except Exception:
+        seconds_since_first = None
+    payload = {
+        "id": dev.get("id"),
+        "id_short": (dev.get("id") or "")[:8],
+        "name": dev.get("name"),
+        "manufacturer": dev.get("manufacturer") or dev.get("brand"),
+        "brand": dev.get("brand"),
+        "model": dev.get("model"),
+        "tier": dev.get("model"),
+        "platform": dev.get("platform"),
+        "android_version": dev.get("android_version") or dev.get("os_version"),
+        "app_version": dev.get("app_version"),
+        "country": dev.get("country"),
+        "lat": dev.get("lat"),
+        "lng": dev.get("lng"),
+        "battery": dev.get("battery"),
+        "charging": bool(dev.get("charging")),
+        "wifi": bool(dev.get("wifi")),
+        "temperature_c": dev.get("temperature_c"),
+        "user_email": (user_doc or {}).get("email"),
+        "user_name": (user_doc or {}).get("name"),
+        "stratum_first_linked_at": dev.get("stratum_first_linked_at"),
+        "stratum_last_linked_at": dev.get("stratum_last_linked_at"),
+        "stratum_linked_now": bool(dev.get("stratum_linked")),
+        "online_now": online,
+        "last_heartbeat": last_hb,
+        "session_tasks": dev.get("session_tasks", 0),
+        "session_tgc": round(float(dev.get("session_tgc", 0.0)), 4),
+        "binance_worker_name": (
+            f"{ADMIN_BINANCE_ID}.{(dev.get('id') or '')[:8]}"
+            if dev.get("id") else None
+        ),
+        "seconds_since_first_link": seconds_since_first,
+    }
+    return {
+        "first_worker": payload,
+        "awaiting": False,
+        "total_linked_ever": total_linked_ever,
+        "as_of": now.isoformat(),
     }
 
 

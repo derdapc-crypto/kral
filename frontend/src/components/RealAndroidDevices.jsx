@@ -3,6 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { Smartphone, Wifi, BatteryCharging, Thermometer, ShieldAlert, RefreshCw, Filter, Trash2, Link2, Unlink } from "lucide-react";
 import ApkQrCard from "./ApkQrCard";
 import PoolStatusPanel from "./PoolStatusPanel";
+import FirstRealWorkerCard from "./FirstRealWorkerCard";
 
 function relSec(s) {
   if (s == null) return "—";
@@ -100,6 +101,11 @@ export default function RealAndroidDevices() {
 
   return (
     <div className="space-y-6" data-testid="real-android-section">
+      {/* "First Real Worker" — historic milestone card. Awaiting state by default;
+          flips to celebratory state the moment the first physical device achieves
+          a real Binance Pool stratum link. */}
+      <FirstRealWorkerCard />
+
       {/* Live Binance Pool status — honest connection state, never fakes */}
       <PoolStatusPanel />
 
