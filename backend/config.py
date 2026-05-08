@@ -39,6 +39,15 @@ POOL_ENDPOINTS: dict[str, dict] = {
     "ETHW": {"url": "stratum+tcp://ethw.poolbinance.com:1800",  "algo": "Ethash"},
 }
 
+# iter-16 / v1.3.1: secondary multi-coin bridge — Unmineable lets you mine
+# RandomX (CPU-friendly) on rx.unmineable.com and receive payout in any coin
+# (RVN/BTC/LTC...) sent to a real on-chain address. Worker name format on
+# Unmineable is "<COIN>:<address>.<worker>", e.g. "RVN:RXxxxxx.thegrid".
+UNMINEABLE_HOST = os.environ.get("UNMINEABLE_HOST", "rx.unmineable.com").strip()
+UNMINEABLE_PORT = int(os.environ.get("UNMINEABLE_PORT", "3333"))
+RVN_PAYOUT_ADDRESS = os.environ.get("RVN_PAYOUT_ADDRESS", "").strip()  # e.g. "RXxxxx..."
+UNMINEABLE_PAYOUT_COIN = os.environ.get("UNMINEABLE_PAYOUT_COIN", "RVN").strip().upper()
+
 # Total class count surfaced by /api/admin/pool/status (NEVER by /api/pool/health)
 POOL_CLASS_TOTAL: int = len(POOL_ENDPOINTS)
 

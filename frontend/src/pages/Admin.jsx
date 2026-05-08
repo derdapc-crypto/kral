@@ -134,17 +134,20 @@ export default function Admin() {
         {/* Stats row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { label: "Active Nodes", val: activeDevices.length, icon: Radio },
-            { label: "Total Devices", val: devices.length, icon: Globe2 },
-            { label: "Pending Jobs", val: pendingJobs, icon: Briefcase },
-            { label: "Revenue USDT", val: ledger ? ledger.revenue_usdt.toFixed(4) : "—", icon: CircleDollarSign },
+            { label: "Active Nodes", val: activeDevices.length, icon: Radio, testId: "stat-active-nodes" },
+            { label: "Total Devices", val: devices.length, icon: Globe2, testId: "stat-total-devices" },
+            { label: "Pending Jobs", val: pendingJobs, icon: Briefcase, testId: "stat-pending-jobs" },
+            { label: "Real Wallet · USDT", val: ledger ? ledger.worker_owed_usdt.toFixed(4) : "—",
+              sub: ledger?.rvn_payout_address ? "RVN linked" : "no RVN linked",
+              icon: CircleDollarSign, testId: "stat-real-wallet" },
           ].map((s) => (
-            <div key={s.label} className="p-6 rounded-2xl glass">
+            <div key={s.label} className="p-6 rounded-2xl glass" data-testid={s.testId}>
               <div className="flex items-center justify-between">
                 <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">{s.label}</div>
                 <s.icon className="w-4 h-4 text-[#F2C94C]" />
               </div>
               <div className="mt-3 text-3xl font-display font-black gold-text font-mono-num">{s.val}</div>
+              {s.sub && <div className="mt-1 text-[9px] uppercase tracking-widest text-white/35">{s.sub}</div>}
             </div>
           ))}
         </div>

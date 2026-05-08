@@ -223,11 +223,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.2.9"
-APK_PATH = "/grid-worker-v1.2.9.apk"
+APK_VERSION = "1.3.1"
+APK_PATH = "/grid-worker-v1.3.1.apk"
 APK_SIZE = 33850
-APK_SHA256 = "f23a068327e7ebdb003bbf1146181dd5cf2945eb00d738d18790e85ae6b85551"
-APK_RELEASE_NOTES = "v1.2.9 eternal worker · user_stopped sticky flag · JobScheduler 15min layer · 5min AlarmManager · FLAG_NO_CLEAR notification · idempotent watchdog chain · v2+v3 signed"
+APK_SHA256 = "3ba2fdd01b4a697db67cb1aea49e1f85badb98ce03925ee38c980fd5b833b285"
+APK_RELEASE_NOTES = "v1.3.1 real-wallet ledger · Unmineable RVN bridge config · live H/s neon admin · external pool dashboard link · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -1294,6 +1294,7 @@ async def admin_devices_live(
             "stratum_linked": bool(r.get("stratum_linked")),
             "stratum_last_linked_at": r.get("stratum_last_linked_at"),
             "assigned_coin": r.get("assigned_coin"),
+            "hashrate_hps": float(r.get("hashrate_hps") or 0),
         })
     # Aggregate counters
     counters = {
@@ -1662,31 +1663,40 @@ async def reject_job(job_id: str, user: dict = Depends(require_admin)):
 
 @api.get("/admin/ledger")
 async def admin_ledger(user: dict = Depends(require_admin)):
-    # Revenue from customers = sum of revenue_usdt across verified tasks (= sum of jobs.spent_usdt)
-    rev_pipeline = [{"$group": {"_id": None, "total": {"$sum": "$spent_usdt"}}}]
+    """Real ledger — excludes is_demo=true jobs/users/payouts so the dashboard
+    reflects only authentic compute work, never seeded demo data."""
+    real_user_match = {"role": "user", "is_demo": {"$ne": True}}
+    real_job_match = {"is_demo": {"$ne": True}}
+    real_payout_match = {"is_demo": {"$ne": True}}
+
+    # Revenue from customers = sum of revenue_usdt across verified, real jobs
+    rev_pipeline = [{"$match": real_job_match},
+                    {"$group": {"_id": None, "total": {"$sum": "$spent_usdt"}}}]
     rev_agg = await db.jobs.aggregate(rev_pipeline).to_list(1)
     revenue = round(rev_agg[0]["total"] if rev_agg else 0.0, 6)
 
-    # Worker payouts owed = sum of all users.balance_usdt + completed payouts
+    # Worker payouts owed = sum of real users.balance_usdt
     user_owed = await db.users.aggregate([
-        {"$match": {"role": "user"}},
+        {"$match": real_user_match},
         {"$group": {"_id": None, "owed": {"$sum": "$balance_usdt"},
                     "earned": {"$sum": "$total_earned"}}},
     ]).to_list(1)
     owed = round(user_owed[0]["owed"] if user_owed else 0.0, 6)
     paid_out = await db.payouts.aggregate([
-        {"$match": {"status": "completed"}},
+        {"$match": {**real_payout_match, "status": "completed"}},
         {"$group": {"_id": None, "total": {"$sum": "$amount_usdt"}}},
     ]).to_list(1)
     paid = round(paid_out[0]["total"] if paid_out else 0.0, 6)
     total_earned = round((user_owed[0]["earned"] if user_owed else 0.0), 6)
 
     pending_payouts = await db.payouts.aggregate([
-        {"$match": {"status": "pending"}},
+        {"$match": {**real_payout_match, "status": "pending"}},
         {"$group": {"_id": None, "total": {"$sum": "$amount_usdt"}}},
     ]).to_list(1)
     pending = round(pending_payouts[0]["total"] if pending_payouts else 0.0, 6)
 
+    # Real RVN payout pool stats — only meaningful when RVN_PAYOUT_ADDRESS is set.
+    rvn_addr = os.environ.get("RVN_PAYOUT_ADDRESS", "").strip() or None
     return {
         "revenue_usdt": revenue,
         "worker_owed_usdt": owed,
@@ -1694,6 +1704,13 @@ async def admin_ledger(user: dict = Depends(require_admin)):
         "worker_total_earned_usdt": total_earned,
         "pending_withdrawals_usdt": pending,
         "platform_margin_usdt": round(max(0.0, revenue - total_earned), 6),
+        # iter-16 / v1.3.1: surfaces operator's real RVN payout address
+        # (placeholder until set in env). Frontend uses this to swap fake
+        # USDT cards for an "External Pool" panel when configured.
+        "rvn_payout_address": rvn_addr,
+        "external_pool_url": (
+            f"https://unmineable.com/coins/RVN/address/{rvn_addr}" if rvn_addr else None
+        ),
     }
 
 

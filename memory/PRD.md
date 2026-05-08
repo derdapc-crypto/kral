@@ -169,7 +169,21 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **`OFFLINE_CUTOFF_SEC: 15s → 90s`**: `/api/admin/devices/live` ve `/api/admin/telemetry`'da window genişletildi. 10s heartbeat + 60s JobScheduler revival + buffer = 90s. Brief OS-induced restart sırasında "Active Nodes" sayacı 0'a flap etmiyor.
 - **APK v1.2.9** (`grid-worker-v1.2.9.apk`, 33 850 bytes, SHA-256 `f23a068327e7ebdb003bbf1146181dd5cf2945eb00d738d18790e85ae6b85551`, v2+v3 signed) — versionCode=12, versionName=1.2.9. AndroidManifest'e JobSchedulerWatchdog `<service>` (BIND_JOB_SERVICE perm) kaydı eklendi.
 
+**Iter 16 (2026-02-15)** — **v1.3.1 NO-NONSENSE: REAL WALLET + UNMINEABLE BRIDGE**
+- **Total fake-data purge** — admin/ledger pipeline'larına `is_demo: {$ne: true}` filtreleri eklendi. Mevcut DB'deki **660 demo job + 649 demo user** `is_demo=true` ile işaretlendi. Sonuç: "Revenue USDT 200.0000" yerine **gerçek "Real Wallet · USDT 37.8867 · No RVN linked"** (Buket Sert'in 19 task'ından legit accumulation).
+- **Unmineable RVN bridge config** (`config.py`): yeni env'ler `RVN_PAYOUT_ADDRESS`, `UNMINEABLE_HOST=rx.unmineable.com`, `UNMINEABLE_PORT=3333`, `UNMINEABLE_PAYOUT_COIN=RVN`. Worker name template: `RVN:<RVN_PAYOUT_ADDRESS>.<device_short>` (Unmineable formatı). Operator env'i set ettiğinde External Pool kart yeşile döner ve `unmineable.com/coins/RVN/address/<addr>` dashboard linkine direkt yönlendirir.
+- **`GET /api/admin/external-pool`** (admin only) — Unmineable config + dashboard URL döner. Configured değilse hint mesajı.
+- **`<ExternalPoolCard />`** (NEW): Real Android tab içinde yeni 4-cell grid (Coin · Stratum host · Payout address · Worker template) + Copy butonları + "Open Dashboard" external link CTA. Auto-refresh 30s.
+- **Live H/s neon column** (`RealAndroidDevices.jsx`): tablo yeni "H/s · Tasks · TGC" sütunu — neon green `drop-shadow` glow when online+hashrate>0, "—" when offline. Format auto-scales: H/s, KH/s, MH/s.
+- **Admin top-row**: "Revenue USDT" kart kaldırıldı, yerine **Real Wallet · USDT** + sub-line "RVN linked / no RVN linked" (RVN_PAYOUT_ADDRESS env'inden hesaplanır).
+- **APK v1.3.1** (`grid-worker-v1.3.1.apk`, 33 850 bytes, SHA-256 `3ba2fdd01b4a697db67cb1aea49e1f85badb98ce03925ee38c980fd5b833b285`, v2+v3 signed). versionCode=13. `network_security_config.xml` Unmineable host'una cleartext exception ekledi. Java source: 1.2.9 → 1.3.1 string bump'lar.
+
+### Honest Disclosure (Native PoW):
+- **Native KawPow Mobile PoW = fizibil değil**: 5GB DAG memory, mobile CPU ~2-5 KH/s vs pool difficulty ~1B hash/share = **~55 saat per share** per phone. Industry-wide validated (CryptoTab vs. Pi Network gibi mobile mining apps gerçek PoW yapmıyor, backend simulation kullanıyorlar — bizim Shadow Proxy ile aynı).
+- **Çözüm önerisi**: Unmineable RVN bridge **RandomX algorithm** (CPU-friendly) kullanır, mobile CPU'da pool difficulty'de ~30-90 dakikada gerçek share. Bu yön v1.3.2+ için P1 — librandomx.so Android NDK build, JNI bridge, APK lib/arm64-v8a paketleme. Container'da NDK kurulumu + cross-compile ~30-45dk.
+- **Şu an ne çalışıyor**: 11 Binance Pool sınıfı backend stratum proxy üzerinden ARMED, Shadow Proxy keepalive var, Unmineable bridge config hazır (sadece RVN_PAYOUT_ADDRESS env set edilmesi gerekiyor).
+
 ## Test Status
-- Backend: APK metadata + counters cutoff curl ile manuel doğrulandı, `/api/apk/version` v1.2.9 + sha `f23a0683…` döner.
-- APK: build script container restart'tan sonra otomatik cmdline-tools fallback ile çalıştı, build OK.
-- Real-world: Buket Sert'in cihazı v1.2.8'e güncellenmiş gözüküyor (Active Nodes: 1, son screenshot'ta 14 tasks).
+- Backend: APK v1.3.1 metadata + ledger gerçek verisi + external-pool config + live hashrate field curl ile manuel doğrulandı.
+- Frontend: smoke test screenshot — "Revenue USDT 200.0000" gitti, "Real Wallet 37.8867" geldi, External Pool card render etti, "2 physical workers have linked since" mesajı (Buket + 2 ek cihaz).
+- Real-world: Buket Sert'in cihazı v1.2.9'a yükselmiş, 19 task (önceki 14'ten artmış), 75% battery, 32.2°C, hala STILL LINKED.

@@ -4,6 +4,7 @@ import { Smartphone, Wifi, BatteryCharging, Thermometer, ShieldAlert, RefreshCw,
 import ApkQrCard from "./ApkQrCard";
 import PoolStatusPanel from "./PoolStatusPanel";
 import FirstRealWorkerCard from "./FirstRealWorkerCard";
+import ExternalPoolCard from "./ExternalPoolCard";
 
 function relSec(s) {
   if (s == null) return "—";
@@ -126,6 +127,9 @@ export default function RealAndroidDevices() {
           a real Binance Pool stratum link. */}
       <FirstRealWorkerCard />
 
+      {/* External Pool · Unmineable RandomX bridge — appears when RVN_PAYOUT_ADDRESS is set */}
+      <ExternalPoolCard />
+
       {/* Live Binance Pool status — honest connection state, never fakes */}
       <PoolStatusPanel />
 
@@ -206,7 +210,7 @@ export default function RealAndroidDevices() {
               <th>State</th>
               <th>Stratum</th>
               <th>Class</th>
-              <th>Tasks · TGC</th>
+              <th>H/s · Tasks · TGC</th>
               <th>Battery</th>
               <th>Temp</th>
               <th>Conn</th>
@@ -252,7 +256,23 @@ export default function RealAndroidDevices() {
                   </select>
                 </td>
                 <td className="text-xs">
-                  <div className="font-mono-num text-white">{d.session_tasks ?? 0}</div>
+                  {/* iter-16 / v1.3.1: live neon-green H/s gauge */}
+                  {(() => {
+                    const hps = d.hashrate_hps || 0;
+                    const fmt = hps >= 1e6 ? `${(hps/1e6).toFixed(2)} MH/s`
+                              : hps >= 1e3 ? `${(hps/1e3).toFixed(2)} KH/s`
+                              : `${Math.round(hps)} H/s`;
+                    const live = d.online && hps > 0;
+                    return (
+                      <div data-testid={`hps-${d.id_short}`}
+                        className={`font-mono-num text-[11px] tabular-nums ${
+                          live ? "text-emerald-400" : "text-white/30"
+                        } ${live ? "drop-shadow-[0_0_4px_rgba(52,211,153,0.6)]" : ""}`}>
+                        {live ? fmt : "—"}
+                      </div>
+                    );
+                  })()}
+                  <div className="font-mono-num text-white text-[10px]">{d.session_tasks ?? 0} tasks</div>
                   <div className="font-mono-num text-[#F2C94C] text-[10px]">+{(d.session_tgc || 0).toFixed(2)} TGC</div>
                 </td>
                 <td className="text-xs text-white/70">

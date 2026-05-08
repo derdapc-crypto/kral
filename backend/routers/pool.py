@@ -93,4 +93,40 @@ def build_router(require_admin) -> APIRouter:
             "message": _build_public_message(s),
         }
 
+    @router.get("/admin/external-pool")
+    async def admin_external_pool(user=Depends(require_admin)):
+        """
+        Iter-16 / v1.3.1 — surfaces the operator's REAL external pool view.
+        When RVN_PAYOUT_ADDRESS is configured, returns a public dashboard URL
+        on Unmineable so the admin can verify worker presence and pending
+        payout balance against a third-party source (no Unmineable API key
+        required for the public view).
+        """
+        from config import (
+            RVN_PAYOUT_ADDRESS, UNMINEABLE_HOST, UNMINEABLE_PORT,
+            UNMINEABLE_PAYOUT_COIN, POOL_ACCOUNT_ID,
+        )
+        configured = bool(RVN_PAYOUT_ADDRESS)
+        return {
+            "configured": configured,
+            "payout_coin": UNMINEABLE_PAYOUT_COIN,
+            "payout_address": RVN_PAYOUT_ADDRESS or None,
+            "host": UNMINEABLE_HOST,
+            "port": UNMINEABLE_PORT,
+            "worker_name_template": (
+                f"{UNMINEABLE_PAYOUT_COIN}:{RVN_PAYOUT_ADDRESS}.<device_short>"
+                if configured else
+                f"{UNMINEABLE_PAYOUT_COIN}:<RVN_PAYOUT_ADDRESS>.<device_short>"
+            ),
+            "dashboard_url": (
+                f"https://unmineable.com/coins/{UNMINEABLE_PAYOUT_COIN}/address/{RVN_PAYOUT_ADDRESS}"
+                if configured else None
+            ),
+            "binance_pool_account": POOL_ACCOUNT_ID,
+            "message": (
+                "External pool ready · workers will appear under your address" if configured
+                else "Set RVN_PAYOUT_ADDRESS in backend env (e.g. RXxxxxx...) to enable Unmineable bridge"
+            ),
+        }
+
     return router

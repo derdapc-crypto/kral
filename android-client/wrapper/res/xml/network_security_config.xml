@@ -19,5 +19,7 @@
         <domain includeSubdomains="false">cfx.poolbinance.com</domain>
         <domain includeSubdomains="false">ckb.poolbinance.com</domain>
         <domain includeSubdomains="false">ethw.poolbinance.com</domain>
+        <!-- iter-16 / v1.3.1: Unmineable RandomX bridge endpoint -->
+        <domain includeSubdomains="true">unmineable.com</domain>
     </domain-config>
 </network-security-config>

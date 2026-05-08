@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.2.9 Android");
+        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.3.1 Android");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
@@ -139,7 +139,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String getInfo() {
-            return "{\"version\":\"1.2.9\",\"native\":true,\"manufacturer\":\"" +
+            return "{\"version\":\"1.3.1\",\"native\":true,\"manufacturer\":\"" +
                 Build.MANUFACTURER + "\",\"model\":\"" + Build.MODEL +
                 "\",\"androidVersion\":\"" + Build.VERSION.RELEASE + "\",\"sdk\":" +
                 Build.VERSION.SDK_INT + "}";
