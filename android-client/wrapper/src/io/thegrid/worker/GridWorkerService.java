@@ -301,7 +301,7 @@ public class GridWorkerService extends Service {
         String body = String.format(Locale.US,
             "{\"device_id\":\"%s\",\"charging\":%s,\"wifi\":%s,\"permission\":true," +
             "\"battery\":%d,\"temperature_c\":%.1f,\"thermal\":\"%s\"," +
-            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.3.1\"," +
+            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.3.2\"," +
             "\"stratum_linked\":%s}",
             deviceId, charging, onWifi, batteryPct, tempC,
             (tempC > TEMP_LIMIT_C ? "hot" : "nominal"),

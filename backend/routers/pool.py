@@ -101,12 +101,37 @@ def build_router(require_admin) -> APIRouter:
         on Unmineable so the admin can verify worker presence and pending
         payout balance against a third-party source (no Unmineable API key
         required for the public view).
+
+        Iter-17 / v1.3.2: now PROXIES Unmineable's public REST API for live
+        balance + payment threshold, so the admin sees real on-chain numbers
+        instead of self-reported counters.
         """
         from config import (
             RVN_PAYOUT_ADDRESS, UNMINEABLE_HOST, UNMINEABLE_PORT,
             UNMINEABLE_PAYOUT_COIN, POOL_ACCOUNT_ID,
         )
         configured = bool(RVN_PAYOUT_ADDRESS)
+        live = None
+        if configured:
+            # Unmineable's v4 public API requires no auth for read-only stats.
+            try:
+                import httpx
+                url = f"https://api.unmineable.com/v4/address/{RVN_PAYOUT_ADDRESS}?coin={UNMINEABLE_PAYOUT_COIN}"
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    r = await client.get(url)
+                    if r.status_code == 200:
+                        body = r.json() or {}
+                        d = body.get("data") or {}
+                        live = {
+                            "balance": float(d.get("balance") or 0),
+                            "balance_payable": float(d.get("balance_payable") or 0),
+                            "payment_threshold": float(d.get("payment_threshold") or 0),
+                            "mining_fee_pct": float(d.get("mining_fee") or 0),
+                            "network": d.get("network"),
+                            "enabled": bool(d.get("enabled", True)),
+                        }
+            except Exception:
+                live = None
         return {
             "configured": configured,
             "payout_coin": UNMINEABLE_PAYOUT_COIN,
@@ -119,14 +144,53 @@ def build_router(require_admin) -> APIRouter:
                 f"{UNMINEABLE_PAYOUT_COIN}:<RVN_PAYOUT_ADDRESS>.<device_short>"
             ),
             "dashboard_url": (
-                f"https://unmineable.com/coins/{UNMINEABLE_PAYOUT_COIN}/address/{RVN_PAYOUT_ADDRESS}"
+                f"https://www.unmineable.com/coins/{UNMINEABLE_PAYOUT_COIN}/address/{RVN_PAYOUT_ADDRESS}"
                 if configured else None
             ),
+            "live_stats": live,
             "binance_pool_account": POOL_ACCOUNT_ID,
             "message": (
-                "External pool ready · workers will appear under your address" if configured
+                "External pool live · streaming Unmineable public stats" if (configured and live)
+                else "External pool ready · workers will appear under your address" if configured
                 else "Set RVN_PAYOUT_ADDRESS in backend env (e.g. RXxxxxx...) to enable Unmineable bridge"
             ),
+        }
+
+    @router.get("/admin/external-pool/miner-snippet")
+    async def admin_miner_snippet(user=Depends(require_admin)):
+        """
+        Iter-17 / v1.3.2 — generate a ready-to-run xmrig CLI snippet the
+        operator can paste into ANY Linux/Windows/macOS VPS or laptop to
+        start mining USDT (via Unmineable) directly under their address.
+        We do NOT run the miner inside the container (would burn credits
+        non-stop). The operator runs it on owned hardware.
+        """
+        from config import (
+            RVN_PAYOUT_ADDRESS, UNMINEABLE_HOST, UNMINEABLE_PORT,
+            UNMINEABLE_PAYOUT_COIN,
+        )
+        if not RVN_PAYOUT_ADDRESS:
+            return {"configured": False,
+                    "message": "Set RVN_PAYOUT_ADDRESS first."}
+        worker = "thegrid"
+        user_str = f"{UNMINEABLE_PAYOUT_COIN}:{RVN_PAYOUT_ADDRESS}.{worker}#GRID-OPERATOR"
+        cmd = (
+            f"./xmrig -o {UNMINEABLE_HOST}:{UNMINEABLE_PORT} "
+            f"-u '{user_str}' -p x -k --tls --coin=monero "
+            f"--randomx-1gb-pages --donate-level=1"
+        )
+        return {
+            "configured": True,
+            "command": cmd,
+            "user_string": user_str,
+            "host": f"{UNMINEABLE_HOST}:{UNMINEABLE_PORT}",
+            "instructions": [
+                "1. Download xmrig: https://xmrig.com/download",
+                "2. Extract and `cd` into the folder",
+                f"3. Run: {cmd}",
+                "4. Worker will appear within 60s on the dashboard URL.",
+                "5. Min payout: 1.5 USDT (BEP20 / BSC).",
+            ],
         }
 
     return router

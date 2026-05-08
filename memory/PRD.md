@@ -183,7 +183,20 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **Çözüm önerisi**: Unmineable RVN bridge **RandomX algorithm** (CPU-friendly) kullanır, mobile CPU'da pool difficulty'de ~30-90 dakikada gerçek share. Bu yön v1.3.2+ için P1 — librandomx.so Android NDK build, JNI bridge, APK lib/arm64-v8a paketleme. Container'da NDK kurulumu + cross-compile ~30-45dk.
 - **Şu an ne çalışıyor**: 11 Binance Pool sınıfı backend stratum proxy üzerinden ARMED, Shadow Proxy keepalive var, Unmineable bridge config hazır (sadece RVN_PAYOUT_ADDRESS env set edilmesi gerekiyor).
 
+**Iter 17 (2026-02-15)** — **v1.3.2 USDT BEP20 PAYOUT ACTIVATED**
+- **USDT cüzdan canlı**: `RVN_PAYOUT_ADDRESS=0xea625c7b0c6c29c961d2ab419a957443d84c6869` + `UNMINEABLE_PAYOUT_COIN=USDT` env'e mühürlendi. Unmineable v4 public API sorgusu doğruluyor: address tanındı, network=BSC, payment_threshold=1.5 USDT, mining_fee=1%, enabled=true.
+- **Live Unmineable stats**: `/api/admin/external-pool` artık `httpx` ile `https://api.unmineable.com/v4/address/<addr>?coin=USDT` proxy'liyor (admin only). Returns: balance / balance_payable / payment_threshold / network / mining_fee_pct. Auto-refresh 30s. Hiçbir API key gerekmiyor (public read-only).
+- **xmrig miner-snippet generator**: yeni `GET /api/admin/external-pool/miner-snippet` (admin only) → `./xmrig -o rx.unmineable.com:3333 -u 'USDT:0xea625c7b...thegrid#GRID-OPERATOR' -p x -k --tls --coin=monero --randomx-1gb-pages --donate-level=1` döner. **Container miner KAPALI** (sustained CPU = kredi yakar) — operator kendi VPS/laptop'unda çalıştırır. Frontend "MINER CLI" butonu komutu copyable bir block'ta açar + 5 maddelik instruction listesi.
+- **Frontend `<ExternalPoolCard />` v2**: "VIEW POOL" CTA emerald yeşili, target `https://www.unmineable.com/coins/USDT/address/0xea625c7b...` (kullanıcının verdiği URL); "MINER CLI" butonu xmrig komutunu açar; live stats grid'i 4 cell (Current/Payable/Threshold/Network); copy-to-clipboard her field'da; configured/live durumlarına göre border-color geçişi.
+- **APK v1.3.2** (`grid-worker-v1.3.2.apk`, 33 850 bytes, SHA-256 `7b9c0a3389e84f71c67486a63262c5851a122a5250e76ec8b5e6c079c16194cb`, v2+v3 signed). versionCode=14. Java source 1.3.1→1.3.2 string bump'lar.
+- **httpx pip-installed** + `requirements.txt`'e `httpx==0.28.1` freeze edildi.
+
+### Honest Disclosure (Native PoW + Backend Miner):
+- **Backend xmrig miner shipped DEĞİL**: Sustained ~100% CPU container'da Emergent kredisini hızlı yakar (Iter 16'da uyarı verildi, 17'de aynı pozisyon). Operator-side miner-snippet generator alternative — kullanıcı external rig'inde çalıştırır.
+- **Mobile NDK librandomx.so shipped DEĞİL**: Container'da NDK install + cross-compile + JNI bridge ~45-60dk + her Android ABI için ayrı .so + APK lib/<abi>/ paketleme. Bu v1.3.3+ için P0 backlog.
+- **Şu an gerçek yatan USDT için path**: Kullanıcı VPS/laptop'unda `MINER CLI` butonundan kopyaladığı xmrig komutunu çalıştırsın → ~30dk içinde ilk share submit, ~24-48 saat içinde 1.5 USDT threshold'una ulaşılır → Unmineable otomatik BSC ağında `0xea625c7b...` adresine USDT ödemesi.
+
 ## Test Status
-- Backend: APK v1.3.1 metadata + ledger gerçek verisi + external-pool config + live hashrate field curl ile manuel doğrulandı.
-- Frontend: smoke test screenshot — "Revenue USDT 200.0000" gitti, "Real Wallet 37.8867" geldi, External Pool card render etti, "2 physical workers have linked since" mesajı (Buket + 2 ek cihaz).
-- Real-world: Buket Sert'in cihazı v1.2.9'a yükselmiş, 19 task (önceki 14'ten artmış), 75% battery, 32.2°C, hala STILL LINKED.
+- Backend: APK v1.3.2 + external-pool live stats + miner-snippet curl ile manuel doğrulandı.
+- Frontend: smoke test screenshot — External Pool yeşil status "External pool live · streaming Unmineable public stats", VIEW POOL CTA href doğru, MINER CLI komutu görünür, 4-cell live stats grid render etti.
+- Real-world: Unmineable API `0xea625c7b...` cüzdanını **tanıdı** (enabled=true, network=BSC), threshold=1.5 USDT.

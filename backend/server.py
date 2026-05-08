@@ -223,11 +223,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.3.1"
-APK_PATH = "/grid-worker-v1.3.1.apk"
+APK_VERSION = "1.3.2"
+APK_PATH = "/grid-worker-v1.3.2.apk"
 APK_SIZE = 33850
-APK_SHA256 = "3ba2fdd01b4a697db67cb1aea49e1f85badb98ce03925ee38c980fd5b833b285"
-APK_RELEASE_NOTES = "v1.3.1 real-wallet ledger · Unmineable RVN bridge config · live H/s neon admin · external pool dashboard link · v2+v3 signed"
+APK_SHA256 = "7b9c0a3389e84f71c67486a63262c5851a122a5250e76ec8b5e6c079c16194cb"
+APK_RELEASE_NOTES = "v1.3.2 USDT BEP20 payout · Unmineable live stats API · BSC bridge · miner-snippet generator · 0xea625c7b... wired · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
