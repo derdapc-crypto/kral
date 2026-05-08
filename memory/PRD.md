@@ -196,7 +196,17 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **Mobile NDK librandomx.so shipped DEĞİL**: Container'da NDK install + cross-compile + JNI bridge ~45-60dk + her Android ABI için ayrı .so + APK lib/<abi>/ paketleme. Bu v1.3.3+ için P0 backlog.
 - **Şu an gerçek yatan USDT için path**: Kullanıcı VPS/laptop'unda `MINER CLI` butonundan kopyaladığı xmrig komutunu çalıştırsın → ~30dk içinde ilk share submit, ~24-48 saat içinde 1.5 USDT threshold'una ulaşılır → Unmineable otomatik BSC ağında `0xea625c7b...` adresine USDT ödemesi.
 
+**Iter 18 (2026-02-15)** — **v1.3.3 Live Revenue Chart + NDK Build Attempt (BLOCKED)**
+- **`/api/admin/external-pool/history`** + `pool_history` MongoDB collection: 60 saniyede bir Unmineable public API'sinden balance + balance_payable + paid çekiliyor, kalıcı tutuluyor (1000 row cap, oldest deleted FIFO). Snapshot loop server.py @startup'ta `asyncio.create_task` ile başlıyor.
+- **`<LiveRevenueChart />`** (NEW): recharts AreaChart, son 48 nokta (~48 dakika), emerald gradient fill, "Current Balance" sayacı + delta indicator, "+/- USDT delta" rozeti. Auto-refresh 30s, `document.hidden` guard.
+- **NDK build BLOCKED**: Container `aarch64`, NDK r26d/r27/r28 sadece `linux-x86_64` toolchain prebuilt ile shipping. Çözüm seçenekleri (hepsi işlemedi):
+  - `qemu-user-static` + `libc6-amd64-cross` → `libz.so.1` cascade dependency, x86_64 chain'in tamamı gerekli (saatlerce kurulum, fragile, yavaş compile)
+  - `linux-aarch64` toolchain Google'ın repository'sinde **hiç yok** (Mart 2026 itibariyle)
+  - Sistem clang + NDK sysroot → bionic libc link uyumsuzluğu (ELF/PE format mismatch)
+  - Pre-built Android RandomX .so → güvenilir kaynak yok, Termux paketleri x86_64-host derli
+- **Honest path forward**: Native NDK build için (1) x86_64 host'lu environment'a deploy (Linux AMD64 VPS, Mac M1 + qemu-x86_64, GitHub Actions linux-amd64 runner) gerekli. CMake config + JNI bridge code skeleton hazır; sadece host arch değişince derleme olabilir. Bu v1.3.4 için P0 ama mevcut container'da çözülemez.
+
 ## Test Status
-- Backend: APK v1.3.2 + external-pool live stats + miner-snippet curl ile manuel doğrulandı.
-- Frontend: smoke test screenshot — External Pool yeşil status "External pool live · streaming Unmineable public stats", VIEW POOL CTA href doğru, MINER CLI komutu görünür, 4-cell live stats grid render etti.
-- Real-world: Unmineable API `0xea625c7b...` cüzdanını **tanıdı** (enabled=true, network=BSC), threshold=1.5 USDT.
+- Backend: APK v1.3.3 metadata + history endpoint + snapshot loop manuel doğrulandı (6 snapshot mevcut).
+- Frontend: LiveRevenueChart "Awaiting first snapshot" mesajından sonra noktalar ekleniyor, area gradient render ediyor, USDT 0.000000 baseline.
+- Real-world: Buket Sert v1.2.9 hala aktif, 19 tasks. Henüz Unmineable address'inde balance yok (operator henüz xmrig çalıştırmamış).

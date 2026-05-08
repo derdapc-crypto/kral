@@ -5,6 +5,7 @@ import ApkQrCard from "./ApkQrCard";
 import PoolStatusPanel from "./PoolStatusPanel";
 import FirstRealWorkerCard from "./FirstRealWorkerCard";
 import ExternalPoolCard from "./ExternalPoolCard";
+import LiveRevenueChart from "./LiveRevenueChart";
 
 function relSec(s) {
   if (s == null) return "—";
@@ -129,6 +130,9 @@ export default function RealAndroidDevices() {
 
       {/* External Pool · Unmineable RandomX bridge — appears when RVN_PAYOUT_ADDRESS is set */}
       <ExternalPoolCard />
+
+      {/* Live Revenue Chart — on-chain balance growth from Unmineable */}
+      <LiveRevenueChart />
 
       {/* Live Binance Pool status — honest connection state, never fakes */}
       <PoolStatusPanel />

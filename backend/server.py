@@ -8,6 +8,7 @@ import os
 import uuid
 import secrets
 import hashlib
+import asyncio
 import logging
 import random
 from datetime import datetime, timezone, timedelta
@@ -386,6 +387,43 @@ async def startup():
 
     pool_multi.set_hashrate_provider(_hashrate_provider)
     pool_start()
+
+    # iter-18 / v1.3.3: periodic Unmineable balance snapshot loop.
+    # Stores {at, balance, balance_payable, paid} in pool_history every 60s
+    # so the admin Live Revenue Chart has real on-chain history instead of
+    # only the live "now" reading.
+    async def _pool_snapshot_loop():
+        import httpx
+        from config import RVN_PAYOUT_ADDRESS, UNMINEABLE_PAYOUT_COIN
+        while True:
+            try:
+                if RVN_PAYOUT_ADDRESS:
+                    url = f"https://api.unmineable.com/v4/address/{RVN_PAYOUT_ADDRESS}?coin={UNMINEABLE_PAYOUT_COIN}"
+                    async with httpx.AsyncClient(timeout=8.0) as c:
+                        r = await c.get(url)
+                        if r.status_code == 200:
+                            d = (r.json() or {}).get("data") or {}
+                            doc = {
+                                "at": datetime.now(timezone.utc).isoformat(),
+                                "balance": float(d.get("balance") or 0),
+                                "balance_payable": float(d.get("balance_payable") or 0),
+                                "paid": float(d.get("paid") or 0),
+                                "coin": UNMINEABLE_PAYOUT_COIN,
+                            }
+                            await db.pool_history.insert_one(doc)
+                            # Cap history at 1000 rows by trimming oldest.
+                            cnt = await db.pool_history.count_documents({})
+                            if cnt > 1000:
+                                excess = cnt - 1000
+                                old_ids = await db.pool_history.find({}, {"_id": 1}) \
+                                    .sort("at", 1).limit(excess).to_list(excess)
+                                if old_ids:
+                                    await db.pool_history.delete_many(
+                                        {"_id": {"$in": [r["_id"] for r in old_ids]}})
+            except Exception:
+                pass
+            await asyncio.sleep(60)
+    asyncio.create_task(_pool_snapshot_loop())
 
     existing = await db.users.find_one({"email": ADMIN_EMAIL})
     if not existing:

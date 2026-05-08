@@ -193,4 +193,26 @@ def build_router(require_admin) -> APIRouter:
             ],
         }
 
+    @router.get("/admin/external-pool/history")
+    async def admin_external_pool_history(user=Depends(require_admin)):
+        """
+        Iter-18 / v1.3.3 — Live Revenue Chart data. Returns the last 48
+        observations (samples taken every ~30s by the frontend pool card so
+        the chart shows ~24min of history; longer window if persisted).
+        Each point: {at, balance, balance_payable}.
+
+        Pulls from db.pool_history (cap 1000 rows, indexed on at desc).
+        """
+        try:
+            from datetime import datetime, timezone
+            from server import db
+            cur = db.pool_history.find(
+                {}, {"_id": 0, "at": 1, "balance": 1, "balance_payable": 1, "paid": 1}
+            ).sort("at", -1).limit(48)
+            rows = await cur.to_list(48)
+            rows.reverse()
+            return {"points": rows, "as_of": datetime.now(timezone.utc).isoformat()}
+        except Exception as e:
+            return {"points": [], "error": f"{type(e).__name__}: {e}"}
+
     return router
