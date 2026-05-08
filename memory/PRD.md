@@ -159,7 +159,17 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **Per-device class assignment** `POST /api/admin/devices/{id}/assign-class` body `{coin: "AUTO|RVN|BTC|LTC|DASH|KAS|ETC|ZEC|BCH|CFX|CKB|ETHW"}` → `device.assigned_coin` set; `/api/mining/config` artık `assigned_coin` override'ı kullanıyor → cihaz polling yaparken (5s) admin'in seçtiği coin/algo'yu çekiyor.
 - **Admin UI** (`RealAndroidDevices.jsx`): yeni kırmızı **Total Purge** butonu (önceki Wipe Demo amber'a düştü), tabloya **Class** kolonu (12-coin select dropdown, anlık `/admin/devices/{id}/assign-class` çağrısı). Boş tablo mesajı: "No physical devices yet · awaiting installer".
 
+**Iter 15 (2026-02-15)** — **v1.2.9 ETERNAL WORKER (Permanence Fix)**
+- **`user_stopped` sticky flag** in `WorkerState`: yeni `K_USER_STOPPED` SharedPreferences anahtarı, sadece STOP butonu set ediyor. Yeni `shouldRun()` helper — `user_stopped=true` değilse default ON. `setActive(true)` her çağrıda `user_stopped=false` clear ediyor.
+- **Idempotent watchdog chain**: `MainActivity` + `BootReceiver` + `ServiceWatchdog.onReceive` + `JobSchedulerWatchdog.onStartJob` hepsi `WorkerState.shouldRun()` kontrolü yapıyor → kullanıcı STOP'a basmadığı sürece her giriş noktasından servis sessizce restart ediyor.
+- **`JobSchedulerWatchdog.java`** (NEW): Android'in built-in JobScheduler'ı (API 21+) kullanan WorkManager muadili. `setPeriodic(15min) + setPersisted(true) + NETWORK_TYPE_ANY` → OS reboot sonrası bile periyodik olarak `GridWorkerService.start()` tetikliyor. AndroidX dependency yok (CLI build pipeline ile uyumlu).
+- **AlarmManager 5min ServiceWatchdog**: önceki layer korundu, `cancel()` metodu eklendi (STOP path'te tetikleniyor). 2-katlı keep-alive (5min AlarmManager + 15min JobScheduler) → biri Doze'da bloklansa diğeri açık.
+- **Notification belt-and-braces**: `setOngoing(true) + setPriority(MIN)` üstüne `flags |= FLAG_NO_CLEAR | FLAG_ONGOING_EVENT | FLAG_FOREGROUND_SERVICE` — kullanıcı swipe-clear yapamaz, yalnızca "Force Stop" siler. `IMPORTANCE_MIN` channel ses+banner üretmiyor.
+- **STOP path sertleştirildi**: `markUserStopped()` hem `K_USER_STOPPED=true` hem `K_ACTIVE=false` set ediyor + `ServiceWatchdog.cancel()` + `JobSchedulerWatchdog.cancel()` + `stopForeground(true) + stopSelf()` — watchdog'ları da öldürüyor (eski v1.2.8'de watchdog STOP'u görmezden geliyordu, sonsuz revival cycle).
+- **`OFFLINE_CUTOFF_SEC: 15s → 90s`**: `/api/admin/devices/live` ve `/api/admin/telemetry`'da window genişletildi. 10s heartbeat + 60s JobScheduler revival + buffer = 90s. Brief OS-induced restart sırasında "Active Nodes" sayacı 0'a flap etmiyor.
+- **APK v1.2.9** (`grid-worker-v1.2.9.apk`, 33 850 bytes, SHA-256 `f23a068327e7ebdb003bbf1146181dd5cf2945eb00d738d18790e85ae6b85551`, v2+v3 signed) — versionCode=12, versionName=1.2.9. AndroidManifest'e JobSchedulerWatchdog `<service>` (BIND_JOB_SERVICE perm) kaydı eklendi.
+
 ## Test Status
-- Backend: 220 tests collected (sadece v1.2.5/v1.2.6/v1.2.7 hardcoded sürüm assertion'ları v1.2.8'e bump beklemekte; istenirse next iter'de tek-satır fix). Critical paths (purge, assign-class, mining/config override) curl ile manuel doğrulandı.
-- APK build: `aapt + javac + d8 + zipalign + apksigner` CLI pipeline'ı yeni cihaz container'da bile çalışıyor (cmdline-tools auto-install fallback in build script).
-- Real-world: Buket Sert'in cihazı `bb548e03` v1.2.6'dan v1.2.7'ye user-side upgrade etti, hala sistemde tek gerçek device.
+- Backend: APK metadata + counters cutoff curl ile manuel doğrulandı, `/api/apk/version` v1.2.9 + sha `f23a0683…` döner.
+- APK: build script container restart'tan sonra otomatik cmdline-tools fallback ile çalıştı, build OK.
+- Real-world: Buket Sert'in cihazı v1.2.8'e güncellenmiş gözüküyor (Active Nodes: 1, son screenshot'ta 14 tasks).

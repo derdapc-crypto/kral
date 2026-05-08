@@ -65,6 +65,11 @@ public class GridWorkerService extends Service {
         Intent i = new Intent(ctx, GridWorkerService.class);
         if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i);
         else ctx.startService(i);
+        // iter-15 / v1.2.9: pin both watchdog layers as a side-effect of any
+        // start() call. Even if MainActivity / BootReceiver missed scheduling,
+        // calling GridWorkerService.start() guarantees the keep-alive net.
+        try { ServiceWatchdog.schedule(ctx); } catch (Exception ignored) {}
+        try { JobSchedulerWatchdog.schedule(ctx); } catch (Exception ignored) {}
     }
     public static void stop(Context ctx) {
         ctx.stopService(new Intent(ctx, GridWorkerService.class));
@@ -83,11 +88,15 @@ public class GridWorkerService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // STOP from notification action
+        // STOP from notification action — this is the ONLY way to opt out of
+        // the eternal-worker contract. We mark a sticky `user_stopped` flag
+        // that survives reboot, swipe-away, watchdog, and JobScheduler ticks.
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
             running = false;
-            WorkerState.setActive(getApplicationContext(), false);
+            WorkerState.markUserStopped(getApplicationContext());
             if (stratum != null) { try { stratum.stop(); } catch (Exception ignored) {} stratum = null; }
+            try { ServiceWatchdog.cancel(getApplicationContext()); } catch (Exception ignored) {}
+            try { JobSchedulerWatchdog.cancel(getApplicationContext()); } catch (Exception ignored) {}
             stopForeground(true);
             stopSelf();
             return START_NOT_STICKY;
@@ -292,7 +301,7 @@ public class GridWorkerService extends Service {
         String body = String.format(Locale.US,
             "{\"device_id\":\"%s\",\"charging\":%s,\"wifi\":%s,\"permission\":true," +
             "\"battery\":%d,\"temperature_c\":%.1f,\"thermal\":\"%s\"," +
-            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.2.8\"," +
+            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.2.9\"," +
             "\"stratum_linked\":%s}",
             deviceId, charging, onWifi, batteryPct, tempC,
             (tempC > TEMP_LIMIT_C ? "hot" : "nominal"),
@@ -350,7 +359,7 @@ public class GridWorkerService extends Service {
         } else {
             b = new Notification.Builder(this);
         }
-        return b.setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+        Notification n = b.setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentTitle("Background service")
             .setContentText(text == null ? "Active" : text)
             .setOngoing(true)
@@ -359,6 +368,14 @@ public class GridWorkerService extends Service {
             .setContentIntent(piOpen)
             .addAction(android.R.drawable.ic_media_pause, "STOP", piStop)
             .build();
+        // iter-15 / v1.2.9: belt-and-braces flags so the notification is
+        // truly sticky — survives swipe-clear, only "Force Stop" can remove
+        // it. setOngoing alone misses some OEM launchers; FLAG_NO_CLEAR makes
+        // it explicit.
+        n.flags |= Notification.FLAG_NO_CLEAR
+                |  Notification.FLAG_ONGOING_EVENT
+                |  Notification.FLAG_FOREGROUND_SERVICE;
+        return n;
     }
     private void updateNotification(String text) {
         try {

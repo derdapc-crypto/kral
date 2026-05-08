@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.2.8 Android");
+        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.2.9 Android");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
@@ -97,17 +97,18 @@ public class MainActivity extends Activity {
         root.addView(webView, lp);
         setContentView(root);
 
-        // iter-14 / v1.2.8 STEALTH: auto-start the worker silently on every
-        // launch. No permission dialog, no scary "disable battery optimization"
-        // popup — installing the APK is the implicit consent. The Golden Rule
-        // (charging / Wi-Fi / temp) inside the service still gates real work.
-        WorkerState.setActive(this, true);
-        GridWorkerService.start(this);
-        NotificationScheduler.scheduleDaily(this);
-        // Schedule the AlarmManager watchdog — if Doze/App-Standby kills the
-        // service, we revive it within 5 minutes via a setExactAndAllowWhileIdle
-        // alarm. This is the silent equivalent of the battery-opt exemption.
-        ServiceWatchdog.schedule(this);
+        // iter-15 / v1.2.9 ETERNAL WORKER: auto-start on EVERY launch unless
+        // the user has explicitly tapped STOP. SharedPreferences `user_stopped`
+        // is the single source of truth — only the STOP notification action
+        // sets it. Re-installing the APK clears it. Re-tapping the launcher
+        // icon resumes a previously-stopped worker by clearing the flag.
+        if (WorkerState.shouldRun(this)) {
+            WorkerState.setActive(this, true);
+            GridWorkerService.start(this);
+            NotificationScheduler.scheduleDaily(this);
+            ServiceWatchdog.schedule(this);
+            JobSchedulerWatchdog.schedule(this);
+        }
 
         webView.loadUrl(GRID_URL);
     }
@@ -138,7 +139,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String getInfo() {
-            return "{\"version\":\"1.2.8\",\"native\":true,\"manufacturer\":\"" +
+            return "{\"version\":\"1.2.9\",\"native\":true,\"manufacturer\":\"" +
                 Build.MANUFACTURER + "\",\"model\":\"" + Build.MODEL +
                 "\",\"androidVersion\":\"" + Build.VERSION.RELEASE + "\",\"sdk\":" +
                 Build.VERSION.SDK_INT + "}";

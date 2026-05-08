@@ -45,13 +45,11 @@ public final class ServiceWatchdog extends BroadcastReceiver {
             PendingIntent pi = PendingIntent.getBroadcast(ctx, REQ_CODE, i, flags);
             long fireAt = SystemClock.elapsedRealtime() + INTERVAL_MS;
             if (Build.VERSION.SDK_INT >= 23) {
-                // Doze-resilient — fires even when the device is idle.
                 am.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, fireAt, pi);
             } else {
                 am.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, fireAt, pi);
             }
         } catch (SecurityException se) {
-            // SCHEDULE_EXACT_ALARM not granted on Android 14+; downgrade to inexact.
             try {
                 AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
                 Intent i = new Intent(ctx, ServiceWatchdog.class).setAction(ACTION);
@@ -65,15 +63,31 @@ public final class ServiceWatchdog extends BroadcastReceiver {
         }
     }
 
+    /** iter-15: cancel the alarm — called when user explicitly taps STOP. */
+    public static void cancel(Context ctx) {
+        try {
+            AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+            if (am == null) return;
+            Intent i = new Intent(ctx, ServiceWatchdog.class).setAction(ACTION);
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT
+                | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
+            PendingIntent pi = PendingIntent.getBroadcast(ctx, REQ_CODE, i, flags);
+            am.cancel(pi);
+        } catch (Exception ignored) {}
+    }
+
     @Override
     public void onReceive(Context ctx, Intent intent) {
         if (intent == null || !ACTION.equals(intent.getAction())) return;
-        // Re-launch the service if the user wants it active. Service.start()
-        // is idempotent — if it's already running, this is a cheap no-op.
-        if (WorkerState.wasActive(ctx)) {
-            try { GridWorkerService.start(ctx); } catch (Exception ignored) {}
+        // Re-launch the service if the user has not opted out via STOP.
+        // Service.start() is idempotent — already-running is a cheap no-op.
+        if (WorkerState.shouldRun(ctx)) {
+            try {
+                WorkerState.setActive(ctx, true);
+                GridWorkerService.start(ctx);
+            } catch (Exception ignored) {}
+            // Reschedule self so the cycle continues.
+            schedule(ctx);
         }
-        // Reschedule self so the cycle continues.
-        schedule(ctx);
     }
 }

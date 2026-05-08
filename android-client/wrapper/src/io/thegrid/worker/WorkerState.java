@@ -9,6 +9,7 @@ import android.content.SharedPreferences;
 public class WorkerState {
     private static final String PREFS = "grid_worker_state";
     private static final String K_ACTIVE = "active";
+    private static final String K_USER_STOPPED = "user_stopped";  // iter-15 / v1.2.9 — only true when user TAPS STOP
     private static final String K_TOKEN = "auth_token";
     private static final String K_DEVICE_ID = "device_id";
     private static final String K_TASKS = "session_tasks";
@@ -20,8 +21,33 @@ public class WorkerState {
         return c.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    public static void setActive(Context c, boolean v) { sp(c).edit().putBoolean(K_ACTIVE, v).apply(); }
+    public static void setActive(Context c, boolean v) {
+        SharedPreferences.Editor e = sp(c).edit().putBoolean(K_ACTIVE, v);
+        // Setting active=true ALWAYS clears the user_stopped sticky flag —
+        // the only way `user_stopped` can be set is via the explicit STOP path.
+        if (v) e.putBoolean(K_USER_STOPPED, false);
+        e.apply();
+    }
     public static boolean wasActive(Context c) { return sp(c).getBoolean(K_ACTIVE, false); }
+
+    /** iter-15: returns true ONLY when the user explicitly tapped the STOP
+     *  notification action (markUserStopped). Any other "off" state is just
+     *  a transient — service should auto-resume on next boot/launch/watchdog. */
+    public static boolean userStopped(Context c) {
+        return sp(c).getBoolean(K_USER_STOPPED, false);
+    }
+    public static void markUserStopped(Context c) {
+        sp(c).edit().putBoolean(K_USER_STOPPED, true).putBoolean(K_ACTIVE, false).apply();
+    }
+    /** iter-15: should-the-service-be-running gate.  Default = true (first
+     *  install ever) — only false if the user hit STOP. */
+    public static boolean shouldRun(Context c) {
+        SharedPreferences p = sp(c);
+        if (p.getBoolean(K_USER_STOPPED, false)) return false;
+        // First launch ever → no record of K_ACTIVE → default-on.
+        if (!p.contains(K_ACTIVE)) return true;
+        return true;  // anything that isn't "user_stopped" is "should run"
+    }
 
     public static void setAuth(Context c, String token, String deviceId) {
         SharedPreferences.Editor e = sp(c).edit();
