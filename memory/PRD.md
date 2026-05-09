@@ -307,3 +307,13 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 
 
 
+
+
+**Iter 25 (2026-05-09)** — **v1.3.8 Native Engine ARMED — librandomx.so EMBEDDED**
+- **Motor montajı tamamlandı**: User provided `librandomx.so` (arm64-v8a, ELF64 AArch64, NDK r28, build-id `78e647e7e4187f61ba6ebbe63e6bbbba20117e67`, 1,195,960 bytes, 175 RandomX symbols, SHA-256 `2c7c0be381cb8e0713926e34a4c76a29da650aa2b0225226ebde4b7943f571b2`). Verified via readelf + `nm -D` (10 `Java_io_thegrid_worker_RandomXBridge_*` JNI symbols).
+- **Container build pipeline reconstructed** — apt-get installed `aapt`, `apksigner`, `zipalign`, `default-jdk-headless`, `android-sdk-build-tools`. Downloaded `platform-34-ext7_r03.zip` for `android.jar` and `build-tools_r34-linux.zip` for `d8.jar`. Placed at `/opt/android-sdk/platforms/android-34/android.jar` + `/opt/android-sdk/build-tools/34.0.0/lib/d8.jar`.
+- **CRITICAL FIX**: Earlier v1.3.6/1.3.7/1.3.8 APKs were byte-identical and shipped a stale DEX from v1.3.2 (no `RandomXBridge` JNI). Bumped `AndroidManifest.xml` to `versionName=1.3.8 / versionCode=138` and rebuilt — classes.dex now contains `Lio/thegrid/worker/RandomXBridge;`, `nativeStartMining`, `nativeGetHashrate`.
+- **Built APK**: `/app/frontend/public/grid-worker-v1.3.8.apk` — **382,107 bytes**, SHA-256 `b0e355ad91dafc3144fe0a12b06c88cfc93fd7e1a51823769c86fee2a751a421`, v2+v3 signed ✓. Contains `lib/arm64-v8a/librandomx.so` (1.14MB).
+- **Backend `/api/apk/version` made dynamic** — `_compute_apk_meta()` reads APK off disk at startup; new JSON fields: `native_lib_embedded`, `native_lib_sha256`, `native_lib_size`, `native_lib_path`, `engine: "RandomX (NDK r28, light mode, 1-4 threads)"`. No more stale hardcoded metadata.
+- **Pending real-device verification** — User installs APK → Start Mining → expected admin observables: `mining_phones≥1`, `mobile_native_hashrate_hps>0`, Live Console `device · share` events, heartbeats with `native_pow=true / native_lib_loaded=true / mining_status="mining"`. Accepted shares may take minutes (mobile RandomX ~50-300 H/s vs pool diff).
+- **APK URL**: `https://grid-supercomputer.preview.emergentagent.com/grid-worker-v1.3.8.apk`

@@ -252,9 +252,48 @@ class JobCreateIn(BaseModel):
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
 APK_VERSION = "1.3.8"
 APK_PATH = "/grid-worker-v1.3.8.apk"
-APK_SIZE = 33850
-APK_SHA256 = "7b9c0a3389e84f71c67486a63262c5851a122a5250e76ec8b5e6c079c16194cb"
 APK_RELEASE_NOTES = "v1.3.8 real mobile mining worker · randomx native hash loop · backend ws stratum bridge · session nonce + signed challenge anti-spoof · pool credentials never leave server · honest connected_only fallback when librandomx.so missing · v2+v3 signed"
+
+
+def _compute_apk_meta() -> dict:
+    """
+    Reads the published APK off disk so /api/apk/version always returns truthful
+    size + sha256 + native-lib presence. Keeps the metadata honest across
+    rebuilds (no more stale hardcoded constants).
+    """
+    import hashlib, zipfile
+    apk_fs = os.path.join("/app/frontend/public", APK_PATH.lstrip("/"))
+    meta = {"size_bytes": 0, "sha256": "", "native_lib_embedded": False,
+            "native_lib_sha256": "", "native_lib_size": 0}
+    try:
+        with open(apk_fs, "rb") as f:
+            data = f.read()
+        meta["size_bytes"] = len(data)
+        meta["sha256"] = hashlib.sha256(data).hexdigest()
+        # Inspect the embedded librandomx.so so investors can independently
+        # verify the native engine is bundled (constitutional guard for v1.3.8).
+        with zipfile.ZipFile(apk_fs) as z:
+            names = z.namelist()
+            for cand in ("lib/arm64-v8a/librandomx.so", "lib/armeabi-v7a/librandomx.so"):
+                if cand in names:
+                    so = z.read(cand)
+                    meta["native_lib_embedded"] = True
+                    meta["native_lib_sha256"] = hashlib.sha256(so).hexdigest()
+                    meta["native_lib_size"] = len(so)
+                    break
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    return meta
+
+
+APK_META = _compute_apk_meta()
+APK_SIZE = APK_META["size_bytes"]
+APK_SHA256 = APK_META["sha256"]
+APK_NATIVE_EMBEDDED = APK_META["native_lib_embedded"]
+APK_NATIVE_SHA256 = APK_META["native_lib_sha256"]
+APK_NATIVE_SIZE = APK_META["native_lib_size"]
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -1997,13 +2036,18 @@ async def apk_version():
         "download_url": APK_PATH,
         "min_android": "7.0",
         "min_sdk": 24,
-        "abi": ["arm64-v8a", "armeabi-v7a", "x86_64", "x86"],
+        "abi": ["arm64-v8a"],
         "release_notes": APK_RELEASE_NOTES,
-        "released_at": "2026-02-15",
+        "released_at": "2026-05-09",
         "size_bytes": APK_SIZE,
         "sha256": APK_SHA256,
         "signature_schemes": ["v2", "v3"],
         "signed": True,
+        "native_lib_embedded": APK_NATIVE_EMBEDDED,
+        "native_lib_sha256": APK_NATIVE_SHA256,
+        "native_lib_size": APK_NATIVE_SIZE,
+        "native_lib_path": "lib/arm64-v8a/librandomx.so",
+        "engine": "RandomX (NDK r28, light mode, 1-4 threads)" if APK_NATIVE_EMBEDDED else "wrapper-only (no native engine)",
         "features": [
             "foreground_service",
             "background_heartbeat",
