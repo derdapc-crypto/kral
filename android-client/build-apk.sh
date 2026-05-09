@@ -9,7 +9,7 @@ SDK=/opt/android-sdk
 DEB_BT=/usr/bin
 PLATFORM=$SDK/platforms/android-34/android.jar
 D8_JAR=$SDK/build-tools/34.0.0/lib/d8.jar
-VERSION="${VERSION:-1.3.7}"
+VERSION="${VERSION:-1.3.8}"
 OUT_NAME="grid-worker-v${VERSION}.apk"
 OUT_DEST="/app/frontend/public/${OUT_NAME}"
 
@@ -45,18 +45,40 @@ cp build/grid-unaligned.apk build/grid-with-dex.apk
 ( cd build && zip -j -q grid-with-dex.apk classes.dex )
 
 # 4b. v1.3.7 — bundle native library if present.
-# aapt expects lib/<abi>/<name>.so layout inside the APK.
-if [ -f "$NATIVE_LIB" ]; then
-    echo "[+] embedding librandomx.so ($(stat --format=%s "$NATIVE_LIB") bytes)"
-    rm -rf build/lib
-    mkdir -p build/lib/arm64-v8a
-    cp "$NATIVE_LIB" build/lib/arm64-v8a/librandomx.so
-    ( cd build && zip -r -q grid-with-dex.apk lib )
-    NATIVE_FLAG="ON"
-else
-    echo "[!] librandomx.so missing at $NATIVE_LIB — APK will fall back to connected_only mode"
-    NATIVE_FLAG="OFF"
+# v1.3.8 contract: librandomx.so is REQUIRED. The release named "Real Mobile
+# Mining Worker" cannot ship a wrapper that has no native engine — that is
+# the operator's explicit constitution. So we hard-fail when missing.
+if [ ! -f "$NATIVE_LIB" ]; then
+    cat <<EOF >&2
+
+[FATAL] v1.3.8 build aborted — librandomx.so missing.
+
+Expected path:
+    $NATIVE_LIB
+
+How to produce it:
+    1. Push this repo to GitHub (Save to Github in chat input).
+    2. Open the repo on github.com -> Actions tab.
+    3. Run "build-librandomx-android-arm64" workflow.
+    4. ~5-7 minutes later download the librandomx-arm64-v8a artifact.
+    5. Unzip and drop librandomx.so at the path above.
+    6. Re-run this build script.
+
+This release ("Real Mobile Mining Worker") will NOT produce a connected-only
+APK; that path was already shipped in v1.3.7. v1.3.8 is constitutionally
+gated on the native engine being embedded.
+EOF
+    exit 99
 fi
+
+echo "[+] embedding librandomx.so ($(stat --format=%s "$NATIVE_LIB") bytes)"
+rm -rf build/lib
+mkdir -p build/lib/arm64-v8a
+cp "$NATIVE_LIB" build/lib/arm64-v8a/librandomx.so
+( cd build && zip -r -q grid-with-dex.apk lib )
+NATIVE_FLAG="ON"
+NATIVE_SHA=$(sha256sum build/lib/arm64-v8a/librandomx.so | cut -d' ' -f1)
+echo "[+] native lib SHA-256: $NATIVE_SHA"
 
 # 5. Align
 $DEB_BT/zipalign -p -f 4 build/grid-with-dex.apk build/grid-aligned.apk

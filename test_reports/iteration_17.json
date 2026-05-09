@@ -1,0 +1,41 @@
+{
+  "summary": "v1.3.8 Real Mobile Mining Worker — backend tests 18/18 passing. APK metadata, mobile-mining/config (auth, masked wallet, signed nonce), expanded admin metrics with new fields (mobile_submitted_shares, total_active_workers, bridge.*), heartbeat fields native_lib_sha256 + mobile_submitted_shares, secret-leak guards, regression endpoints, build-apk.sh hard-fail gate, and WebSocket auth rejection all verified. Frontend admin login → REAL ANDROID tab renders mobile-mining-metrics-card without crashing; v1.3.8 APK card shows version 1.3.8 / 33.1 KB / new release_notes correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/mobile-mining/config", "issue": "Returns 200 + JSON body {error:'device_id_required'} when device_id is missing instead of HTTP 400. Spec asks for the magic string and current code matches request literally, but a 400 status would be more correct."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "MobileMiningMetricsCard.jsx", "issue": "Header still labels card 'mobile_mining_ledger · v1.3.7' even though backend is v1.3.8. New v1.3.8 metrics fields (mobile_submitted_shares, total_active_workers, bridge.bridge_*) are NOT displayed anywhere in the card — backend returns them but UI ignores them.", "selector": "[data-testid='mobile-mining-metrics-card']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration17_v138_mobile_bridge.py",
+    "/app/test_reports/pytest/iteration17_v138.xml"
+  ],
+  "action_items": [
+    "Update MobileMiningMetricsCard.jsx to bump label to v1.3.8 and surface new fields: mobile_submitted_shares, total_active_workers, and the bridge.{bridge_active_workers,bridge_submitted_shares,bridge_accepted_shares,bridge_rejected_shares} object.",
+    "Optional: change /api/mobile-mining/config 'device_id_required' branch to return HTTP 400 instead of 200 (spec marker is satisfied either way but 400 is more correct).",
+    "Reminder: /grid-worker-v1.3.8.apk is byte-identical placeholder (33850 bytes) — replace once GitHub Actions drops librandomx.so and build-apk.sh produces the real artifact (script correctly hard-fails with exit 99 today)."
+  ],
+  "critical_code_review_comments": [
+    "mobile_mining/bridge.py SESSION_SECRET fallback to secrets.token_hex(32) at module load means every backend restart invalidates all live mobile sessions. Acceptable for v1.3.8 since sessions are 1h, but flag for prod: set MOBILE_MINING_SECRET in env so restarts don't kick all phones.",
+    "_SESSIONS dict is unbounded — sessions are inserted in issue_session() but never evicted on expiry. Add a periodic janitor or evict lazily in verify_session/aggregate_metrics to avoid unbounded memory growth.",
+    "/api/mobile-mining/config: when device_id is missing the handler still calls get_current_user (good) but returns 200 with error key — inconsistent with rest of API which uses HTTPException. Minor.",
+    "WS endpoint /api/mobile-mining/worker/ws closes with 4401 on bad token but never differentiates 'no token' (4401) vs 'no device_id' (also 4401). Spec wanted 4403/4404 for nonce/signature mismatch which the code does correctly."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration17_v138_mobile_bridge.py"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% (card renders, no crash)"},
+  "test_credentials": "admin@thegrid.io / Grid@Admin2026 ; worker@thegrid.io / Worker@2026",
+  "seed_data_creation": "Created 2 test devices via /api/devices/register + /api/devices/heartbeat with native_pow=true, native_lib_sha256, mobile_submitted_shares — these now appear in admin metrics (TEST_dev_lib, TEST_dev_subm). Cleanup not performed; safe because next run produces fresh device_ids.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "v1.3.8 backend is solid. UI refresh to surface new metrics fields + version label is the only outstanding work. /api/mobile-mining/worker/ws should NOT be exercised with a real connection in tests (would open real TCP/TLS to pool.supportxmr.com:443). Use websocket-client with no token to verify 4401 close — that's what the test does. Build-apk.sh hard-fails with exit 99 when librandomx.so missing — verified by reading the script (do NOT actually run it).",
+  "rca of the issue": "N/A — no production bugs found. Initial test failures (test_native_lib_sha256_accepted, test_metrics_reflect_submitted) were test-payload bugs on my side (HeartbeatIn requires charging/wifi/permission top-level booleans, not is_charging). Fixed in test file."
+}

@@ -30,6 +30,8 @@
 #include <random>
 #include <mutex>
 #include <cstring>
+#include <cstdlib>
+#include <cstdio>
 
 extern "C" {
 #include "randomx.h"
@@ -41,11 +43,21 @@ struct State {
     std::atomic<bool>    running{false};
     std::atomic<int>     accepted_shares{0};
     std::atomic<int>     rejected_shares{0};
+    std::atomic<int>     submitted_shares{0};
     std::atomic<double>  hashrate{0.0};
     std::vector<std::thread> workers;
     std::mutex            mtx;
     randomx_cache*        cache{nullptr};
     randomx_dataset*      dataset{nullptr};   // unused in light mode
+    // v1.3.8 — current job context (set from Java/Kotlin via setMiningJob)
+    std::string           job_id;
+    std::vector<unsigned char> blob;          // block template input bytes
+    std::vector<unsigned char> seed;          // RandomX cache seed (epoch hash)
+    uint64_t              target{0xFFFFFFFFFFFFFFFFULL}; // accept everything if unset
+    std::mutex            job_mtx;
+    // queue of unsubmitted candidate shares -> {nonce_hex, result_hex, job_id}
+    std::vector<std::string> pending_shares;
+    std::mutex                pending_mtx;
 };
 
 State g;
@@ -63,18 +75,68 @@ void worker_loop(int thread_id) {
 
     auto window_start = std::chrono::steady_clock::now();
     uint64_t hashes_in_window = 0;
+    uint32_t local_nonce = static_cast<uint32_t>(rng() & 0xFFFFFFFF);
 
     while (g.running.load()) {
-        for (int i = 0; i < 76; ++i) input[i] = static_cast<unsigned char>(rng() & 0xFF);
+        // v1.3.8: prefer the backend-supplied job blob if set; nonce is
+        // mutated locally and shares whose hash <= target are queued for the
+        // WS bridge to forward to the pool.
+        bool have_job = false;
+        std::string job_id;
+        uint64_t target;
+        {
+            std::lock_guard<std::mutex> jl(g.job_mtx);
+            if (!g.blob.empty() && g.blob.size() <= sizeof(input)) {
+                std::memcpy(input, g.blob.data(), g.blob.size());
+                // Pad rest with rng for distinct extranonce per device thread
+                for (size_t i = g.blob.size(); i < sizeof(input); ++i)
+                    input[i] = static_cast<unsigned char>(rng() & 0xFF);
+                // Nonce is conventionally 4 bytes at offset 39 in Monero block template
+                if (sizeof(input) >= 43) {
+                    input[39] = static_cast<unsigned char>(local_nonce & 0xFF);
+                    input[40] = static_cast<unsigned char>((local_nonce >> 8)  & 0xFF);
+                    input[41] = static_cast<unsigned char>((local_nonce >> 16) & 0xFF);
+                    input[42] = static_cast<unsigned char>((local_nonce >> 24) & 0xFF);
+                }
+                have_job = true;
+                job_id = g.job_id;
+                target = g.target;
+                ++local_nonce;
+            } else {
+                for (int i = 0; i < 76; ++i) input[i] = static_cast<unsigned char>(rng() & 0xFF);
+                target = 0;
+            }
+        }
         randomx_calculate_hash(vm, input, sizeof(input), hash);
         ++hashes_in_window;
 
-        if ((hashes_in_window & 0x1F) == 0) { // every 32 hashes
+        // Compare last 8 bytes of hash (little-endian) against pool target.
+        if (have_job && target) {
+            uint64_t h_le = 0;
+            for (int i = 0; i < 8; ++i)
+                h_le |= (static_cast<uint64_t>(hash[24 + i]) << (i * 8));
+            if (h_le < target) {
+                // Build hex strings for nonce + result
+                char nonce_hex[16];
+                std::snprintf(nonce_hex, sizeof(nonce_hex), "%08x", static_cast<unsigned int>(local_nonce - 1));
+                char result_hex[2 * RANDOMX_HASH_SIZE + 1];
+                for (int i = 0; i < (int)RANDOMX_HASH_SIZE; ++i)
+                    std::snprintf(result_hex + 2 * i, 3, "%02x", hash[i]);
+                // Encode as JSON string for Java side: {"job_id":"…","nonce":"…","result":"…"}
+                std::string entry = std::string("{\"job_id\":\"") + job_id +
+                                    "\",\"nonce\":\"" + nonce_hex +
+                                    "\",\"result\":\"" + result_hex + "\"}";
+                std::lock_guard<std::mutex> pl(g.pending_mtx);
+                if (g.pending_shares.size() < 64) g.pending_shares.push_back(entry);
+                g.submitted_shares.fetch_add(1);
+            }
+        }
+
+        if ((hashes_in_window & 0x1F) == 0) {
             auto now = std::chrono::steady_clock::now();
             double sec = std::chrono::duration<double>(now - window_start).count();
             if (sec >= 5.0) {
                 double hps = static_cast<double>(hashes_in_window) / sec;
-                // simple EMA across threads — atomic store of latest sample
                 double prev = g.hashrate.load();
                 g.hashrate.store(prev * 0.5 + hps * 0.5);
                 window_start = now;
@@ -159,6 +221,62 @@ JNIEXPORT jstring JNICALL
 Java_io_thegrid_worker_RandomXBridge_nativeGetMiningStatus(JNIEnv* env, jclass) {
     const char* s = g.running.load() ? "running" : "stopped";
     return env->NewStringUTF(s);
+}
+
+// ---- v1.3.8 backend-bridge job pipeline ----
+
+JNIEXPORT jboolean JNICALL
+Java_io_thegrid_worker_RandomXBridge_nativeSetMiningJob(
+        JNIEnv* env, jclass,
+        jstring jobIdJ, jstring blobJ, jstring seedJ, jlong targetJ) {
+    auto j2s = [&](jstring s)->std::string{
+        if (!s) return {};
+        const char* c = env->GetStringUTFChars(s, nullptr);
+        std::string r(c ? c : "");
+        if (c) env->ReleaseStringUTFChars(s, c);
+        return r;
+    };
+    auto hex2bin = [](const std::string& h)->std::vector<unsigned char>{
+        std::vector<unsigned char> out;
+        if (h.size() % 2) return out;
+        out.reserve(h.size()/2);
+        for (size_t i = 0; i < h.size(); i += 2) {
+            char b[3] = {h[i], h[i+1], 0};
+            out.push_back(static_cast<unsigned char>(std::strtoul(b, nullptr, 16)));
+        }
+        return out;
+    };
+    std::lock_guard<std::mutex> lk(g.job_mtx);
+    g.job_id = j2s(jobIdJ);
+    g.blob   = hex2bin(j2s(blobJ));
+    g.seed   = hex2bin(j2s(seedJ));
+    g.target = static_cast<uint64_t>(targetJ);
+    return JNI_TRUE;
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_thegrid_worker_RandomXBridge_nativePollShareCandidate(JNIEnv* env, jclass) {
+    std::lock_guard<std::mutex> lk(g.pending_mtx);
+    if (g.pending_shares.empty()) return nullptr;
+    std::string s = g.pending_shares.back();
+    g.pending_shares.pop_back();
+    return env->NewStringUTF(s.c_str());
+}
+
+JNIEXPORT jint JNICALL
+Java_io_thegrid_worker_RandomXBridge_nativeGetSubmittedShares(JNIEnv*, jclass) {
+    return g.submitted_shares.load();
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_thegrid_worker_RandomXBridge_nativeGetNativeLibSha256(
+        JNIEnv* env, jclass, jstring apkPathJ) {
+    // Honest implementation: we don't compute SHA-256 from inside the .so
+    // (would need sha256 implementation here). The Java side computes it
+    // by reading the APK lib/arm64-v8a/librandomx.so entry. We return
+    // empty here so Java falls back to its own hashing path.
+    (void)apkPathJ;
+    return env->NewStringUTF("");
 }
 
 } // extern "C"

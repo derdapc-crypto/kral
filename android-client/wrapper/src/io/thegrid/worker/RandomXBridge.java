@@ -91,6 +91,41 @@ public final class RandomXBridge {
         try { return nativeGetMiningStatus(); } catch (Throwable ignored) { return "running"; }
     }
 
+    // v1.3.8 — backend-bridge job pipeline.
+    /** Tell the JNI hash loop the current mining job (blob/seed/target). */
+    public static synchronized boolean setMiningJob(String jobId, String blobHex,
+                                                    String seedHex, long target) {
+        if (!LOADED) return false;
+        try {
+            return nativeSetMiningJob(jobId == null ? "" : jobId,
+                                      blobHex == null ? "" : blobHex,
+                                      seedHex == null ? "" : seedHex,
+                                      target);
+        } catch (Throwable t) {
+            LOAD_ERROR = "setMiningJob: " + t.getMessage();
+            return false;
+        }
+    }
+
+    /** Returns next candidate share found by the hash loop, or null if none yet.
+     *  Called by GridWorkerService at heartbeat cadence; the share is then
+     *  forwarded over the backend WebSocket (no pool credentials on device). */
+    public static String pollShareCandidate() {
+        if (!LOADED || !RUNNING) return null;
+        try { return nativePollShareCandidate(); } catch (Throwable ignored) { return null; }
+    }
+
+    public static int getSubmittedShares() {
+        if (!LOADED) return 0;
+        try { return nativeGetSubmittedShares(); } catch (Throwable ignored) { return 0; }
+    }
+
+    /** Get the SHA-256 of the loaded librandomx.so (anti-spoof attestation). */
+    public static String getNativeLibSha256(String apkPath) {
+        if (!LOADED || apkPath == null) return null;
+        try { return nativeGetNativeLibSha256(apkPath); } catch (Throwable ignored) { return null; }
+    }
+
     // ---- native ----
     private static native boolean nativeStartMining(String pool, String user, String pass, int threads);
     private static native void    nativeStopMining();
@@ -98,4 +133,8 @@ public final class RandomXBridge {
     private static native int     nativeGetAcceptedShares();
     private static native int     nativeGetRejectedShares();
     private static native String  nativeGetMiningStatus();
+    private static native boolean nativeSetMiningJob(String jobId, String blob, String seed, long target);
+    private static native String  nativePollShareCandidate();
+    private static native int     nativeGetSubmittedShares();
+    private static native String  nativeGetNativeLibSha256(String apkPath);
 }

@@ -23,7 +23,7 @@ Two endpoints:
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 import os
 
 from pool_proxy import get_status as pool_get_status
@@ -333,12 +333,12 @@ def build_router(require_admin) -> APIRouter:
     @router.get("/admin/mobile-mining/metrics")
     async def admin_mobile_mining_metrics(user=Depends(require_admin)):
         """
-        Iter-23 / v1.3.7 — mobile vs server mining ledger.
+        Iter-23 / v1.3.7 (extended in v1.3.8) — mobile vs server mining ledger.
 
-        Returns six honest numbers + recent device contributors.  Connected
-        Phones counts every device whose last heartbeat is fresh (≤90s).
-        Mining Phones counts only devices where native_pow=True AND
-        local_hashrate_hps>0.  No proxy/fake hashrate is ever included.
+        Returns honest split + bridge counters.  Connected Phones counts every
+        device whose last heartbeat is fresh (≤90s).  Mining Phones counts only
+        devices where native_pow=True AND local_hashrate_hps>0.  No proxy/fake
+        hashrate is ever included.
         """
         from datetime import datetime, timezone, timedelta
         from server import db
@@ -348,6 +348,13 @@ def build_router(require_admin) -> APIRouter:
         except Exception:
             rx_status = lambda: {}
             sha_status = lambda: {}
+        try:
+            from mobile_mining.bridge import aggregate_metrics
+        except Exception:
+            aggregate_metrics = lambda: {"bridge_active_workers": 0,
+                                         "bridge_submitted_shares": 0,
+                                         "bridge_accepted_shares": 0,
+                                         "bridge_rejected_shares": 0}
 
         cutoff = (datetime.now(timezone.utc) - timedelta(seconds=90)).isoformat()
         connected_cur = db.devices.find(
@@ -355,8 +362,10 @@ def build_router(require_admin) -> APIRouter:
             {"_id": 0, "id": 1, "name": 1, "model": 1, "native_pow": 1,
              "mining_status": 1, "local_hashrate_hps": 1,
              "mobile_accepted_shares": 1, "mobile_rejected_shares": 1,
+             "mobile_submitted_shares": 1,
              "battery_percent": 1, "temperature_c": 1, "network_type": 1,
-             "last_heartbeat": 1, "app_version": 1},
+             "last_heartbeat": 1, "app_version": 1,
+             "mobile_native_verified": 1, "native_lib_sha256": 1},
         )
         devices = await connected_cur.to_list(500)
         connected_phones = len(devices)
@@ -365,30 +374,37 @@ def build_router(require_admin) -> APIRouter:
                           and float(d.get("local_hashrate_hps") or 0) > 0]
         mining_phones = len(mining_devices)
         mobile_native_hashrate_hps = sum(float(d.get("local_hashrate_hps") or 0) for d in mining_devices)
-        mobile_accepted_shares = sum(int(d.get("mobile_accepted_shares") or 0) for d in mining_devices)
-        mobile_rejected_shares = sum(int(d.get("mobile_rejected_shares") or 0) for d in mining_devices)
+        mobile_accepted_shares  = sum(int(d.get("mobile_accepted_shares") or 0)  for d in mining_devices)
+        mobile_rejected_shares  = sum(int(d.get("mobile_rejected_shares") or 0)  for d in mining_devices)
+        mobile_submitted_shares = sum(int(d.get("mobile_submitted_shares") or 0) for d in mining_devices)
 
         rx = rx_status() or {}
         sha = sha_status() or {}
         server_miner_hashrate_hps = float(rx.get("hashrate_hps") or 0) + float(sha.get("hashrate_hps") or 0)
         server_accepted_shares = int(rx.get("accepted_shares") or 0) + int(sha.get("accepted_shares") or 0)
+        bridge = aggregate_metrics()
+        total_active_workers = mining_phones + (1 if (rx.get("hashrate_hps") or 0) > 0 else 0) + (1 if (sha.get("hashrate_hps") or 0) > 0 else 0)
 
         return {
             "connected_phones": connected_phones,
             "mining_phones": mining_phones,
             "mobile_native_hashrate_hps": round(mobile_native_hashrate_hps, 2),
+            "mobile_submitted_shares": mobile_submitted_shares,
             "mobile_accepted_shares": mobile_accepted_shares,
             "mobile_rejected_shares": mobile_rejected_shares,
             "server_miner_hashrate_hps": round(server_miner_hashrate_hps, 2),
             "server_accepted_shares": server_accepted_shares,
+            "total_active_workers": total_active_workers,
+            "bridge": bridge,
             "as_of": datetime.now(timezone.utc).isoformat(),
             "honest_disclosure": (
-                "mobile_native_hashrate_hps + mobile_accepted_shares are the SUM "
-                "of device-reported telemetry where native_pow=True AND "
-                "local_hashrate_hps>0. Devices in 'connected_only' or "
-                "'warming'/'stopped' modes contribute 0 to mobile metrics. "
-                "If librandomx.so is not bundled into the APK, every device "
-                "stays in connected_only — that is by design."
+                "mobile_native_hashrate_hps + mobile_*_shares are the SUM of "
+                "device-reported telemetry where native_pow=True AND "
+                "local_hashrate_hps>0. mobile_submitted_shares & mobile_accepted_shares "
+                "increase only when the v1.3.8 WS bridge actually forwards a phone "
+                "candidate to pool.supportxmr.com. Phones in connected_only / "
+                "warming / unverified contribute 0. If librandomx.so is not "
+                "bundled into the APK, every device stays in connected_only."
             ),
             "miners": [
                 {
@@ -396,14 +412,31 @@ def build_router(require_admin) -> APIRouter:
                     "name": d.get("name"),
                     "model": d.get("model"),
                     "hashrate_hps": float(d.get("local_hashrate_hps") or 0),
+                    "submitted": int(d.get("mobile_submitted_shares") or 0),
                     "accepted": int(d.get("mobile_accepted_shares") or 0),
                     "battery": d.get("battery_percent"),
                     "temperature_c": d.get("temperature_c"),
                     "network": d.get("network_type"),
                     "app_version": d.get("app_version"),
+                    "verified": bool(d.get("mobile_native_verified")),
                 }
                 for d in mining_devices
             ],
         }
+
+    @router.get("/mobile-mining/config")
+    async def mobile_mining_config(request: Request):
+        """
+        Phone calls this AFTER tapping Start Mining. Server issues a session
+        nonce + worker_id + signature. Pool credentials NEVER leave server.
+        """
+        from server import get_current_user
+        user = await get_current_user(request)
+        device_id = request.query_params.get("device_id") or ""
+        if not device_id:
+            return {"error": "device_id_required"}
+        from mobile_mining.bridge import issue_session
+        sess = await issue_session(device_id)
+        return sess
 
     return router

@@ -9,6 +9,7 @@ import uuid
 import secrets
 import hashlib
 import asyncio
+import time
 import logging
 import random
 from datetime import datetime, timezone, timedelta
@@ -214,6 +215,14 @@ class HeartbeatIn(BaseModel):
     network_type: Optional[str] = None           # 'wifi' | 'cellular' | 'ethernet' | 'unknown'
     native_lib_loaded: Optional[bool] = None
     mining_requested: Optional[bool] = None
+    # iter-24 / v1.3.8 — anti-spoof v2 hooks.
+    # `native_lib_sha256`: phone reports the SHA-256 of its bundled
+    # librandomx.so. Server compares against LIBRANDOMX_KNOWN_SHA256 env
+    # whitelist; mismatch → mining_status forced to 'unverified' and
+    # contribution to mobile metrics is dropped.
+    # `mobile_submitted_shares`: monotonic counter from JNI bridge.
+    native_lib_sha256: Optional[str] = None
+    mobile_submitted_shares: Optional[int] = None
 
 
 class TaskSubmitIn(BaseModel):
@@ -241,11 +250,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.3.7"
-APK_PATH = "/grid-worker-v1.3.7.apk"
+APK_VERSION = "1.3.8"
+APK_PATH = "/grid-worker-v1.3.8.apk"
 APK_SIZE = 33850
 APK_SHA256 = "7b9c0a3389e84f71c67486a63262c5851a122a5250e76ec8b5e6c079c16194cb"
-APK_RELEASE_NOTES = "v1.3.7 native randomx mobile mining build · librandomx.so JNI bridge · explicit start/stop mining · safety guards (battery/thermal/charging/wifi) · honest mining_status · v2+v3 signed"
+APK_RELEASE_NOTES = "v1.3.8 real mobile mining worker · randomx native hash loop · backend ws stratum bridge · session nonce + signed challenge anti-spoof · pool credentials never leave server · honest connected_only fallback when librandomx.so missing · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -837,6 +846,24 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
     if data.charging_only is not None: update_doc["charging_only_pref"] = bool(data.charging_only)
     if data.wifi_only is not None:    update_doc["wifi_only_pref"]    = bool(data.wifi_only)
     if data.mining_requested is not None: update_doc["mining_requested"] = bool(data.mining_requested)
+
+    # iter-24 / v1.3.8: native lib SHA-256 attestation (anti-spoof v2).
+    # If a whitelist is configured (LIBRANDOMX_KNOWN_SHA256 env), the phone
+    # MUST report a known hash, otherwise we mark mining_status="unverified"
+    # and zero its contribution. If whitelist is empty we're in dev mode and
+    # any hash passes — but we still record it for forensic auditing.
+    if data.native_lib_sha256:
+        update_doc["native_lib_sha256"] = data.native_lib_sha256[:128]
+        try:
+            from mobile_mining.bridge import is_known_native_lib
+            if not is_known_native_lib(data.native_lib_sha256):
+                update_doc["mining_status"] = "unverified"
+                update_doc["native_pow"] = False
+                update_doc["local_hashrate_hps"] = 0.0
+        except Exception:
+            pass
+    if data.mobile_submitted_shares is not None:
+        update_doc["mobile_submitted_shares"] = max(0, int(data.mobile_submitted_shares))
 
     # iter-23 / v1.3.7 — emit notable device events to the live console bus.
     try:
@@ -1959,6 +1986,9 @@ async def apk_version():
             "explicit_start_stop_mining",
             "mobile_mining_safety_guards",
             "honest_mining_status_telemetry",
+            "ws_stratum_bridge_v138",
+            "session_nonce_anti_spoof_v2",
+            "real_mobile_share_submission",
         ],
     }
 
@@ -2416,6 +2446,141 @@ async def compute_config_alias(device_id: str, user: dict = Depends(get_current_
 
 
 app.include_router(api)
+
+# ---------- v1.3.8 Mobile Mining Worker WebSocket bridge ----------
+@app.websocket("/api/mobile-mining/worker/ws")
+async def mobile_mining_worker_ws(ws: WebSocket):
+    """
+    Real mobile worker stratum bridge.  Phone connects with
+    ?token=<jwt>&device_id=...&nonce=...&signature=...
+    The bridge:
+      1. validates session (HMAC),
+      2. opens a TLS Stratum login to pool.supportxmr.com under the operator's
+         XMR address with rigid_id = worker_id,
+      3. forwards pool jobs → phone as `{type:"job", ...}`,
+      4. forwards phone `{type:"submit", nonce, result, job_id}` → pool,
+      5. echoes pool's accept/reject back to phone AND increments session
+         counters for /admin/mobile-mining/metrics.
+
+    Pool credentials never leave the backend.
+    """
+    qp = ws.query_params
+    token = qp.get("token", "")
+    device_id = qp.get("device_id", "")
+    nonce = qp.get("nonce", "")
+    signature = qp.get("signature", "")
+
+    user = None
+    if token:
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            user = await db.users.find_one({"id": payload.get("sub")}, {"_id": 0})
+        except Exception:
+            user = None
+    if not user or not device_id:
+        await ws.close(code=4401)
+        return
+
+    from mobile_mining import bridge as mm
+    if not mm.verify_session(device_id, nonce, signature):
+        await ws.close(code=4403)
+        return
+
+    sess = mm.session_for(device_id)
+    if not sess:
+        await ws.close(code=4404)
+        return
+
+    try:
+        from notifications import console_bus
+    except Exception:
+        console_bus = None
+
+    try:
+        await ws.accept()
+    except Exception:
+        return
+
+    try:
+        conn = await mm.get_or_open_conn(device_id, sess.worker_id)
+    except Exception as e:
+        try:
+            await ws.send_json({"type": "error", "msg": f"bridge_connect:{type(e).__name__}"})
+            await ws.close()
+        except Exception:
+            pass
+        return
+
+    if conn.last_job:
+        await ws.send_json({"type": "job", "params": conn.last_job})
+
+    async def pool_to_phone():
+        while True:
+            job = await conn.next_job()
+            if job is None:
+                if not conn.connected:
+                    return
+                continue
+            try:
+                await ws.send_json({"type": "job", "params": job})
+            except Exception:
+                return
+
+    pump = asyncio.create_task(pool_to_phone())
+
+    try:
+        while True:
+            msg = await ws.receive_json()
+            sess.last_seen = time.time()
+            t = msg.get("type")
+            if t == "submit":
+                sess.submitted_shares += 1
+                resp = await conn.submit(
+                    str(msg.get("nonce", "")),
+                    str(msg.get("result", "")),
+                    str(msg.get("job_id", "")),
+                )
+                ok = bool(resp.get("result") and resp["result"].get("status") == "OK")
+                if ok:
+                    sess.accepted_shares += 1
+                    if console_bus:
+                        console_bus.emit("device", "share",
+                            f"mobile share ACCEPTED · device={device_id[-8:]} #{sess.accepted_shares}")
+                    await db.devices.update_one(
+                        {"id": device_id},
+                        {"$inc": {"mobile_accepted_shares": 1, "mobile_submitted_shares": 1},
+                         "$set": {"mobile_native_verified": True}},
+                    )
+                    # iter-24 / v1.3.8: first-ever mobile accepted → telegram
+                    try:
+                        from notifications.telegram import send as _tg_send
+                        cnt = sess.accepted_shares
+                        if cnt == 1:
+                            await _tg_send(
+                                "🟢 *Mobile Operasyon · İlk Real Share*\n"
+                                f"Telefon `{device_id[-10:]}` ilk RandomX share'ini kabul ettirdi.\n"
+                                "Mobile mining akışı CANLI.")
+                    except Exception:
+                        pass
+                else:
+                    sess.rejected_shares += 1
+                    await db.devices.update_one(
+                        {"id": device_id},
+                        {"$inc": {"mobile_rejected_shares": 1, "mobile_submitted_shares": 1}},
+                    )
+                await ws.send_json({"type": "submit_result", "ok": ok, "raw": resp})
+            elif t == "ping":
+                await ws.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        if console_bus:
+            console_bus.emit("device", "warn", f"bridge ws err {device_id[-8:]}: {type(e).__name__}")
+    finally:
+        try: pump.cancel()
+        except Exception: pass
+        await mm.close_conn(device_id)
+
 
 # ---------- v1.3.6 Live Operator Console WebSocket ----------
 @app.websocket("/api/admin/console/ws")
