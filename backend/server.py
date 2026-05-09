@@ -664,8 +664,53 @@ async def logout(response: Response):
 
 
 @api.get("/auth/me")
-async def me(user: dict = Depends(get_current_user)):
-    return user
+async def me(response: Response, request: Request, user: dict = Depends(get_current_user)):
+    """
+    Returns the current user. Also issues a fresh `token` (and rolls the
+    access_token cookie) so the frontend can keep `localStorage.grid_token`
+    in sync with the cookie session. This prevents stale tokens from being
+    sent to WebSocket endpoints (which were the root cause of 403 floods on
+    /api/admin/console/ws).
+    """
+    fresh_access = create_access_token(user["id"], user["email"], user.get("role", "user"))
+    response.set_cookie("access_token", fresh_access, httponly=True, secure=True,
+                        samesite="none", max_age=60 * 60 * 24, path="/")
+    out = dict(user)
+    out["token"] = fresh_access
+    return out
+
+
+@api.post("/auth/refresh")
+async def auth_refresh(request: Request, response: Response):
+    """
+    Exchanges the long-lived refresh_token cookie for a brand-new access_token.
+    Used by the frontend when localStorage.grid_token is missing or expired so
+    that WebSocket auth (which only sees query-string tokens) keeps working.
+    """
+    rtok = request.cookies.get("refresh_token")
+    if not rtok:
+        # Fallback: header-based bearer for non-cookie clients
+        auth = request.headers.get("X-Refresh-Token", "")
+        if auth:
+            rtok = auth
+    if not rtok:
+        raise HTTPException(status_code=401, detail="No refresh token")
+    try:
+        payload = jwt.decode(rtok, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        uid = payload.get("sub")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    user = await db.users.find_one({"id": uid}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    access = create_access_token(user["id"], user["email"], user.get("role", "user"))
+    refresh = create_refresh_token(user["id"])
+    set_auth_cookies(response, access, refresh)
+    return {"token": access, "id": user["id"], "email": user["email"], "role": user.get("role", "user")}
 
 
 # ---------- Device Endpoints ----------
@@ -2583,27 +2628,53 @@ async def mobile_mining_worker_ws(ws: WebSocket):
 
 
 # ---------- v1.3.6 Live Operator Console WebSocket ----------
+async def _resolve_admin_from_ws(ws: WebSocket) -> Optional[dict]:
+    """
+    Resolves the admin user from a WebSocket handshake. Tries the `?token=`
+    query-string first (matches existing frontend behaviour), then falls back
+    to the `access_token` HTTP-only cookie (sent automatically on same-origin
+    WS handshakes). This dual lookup eliminates the 403-flood that happens
+    when `localStorage.grid_token` is stale but the cookie session is fresh.
+    """
+    candidates = []
+    qtok = ws.query_params.get("token", "")
+    if qtok:
+        candidates.append(qtok)
+    ctok = ws.cookies.get("access_token", "")
+    if ctok and ctok not in candidates:
+        candidates.append(ctok)
+    for tok in candidates:
+        try:
+            payload = jwt.decode(tok, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            if payload.get("type") != "access":
+                continue
+            user = await db.users.find_one({"id": payload.get("sub")}, {"_id": 0, "password_hash": 0})
+            if user and user.get("role") == "admin":
+                return user
+        except jwt.ExpiredSignatureError:
+            continue
+        except jwt.InvalidTokenError:
+            continue
+        except Exception:
+            continue
+    return None
+
+
 @app.websocket("/api/admin/console/ws")
 async def admin_console_ws(ws: WebSocket):
     """
     Live operator console — streams real-time mining + system events to the
-    admin dashboard. Token is passed as `?token=<jwt>` query string. Drop-on-
-    auth-fail to keep the surface area minimal.
+    admin dashboard. Auth: `?token=<jwt>` query-string OR `access_token` cookie.
+    Close codes: 4401 = unauthorized (frontend must stop reconnecting).
     """
-    token = ws.query_params.get("token", "")
-    user = None
-    if token:
-        try:
-            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            user = await db.users.find_one({"id": payload.get("sub")}, {"_id": 0})
-        except Exception:
-            user = None
-    if not user or user.get("role") != "admin":
+    user = await _resolve_admin_from_ws(ws)
+    if not user:
         await ws.close(code=4401)
         return
 
     from notifications import console_bus
     await ws.accept()
+    q = None
     # Replay last 60 events so the terminal is never empty on connect.
     try:
         for ev in console_bus.snapshot(60):
@@ -2618,7 +2689,8 @@ async def admin_console_ws(ws: WebSocket):
         pass
     finally:
         try:
-            console_bus.unsubscribe(q)  # type: ignore
+            if q is not None:
+                console_bus.unsubscribe(q)
         except Exception:
             pass
 
@@ -2643,10 +2715,28 @@ async def _verify_ws_admin(token: str) -> bool:
         return False
 
 
+async def _verify_ws_admin_handshake(websocket: WebSocket, token: str) -> bool:
+    """Accepts admin via query token or `access_token` cookie (handshake fallback)."""
+    candidates = []
+    if token:
+        candidates.append(token)
+    ctok = websocket.cookies.get("access_token", "")
+    if ctok and ctok not in candidates:
+        candidates.append(ctok)
+    for tok in candidates:
+        try:
+            payload = jwt.decode(tok, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            if payload.get("role") == "admin" and payload.get("type") == "access":
+                return True
+        except Exception:
+            continue
+    return False
+
+
 @app.websocket("/api/ws/admin/telemetry")
 async def admin_telemetry_ws(websocket: WebSocket, token: str = ""):
     """Streams aggregate hashrate + active-node count every 2s to admin dashboards."""
-    if not await _verify_ws_admin(token):
+    if not await _verify_ws_admin_handshake(websocket, token):
         await websocket.close(code=4401)
         return
     await websocket.accept()

@@ -293,4 +293,17 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **`server.py` 2536 satır** P2 — testing agent açıkça vurguladı; `routers/devices.py`, `routers/apk.py`, `routers/notifications.py` extraction'ı yakın gelecekte.
 - **Anti-spoof v2** P2 — şu an client-side `native_lib_loaded` flag'a güveniyoruz. v1.3.8'de signed nonce challenge (HMAC over .so SHA256) ile sertleştirilecek.
 
+**Iter 24 (2026-05-09)** — **Admin Console WebSocket 403-Flood Fix (v1.3.9)**
+- **Root cause** — Browser tabs were carrying a 24h-old `localStorage.grid_token` while the `access_token` cookie session was still fresh. Stale JWT → `jwt.ExpiredSignatureError` → handshake closed with 4401 → frontend reconnect-loop hammered the backend every 2.5s with 403s.
+- **Backend fixes** (`/app/backend/server.py`):
+  * `/auth/me` now ALSO rolls a fresh `access_token` (rotates the cookie + returns the JWT in the body) so the frontend can keep `localStorage.grid_token` in sync with the cookie session.
+  * **NEW `POST /auth/refresh`** — exchanges the 7d `refresh_token` cookie (or `X-Refresh-Token` header) for a brand-new access token + refreshes both cookies. Returns `{ token, id, email, role }`. 401 on missing/expired/invalid refresh.
+  * `/api/admin/console/ws` and `/api/ws/admin/telemetry` now accept handshake auth from EITHER the `?token=` query string OR the `access_token` HTTP-only cookie (cookies are sent automatically on same-origin WS handshakes). 4401 close on auth fail.
+- **Frontend fixes**:
+  * `AuthContext.jsx` boot flow: `/auth/me` → store `data.token` in `localStorage.grid_token`; on failure, fall back to `/auth/refresh` once before declaring the user logged out.
+  * `LiveOperatorConsole.jsx`: reads `grid_token` at connect-time (not effect-time) so refreshed tokens pick up; on close-codes 4401/4403 it stops the reconnect loop, calls `/auth/me` + `/auth/refresh` once, and then attempts a single reconnect; otherwise enters `auth-required` state. New status pill label.
+- **Regression** — `/app/backend/tests/test_admin_console_ws_auth.py`: 10/10 PASS (login, /auth/me rolls fresh token, /auth/refresh with cookie, /auth/refresh without cookie → 401, valid query token connects, expired query + no cookie → 403, expired query + valid cookie → connects via fallback, no query + valid cookie → connects, non-admin → 403, no token → 403).
+- **Behavioural impact** — Admin Live Operator Console is now stable across long sessions. Stale-token reconnect floods are eliminated.
+
+
 

@@ -15,17 +15,19 @@ export default function LiveOperatorConsole({ height = 280 }) {
 
   useEffect(() => {
     const base = process.env.REACT_APP_BACKEND_URL || "";
-    const token = (typeof localStorage !== "undefined" && localStorage.getItem("grid_token")) || "";
-    const wsUrl = base.replace(/^http/, "ws") + "/api/admin/console/ws?token=" + encodeURIComponent(token);
-
     let cancelled = false;
     let reconnectT = null;
+    let backoff = 1500;
+
     const open = () => {
       if (cancelled) return;
+      // Read token at connect-time (not effect-time) so refreshed tokens pick up.
+      const token = (typeof localStorage !== "undefined" && localStorage.getItem("grid_token")) || "";
+      const wsUrl = base.replace(/^http/, "ws") + "/api/admin/console/ws?token=" + encodeURIComponent(token);
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       setState("connecting");
-      ws.onopen = () => setState("live");
+      ws.onopen = () => { backoff = 1500; setState("live"); };
       ws.onmessage = (e) => {
         try {
           const ev = JSON.parse(e.data);
@@ -35,10 +37,43 @@ export default function LiveOperatorConsole({ height = 280 }) {
           });
         } catch {}
       };
-      ws.onclose = () => {
+      ws.onclose = (ev) => {
         if (cancelled) return;
+        // 4401 = unauthorized. Don't hammer the backend in a reconnect loop;
+        // try one auth refresh, then a single reconnect. If still unauthorized,
+        // park the console in an "auth-required" state.
+        if (ev && (ev.code === 4401 || ev.code === 4403)) {
+          setState("auth-required");
+          (async () => {
+            try {
+              const apiBase = (process.env.REACT_APP_BACKEND_URL || "") + "/api";
+              const r = await fetch(apiBase + "/auth/me", { credentials: "include" });
+              if (r.ok) {
+                const me = await r.json();
+                if (me && me.token) {
+                  localStorage.setItem("grid_token", me.token);
+                  reconnectT = setTimeout(open, 800);
+                  return;
+                }
+              }
+              // Try refresh once
+              const rr = await fetch(apiBase + "/auth/refresh", { method: "POST", credentials: "include" });
+              if (rr.ok) {
+                const rj = await rr.json();
+                if (rj && rj.token) {
+                  localStorage.setItem("grid_token", rj.token);
+                  reconnectT = setTimeout(open, 800);
+                  return;
+                }
+              }
+            } catch {}
+            // Give up: remain in auth-required state; user must re-login.
+          })();
+          return;
+        }
         setState("reconnecting");
-        reconnectT = setTimeout(open, 2500);
+        backoff = Math.min(backoff * 1.5, 15000);
+        reconnectT = setTimeout(open, backoff);
       };
       ws.onerror = () => { try { ws.close(); } catch {} };
     };
@@ -80,7 +115,10 @@ export default function LiveOperatorConsole({ height = 280 }) {
         <div className="flex items-center gap-2">
           <span className="cyber-pill" data-testid="console-state">
             <Activity className="w-3 h-3" />
-            {state === "live" ? "LIVE" : state === "reconnecting" ? "RECONNECTING" : "CONNECTING"}
+            {state === "live" ? "LIVE" :
+             state === "reconnecting" ? "RECONNECTING" :
+             state === "auth-required" ? "AUTH REQUIRED" :
+             "CONNECTING"}
           </span>
           <span className="text-[10px] text-white/40 font-mono-term">{events.length} events</span>
         </div>

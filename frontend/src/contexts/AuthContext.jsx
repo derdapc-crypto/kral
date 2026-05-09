@@ -10,10 +10,24 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     (async () => {
       try {
+        // /auth/me now returns a freshly-rolled access token; mirror it into
+        // localStorage so WebSocket endpoints (which read query-string tokens)
+        // never see a stale JWT after the cookie has been rotated.
         const { data } = await api.get("/auth/me");
+        if (data && data.token) localStorage.setItem("grid_token", data.token);
         setUser(data);
       } catch {
-        setUser(false);
+        // Cookie session may have expired — try to revive via refresh token.
+        try {
+          const { data } = await api.post("/auth/refresh");
+          if (data && data.token) localStorage.setItem("grid_token", data.token);
+          const me = await api.get("/auth/me");
+          if (me.data && me.data.token) localStorage.setItem("grid_token", me.data.token);
+          setUser(me.data);
+        } catch {
+          localStorage.removeItem("grid_token");
+          setUser(false);
+        }
       } finally {
         setLoading(false);
       }
@@ -51,6 +65,7 @@ export function AuthProvider({ children }) {
   const refresh = async () => {
     try {
       const { data } = await api.get("/auth/me");
+      if (data && data.token) localStorage.setItem("grid_token", data.token);
       setUser(data);
     } catch {}
   };
