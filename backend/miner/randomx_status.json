@@ -15,8 +15,8 @@
   "started_at": "2026-05-09T19:05:48.949479+00:00",
   "last_share_at": null,
   "last_accepted_at": null,
-  "last_message": "hashrate 2.84 H/s",
+  "last_message": "job diff 75000",
   "last_error": null,
-  "uptime_sec": 156,
+  "uptime_sec": 163,
   "version": "v1.3.5-weapon"
 }
