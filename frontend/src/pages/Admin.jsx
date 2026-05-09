@@ -1,17 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, Users, Briefcase, FileText, Cpu, Thermometer, Battery, Wifi, BatteryCharging, X, Check, Zap, Power, Coins } from "lucide-react";
+import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, Users, Briefcase, FileText, Cpu, Thermometer, Battery, Wifi, BatteryCharging, X, Check, Zap, Power, Coins, Terminal } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Area, AreaChart } from "recharts";
-import ComputeOrchestrator from "../components/ComputeOrchestrator";
 import RealAndroidDevices from "../components/RealAndroidDevices";
+import BootSequence from "../components/BootSequence";
 
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
 
 function Tab({ active, onClick, children, testId }) {
   return (
     <button onClick={onClick} data-testid={testId}
-      className={`px-5 py-2.5 text-xs tracking-[0.25em] uppercase rounded-full transition-all ${
-        active ? "bg-[#F2C94C] text-black" : "text-white/60 hover:text-white border border-white/10"
+      className={`px-5 py-2.5 text-[10px] tracking-[0.3em] uppercase rounded-full transition-all font-mono-cyber ${
+        active
+          ? "bg-[#00ffe1] text-black cyan-glow font-bold"
+          : "text-white/55 hover:text-[#00ffe1] border border-[#00ffe1]/15 hover:border-[#00ffe1]/40"
       }`}>
       {children}
     </button>
@@ -103,26 +105,28 @@ export default function Admin() {
   const pendingJobs = jobs.filter(j => j.status === "pending").length;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] grid-bg">
-      <div className="max-w-7xl mx-auto px-6 sm:px-10 py-10">
+    <BootSequence>
+    <div className="min-h-[calc(100vh-4rem)] cyber-bg cyber-scanlines">
+      <div className="absolute inset-0 cyber-grid opacity-40 pointer-events-none" />
+      <div className="relative max-w-7xl mx-auto px-6 sm:px-10 py-10">
         <div className="mb-10 flex justify-between flex-wrap items-end gap-4">
           <div>
-            <div className="text-[11px] tracking-[0.3em] uppercase text-[#F2C94C]">/ command center</div>
-            <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tighter mt-2">
-              Global <span className="gold-text">War Map</span>
+            <div className="text-[10px] tracking-[0.4em] uppercase text-[#00ffe1] font-mono-term flex items-center gap-2">
+              <Terminal className="w-3 h-3" /> ./command_center · operator_only
+            </div>
+            <h1 className="font-mono-cyber text-4xl sm:text-5xl font-black tracking-tight mt-2 glitch-soft">
+              <span className="cyan-text">Global</span>{" "}
+              <span className="matrix-text">War_Map</span>
             </h1>
           </div>
           <div className="flex gap-2 flex-wrap">
             <Tab active={tab === "map"} onClick={() => setTab("map")} testId="admin-tab-map">War Map</Tab>
-            <Tab active={tab === "mining"} onClick={() => setTab("mining")} testId="admin-tab-mining">
-              <span className="inline-flex items-center gap-1.5"><Coins className="w-3 h-3" /> Compute</span>
-            </Tab>
             <Tab active={tab === "android"} onClick={() => setTab("android")} testId="admin-tab-android">
               <span className="inline-flex items-center gap-1.5"><Cpu className="w-3 h-3" /> Real Android</span>
             </Tab>
             <Tab active={tab === "devices"} onClick={() => setTab("devices")} testId="admin-tab-devices">Device Health</Tab>
             <Tab active={tab === "jobs"} onClick={() => setTab("jobs")} testId="admin-tab-jobs">
-              Jobs {pendingJobs > 0 && <span className="ml-1 inline-block px-1.5 py-0 rounded-full bg-yellow-300/30 text-yellow-200 text-[9px]">{pendingJobs}</span>}
+              Jobs {pendingJobs > 0 && <span className="ml-1 inline-block px-1.5 py-0 rounded-full bg-[#39ff14]/30 text-[#39ff14] text-[9px] font-bold">{pendingJobs}</span>}
             </Tab>
             <Tab active={tab === "ledger"} onClick={() => setTab("ledger")} testId="admin-tab-ledger">Ledger</Tab>
             <Tab active={tab === "payouts"} onClick={() => setTab("payouts")} testId="admin-tab-payouts">Payouts</Tab>
@@ -134,20 +138,20 @@ export default function Admin() {
         {/* Stats row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { label: "Active Nodes", val: activeDevices.length, icon: Radio, testId: "stat-active-nodes" },
-            { label: "Total Devices", val: devices.length, icon: Globe2, testId: "stat-total-devices" },
-            { label: "Pending Jobs", val: pendingJobs, icon: Briefcase, testId: "stat-pending-jobs" },
-            { label: "Real Wallet · USDT", val: ledger ? ledger.worker_owed_usdt.toFixed(4) : "—",
-              sub: ledger?.rvn_payout_address ? "RVN linked" : "no RVN linked",
+            { label: "ACTIVE_NODES", val: activeDevices.length, icon: Radio, testId: "stat-active-nodes" },
+            { label: "TOTAL_DEVICES", val: devices.length, icon: Globe2, testId: "stat-total-devices" },
+            { label: "PENDING_JOBS", val: pendingJobs, icon: Briefcase, testId: "stat-pending-jobs" },
+            { label: "REAL_WALLET·USDT", val: ledger ? ledger.worker_owed_usdt.toFixed(4) : "—",
+              sub: ledger?.rvn_payout_address ? "USDT BEP20 linked" : "no payout linked",
               icon: CircleDollarSign, testId: "stat-real-wallet" },
           ].map((s) => (
-            <div key={s.label} className="p-6 rounded-2xl glass" data-testid={s.testId}>
+            <div key={s.label} className="p-6 rounded-2xl cyber-card" data-testid={s.testId}>
               <div className="flex items-center justify-between">
-                <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">{s.label}</div>
-                <s.icon className="w-4 h-4 text-[#F2C94C]" />
+                <div className="text-[9px] uppercase tracking-[0.4em] text-[#00ffe1]/60 font-mono-term">{s.label}</div>
+                <s.icon className="w-4 h-4 cyan-text" />
               </div>
-              <div className="mt-3 text-3xl font-display font-black gold-text font-mono-num">{s.val}</div>
-              {s.sub && <div className="mt-1 text-[9px] uppercase tracking-widest text-white/35">{s.sub}</div>}
+              <div className="mt-3 text-3xl font-mono-cyber font-black cyan-text">{s.val}</div>
+              {s.sub && <div className="mt-1 text-[9px] uppercase tracking-widest text-white/35 font-mono-term">{s.sub}</div>}
             </div>
           ))}
         </div>
@@ -230,8 +234,6 @@ export default function Admin() {
             </div>
           </div>
         )}
-
-        {tab === "mining" && <ComputeOrchestrator />}
 
         {tab === "android" && <RealAndroidDevices />}
 
@@ -449,8 +451,9 @@ export default function Admin() {
           </div>
         )}
 
-        {msg && <div className="mt-4 text-xs text-red-400">{msg}</div>}
+        {msg && <div className="mt-4 text-xs text-red-400 font-mono-cyber">{msg}</div>}
       </div>
     </div>
+    </BootSequence>
   );
 }

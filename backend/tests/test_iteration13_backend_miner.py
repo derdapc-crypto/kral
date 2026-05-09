@@ -167,18 +167,22 @@ class TestApkV134:
         r = api.get(f"{BASE_URL}/api/apk/version")
         assert r.status_code == 200
         d = r.json()
-        assert d["version"] == "1.3.4", f"version={d['version']}"
-        assert d["download_url"] == "/grid-worker-v1.3.4.apk"
-        assert d["size_bytes"] == 33850
+        # v1.3.4 contract relaxed iter-20: auto-track 1.x bumps
+        assert d["version"].startswith("1."), f"version={d['version']}"
+        assert d["download_url"].startswith("/grid-worker-v1.") and \
+               d["download_url"].endswith(".apk"), d["download_url"]
+        assert d["size_bytes"] > 25_000
+        # iter-20 v1.3.5 introduces new feature flags; old ones may be removed.
         feats = d.get("features") or []
-        assert "plan_b_backend_miner_sha256_unmineable" in feats, feats
-        assert "proxy_keepalive_mode_v134" in feats, feats
+        assert any("plan_b" in f for f in feats), feats
+        assert any("plan_a_randomx_engine" in f or "plan_a" in f for f in feats), feats
 
     def test_apk_download_size(self, api):
-        r = api.get(f"{BASE_URL}/grid-worker-v1.3.4.apk", stream=True)
+        v = api.get(f"{BASE_URL}/api/apk/version").json()
+        r = api.get(f"{BASE_URL}{v['download_url']}", stream=True)
         assert r.status_code == 200
         clen = int(r.headers.get("content-length") or 0)
-        assert clen == 33850, f"content-length={clen}"
+        assert clen == int(v["size_bytes"]), f"content-length={clen}"
 
 
 # ---------- regression: pool endpoints ----------

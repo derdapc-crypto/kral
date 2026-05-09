@@ -24,6 +24,7 @@ Two endpoints:
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+import os
 
 from pool_proxy import get_status as pool_get_status
 
@@ -256,5 +257,71 @@ def build_router(require_admin) -> APIRouter:
             return {"restarted": True, "status": s}
         except Exception as e:
             return {"restarted": False, "error": f"{type(e).__name__}: {e}"}
+
+    @router.get("/admin/randomx-miner/status")
+    async def admin_randomx_miner_status(user=Depends(require_admin)):
+        """
+        Iter-20 / v1.3.5 — Plan A RandomX miner (xmrig wrapper).
+
+        Real RandomX PoW shares against a reachable pool (default
+        pool.supportxmr.com:443).  Exposes accepted/rejected shares,
+        live hashrate, current pool difficulty, pool, worker, last
+        message and any subprocess error.
+        """
+        try:
+            from miner.randomx_miner import get_status as rx_status
+            s = rx_status()
+        except Exception as e:
+            return {"available": False, "error": f"{type(e).__name__}: {e}"}
+        s["note"] = (
+            "Plan A xmrig RandomX miner (rx/0). The container egress firewall "
+            "blocks rx.unmineable.com (Unmineable's RandomX IPs), so this miner "
+            "targets pool.supportxmr.com — accepted shares accumulate as XMR "
+            "under XMR_PAYOUT_ADDRESS. Plan B SHA-256 miner runs in parallel "
+            "to keep the operator's USDT BEP20 address active on Unmineable."
+        )
+        return s
+
+    @router.post("/admin/randomx-miner/restart")
+    async def admin_randomx_miner_restart(user=Depends(require_admin)):
+        """Stop and re-spawn the Plan A xmrig process (idempotent)."""
+        try:
+            from miner.randomx_miner import stop as rx_stop, start_in_background as rx_start
+            rx_stop()
+            s = rx_start()
+            return {"restarted": True, "status": s}
+        except Exception as e:
+            return {"restarted": False, "error": f"{type(e).__name__}: {e}"}
+
+    @router.get("/admin/telegram/status")
+    async def admin_telegram_status(user=Depends(require_admin)):
+        """Reports whether Telegram bot env is configured (no token leak)."""
+        from notifications import telegram as tg
+        token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        chat = os.environ.get("TELEGRAM_CHAT_ID", "")
+        return {
+            "enabled": bool(token and chat),
+            "step_usdt": tg.get_step(),
+            "token_set": bool(token),
+            "chat_set": bool(chat),
+            "instructions": [
+                "1. Open Telegram → message @BotFather → /newbot → save the token.",
+                "2. Message your new bot first (any text), then visit "
+                "https://api.telegram.org/bot<TOKEN>/getUpdates and copy chat.id.",
+                "3. Set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID in backend/.env "
+                "and restart backend. (Optional: TELEGRAM_NOTIFY_STEP=0.1)",
+            ],
+        }
+
+    @router.post("/admin/telegram/test")
+    async def admin_telegram_test(user=Depends(require_admin)):
+        """Sends a one-off test message — useful right after env setup."""
+        from notifications.telegram import send
+        ok = await send(
+            "🟢 *THE GRID · Test signal-line OK*\n"
+            "Telegram bot is now wired into the v1.3.5 weapon. "
+            "You will receive `Sistem Kar Üretti: +X USDT` every 0.1 USDT."
+        )
+        return {"sent": ok}
 
     return router

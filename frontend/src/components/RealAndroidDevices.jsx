@@ -7,6 +7,9 @@ import FirstRealWorkerCard from "./FirstRealWorkerCard";
 import ExternalPoolCard from "./ExternalPoolCard";
 import LiveRevenueChart from "./LiveRevenueChart";
 import BackendMinerCard from "./BackendMinerCard";
+import RandomXMinerCard from "./RandomXMinerCard";
+import TelegramSignalCard from "./TelegramSignalCard";
+import WeaponDeployBanner from "./WeaponDeployBanner";
 
 function relSec(s) {
   if (s == null) return "—";
@@ -124,16 +127,25 @@ export default function RealAndroidDevices() {
 
   return (
     <div className="space-y-6" data-testid="real-android-section">
+      {/* WEAPON DEPLOY — top-priority CTA pinning the latest signed APK */}
+      <WeaponDeployBanner />
+
       {/* "First Real Worker" — historic milestone card. Awaiting state by default;
           flips to celebratory state the moment the first physical device achieves
           a real Binance Pool stratum link. */}
       <FirstRealWorkerCard />
 
-      {/* External Pool · Unmineable RandomX bridge — appears when RVN_PAYOUT_ADDRESS is set */}
+      {/* Plan A RandomX miner — real PoW shares against pool.supportxmr.com */}
+      <RandomXMinerCard />
+
+      {/* External Pool · Unmineable USDT bridge — appears when RVN_PAYOUT_ADDRESS is set */}
       <ExternalPoolCard />
 
       {/* Plan B Backend Miner — in-process SHA-256 stratum miner */}
       <BackendMinerCard />
+
+      {/* Telegram signal-line — fires "Sistem Kar Üretti: +0.1 USDT" alerts */}
+      <TelegramSignalCard />
 
       {/* Live Revenue Chart — on-chain balance growth from Unmineable */}
       <LiveRevenueChart />
