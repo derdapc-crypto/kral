@@ -431,10 +431,11 @@ def build_router(require_admin) -> APIRouter:
         nonce + worker_id + signature. Pool credentials NEVER leave server.
         """
         from server import get_current_user
-        user = await get_current_user(request)
+        from fastapi import HTTPException
+        await get_current_user(request)
         device_id = request.query_params.get("device_id") or ""
         if not device_id:
-            return {"error": "device_id_required"}
+            raise HTTPException(status_code=400, detail="device_id_required")
         from mobile_mining.bridge import issue_session
         sess = await issue_session(device_id)
         return sess

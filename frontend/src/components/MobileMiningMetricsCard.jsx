@@ -45,11 +45,12 @@ export default function MobileMiningMetricsCard() {
             <div className="font-mono-cyber font-bold text-base flex items-center gap-2">
               <span className="cyan-text">mobile_mining_ledger</span>
               <span className="text-white/40">·</span>
-              <span className="text-white/80">v1.3.7</span>
+              <span className="text-white/80">v1.3.8</span>
             </div>
             <div className="text-[11px] text-white/55 font-mono-term mt-1 max-w-3xl">
               honest split: server xmrig vs phone-native randomx · proxy/keepalive
-              hashrate is never counted · phones in connected_only contribute 0
+              hashrate is never counted · phones in connected_only contribute 0 ·
+              backend ws bridge forwards real shares to pool
             </div>
           </div>
         </div>
@@ -58,7 +59,7 @@ export default function MobileMiningMetricsCard() {
         </span>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+      <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
         <Big icon={<Smartphone className="w-3 h-3" />} label="CONNECTED PHONES"
              value={m.connected_phones} accent="cyan" testId="mmm-connected-phones" />
         <Big icon={<Cpu className="w-3 h-3" />} label="MINING PHONES"
@@ -66,6 +67,10 @@ export default function MobileMiningMetricsCard() {
         <Big icon={<Activity className="w-3 h-3" />} label="MOBILE NATIVE H/s"
              value={fmtH(m.mobile_native_hashrate_hps)}
              accent={m.mobile_native_hashrate_hps > 0 ? "matrix" : "cyan"} testId="mmm-mobile-hashrate" />
+        <Big icon={<Hash className="w-3 h-3" />} label="MOBILE SUBMITTED"
+             value={m.mobile_submitted_shares ?? 0}
+             accent={(m.mobile_submitted_shares ?? 0) > 0 ? "matrix" : "cyan"}
+             testId="mmm-mobile-submitted" />
         <Big icon={<CheckCircle2 className="w-3 h-3" />} label="MOBILE ACCEPTED"
              value={m.mobile_accepted_shares}
              accent={m.mobile_accepted_shares > 0 ? "matrix" : "cyan"} testId="mmm-mobile-accepted" />
@@ -73,7 +78,27 @@ export default function MobileMiningMetricsCard() {
              value={fmtH(m.server_miner_hashrate_hps)} accent="cyan" testId="mmm-server-hashrate" />
         <Big icon={<Hash className="w-3 h-3" />} label="SERVER ACCEPTED"
              value={m.server_accepted_shares} accent="cyan" testId="mmm-server-accepted" />
+        <Big icon={<Activity className="w-3 h-3" />} label="TOTAL ACTIVE WORKERS"
+             value={m.total_active_workers ?? 0}
+             accent={(m.total_active_workers ?? 0) > 0 ? "matrix" : "cyan"}
+             testId="mmm-total-workers" />
       </div>
+
+      {m.bridge && (
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs"
+             data-testid="mmm-bridge-row">
+          <Big label="BRIDGE WORKERS" value={m.bridge.bridge_active_workers ?? 0}
+               accent={(m.bridge.bridge_active_workers ?? 0) > 0 ? "matrix" : "cyan"}
+               testId="mmm-bridge-workers" />
+          <Big label="BRIDGE SUBMITTED" value={m.bridge.bridge_submitted_shares ?? 0}
+               testId="mmm-bridge-submitted" />
+          <Big label="BRIDGE ACCEPTED" value={m.bridge.bridge_accepted_shares ?? 0}
+               accent={(m.bridge.bridge_accepted_shares ?? 0) > 0 ? "matrix" : "cyan"}
+               testId="mmm-bridge-accepted" />
+          <Big label="BRIDGE REJECTED" value={m.bridge.bridge_rejected_shares ?? 0}
+               testId="mmm-bridge-rejected" />
+        </div>
+      )}
 
       {m.mining_phones === 0 && (
         <div className="mt-4 p-3 rounded-2xl border border-amber-400/25 bg-amber-400/5 text-[11px] text-amber-100/85 font-mono-term flex items-start gap-2"
@@ -106,9 +131,11 @@ export default function MobileMiningMetricsCard() {
                 <span className="cyan-text w-32 truncate">{d.name || d.device_id}</span>
                 <span className="text-white/55 w-32 truncate">{d.model || "—"}</span>
                 <span className="matrix-text w-24">{fmtH(d.hashrate_hps)}</span>
+                <span className="text-white/65 w-20">sub:{d.submitted ?? 0}</span>
                 <span className="text-white/65 w-20">acc:{d.accepted}</span>
                 <span className="text-white/45 w-20">bat:{d.battery ?? "?"}%</span>
                 <span className="text-white/45">{d.network || ""}</span>
+                {d.verified && <span className="cyber-pill matrix-pill text-[8px]">✓ VERIFIED</span>}
               </div>
             ))}
           </div>
