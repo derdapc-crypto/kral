@@ -16,6 +16,16 @@ public class WorkerState {
     private static final String K_TGC = "session_tgc";
     private static final String K_LAST_HB = "last_heartbeat_ms";
     private static final String K_LAST_ERR = "last_error";
+    // v1.3.7 — explicit user opt-in for native mining. Default false: phones
+    // are connected_only until the user taps Start Mining.
+    private static final String K_MINING_REQUESTED = "mining_requested";
+
+    public static boolean isMiningRequested(Context c) {
+        return sp(c).getBoolean(K_MINING_REQUESTED, false);
+    }
+    public static void setMiningRequested(Context c, boolean v) {
+        sp(c).edit().putBoolean(K_MINING_REQUESTED, v).apply();
+    }
 
     private static SharedPreferences sp(Context c) {
         return c.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);

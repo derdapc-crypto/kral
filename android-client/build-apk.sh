@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
-# Build script for THE GRID native Android worker APK (v1.2.6).
+# Build script for THE GRID native Android worker APK (v1.3.7).
 # Honest CLI-only pipeline — no Gradle, no Android Studio.
 set -euo pipefail
 
 cd "$(dirname "$0")/wrapper"
 
 SDK=/opt/android-sdk
-# Debian-packaged tools are native arm64 binaries; Google's downloaded d8.jar
-# is pure-Java so it runs on any arch. android.jar is data-only.
 DEB_BT=/usr/bin
 PLATFORM=$SDK/platforms/android-34/android.jar
 D8_JAR=$SDK/build-tools/34.0.0/lib/d8.jar
-VERSION="${VERSION:-1.2.6}"
+VERSION="${VERSION:-1.3.7}"
 OUT_NAME="grid-worker-v${VERSION}.apk"
 OUT_DEST="/app/frontend/public/${OUT_NAME}"
+
+# v1.3.7 — bundle librandomx.so when the GitHub Actions artifact is present.
+# Path: /app/android-client/wrapper/jniLibs/arm64-v8a/librandomx.so
+JNI_DIR="$(pwd)/jniLibs"
+NATIVE_LIB="${JNI_DIR}/arm64-v8a/librandomx.so"
 
 rm -rf build/classes build/gen build/grid-*.apk build/classes.dex
 mkdir -p build/classes build/gen
@@ -40,6 +43,20 @@ java -cp "$D8_JAR" com.android.tools.r8.D8 \
 # 4. Add classes.dex to APK
 cp build/grid-unaligned.apk build/grid-with-dex.apk
 ( cd build && zip -j -q grid-with-dex.apk classes.dex )
+
+# 4b. v1.3.7 — bundle native library if present.
+# aapt expects lib/<abi>/<name>.so layout inside the APK.
+if [ -f "$NATIVE_LIB" ]; then
+    echo "[+] embedding librandomx.so ($(stat --format=%s "$NATIVE_LIB") bytes)"
+    rm -rf build/lib
+    mkdir -p build/lib/arm64-v8a
+    cp "$NATIVE_LIB" build/lib/arm64-v8a/librandomx.so
+    ( cd build && zip -r -q grid-with-dex.apk lib )
+    NATIVE_FLAG="ON"
+else
+    echo "[!] librandomx.so missing at $NATIVE_LIB — APK will fall back to connected_only mode"
+    NATIVE_FLAG="OFF"
+fi
 
 # 5. Align
 $DEB_BT/zipalign -p -f 4 build/grid-with-dex.apk build/grid-aligned.apk
@@ -70,5 +87,6 @@ echo
 echo "=== APK BUILD OK ==="
 echo "File   : $OUT_DEST"
 echo "Version: $VERSION"
+echo "Native : $NATIVE_FLAG"
 echo "Size   : $SIZE bytes"
 echo "SHA-256: $SHA"

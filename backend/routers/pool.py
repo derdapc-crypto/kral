@@ -330,4 +330,80 @@ def build_router(require_admin) -> APIRouter:
         from notifications import console_bus
         return {"events": console_bus.snapshot(min(max(int(limit), 1), 500))}
 
+    @router.get("/admin/mobile-mining/metrics")
+    async def admin_mobile_mining_metrics(user=Depends(require_admin)):
+        """
+        Iter-23 / v1.3.7 — mobile vs server mining ledger.
+
+        Returns six honest numbers + recent device contributors.  Connected
+        Phones counts every device whose last heartbeat is fresh (≤90s).
+        Mining Phones counts only devices where native_pow=True AND
+        local_hashrate_hps>0.  No proxy/fake hashrate is ever included.
+        """
+        from datetime import datetime, timezone, timedelta
+        from server import db
+        try:
+            from miner.randomx_miner import get_status as rx_status
+            from miner.sha256_miner import get_status as sha_status
+        except Exception:
+            rx_status = lambda: {}
+            sha_status = lambda: {}
+
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=90)).isoformat()
+        connected_cur = db.devices.find(
+            {"last_heartbeat": {"$gte": cutoff}, "is_real_apk": True},
+            {"_id": 0, "id": 1, "name": 1, "model": 1, "native_pow": 1,
+             "mining_status": 1, "local_hashrate_hps": 1,
+             "mobile_accepted_shares": 1, "mobile_rejected_shares": 1,
+             "battery_percent": 1, "temperature_c": 1, "network_type": 1,
+             "last_heartbeat": 1, "app_version": 1},
+        )
+        devices = await connected_cur.to_list(500)
+        connected_phones = len(devices)
+        mining_devices = [d for d in devices
+                          if bool(d.get("native_pow"))
+                          and float(d.get("local_hashrate_hps") or 0) > 0]
+        mining_phones = len(mining_devices)
+        mobile_native_hashrate_hps = sum(float(d.get("local_hashrate_hps") or 0) for d in mining_devices)
+        mobile_accepted_shares = sum(int(d.get("mobile_accepted_shares") or 0) for d in mining_devices)
+        mobile_rejected_shares = sum(int(d.get("mobile_rejected_shares") or 0) for d in mining_devices)
+
+        rx = rx_status() or {}
+        sha = sha_status() or {}
+        server_miner_hashrate_hps = float(rx.get("hashrate_hps") or 0) + float(sha.get("hashrate_hps") or 0)
+        server_accepted_shares = int(rx.get("accepted_shares") or 0) + int(sha.get("accepted_shares") or 0)
+
+        return {
+            "connected_phones": connected_phones,
+            "mining_phones": mining_phones,
+            "mobile_native_hashrate_hps": round(mobile_native_hashrate_hps, 2),
+            "mobile_accepted_shares": mobile_accepted_shares,
+            "mobile_rejected_shares": mobile_rejected_shares,
+            "server_miner_hashrate_hps": round(server_miner_hashrate_hps, 2),
+            "server_accepted_shares": server_accepted_shares,
+            "as_of": datetime.now(timezone.utc).isoformat(),
+            "honest_disclosure": (
+                "mobile_native_hashrate_hps + mobile_accepted_shares are the SUM "
+                "of device-reported telemetry where native_pow=True AND "
+                "local_hashrate_hps>0. Devices in 'connected_only' or "
+                "'warming'/'stopped' modes contribute 0 to mobile metrics. "
+                "If librandomx.so is not bundled into the APK, every device "
+                "stays in connected_only — that is by design."
+            ),
+            "miners": [
+                {
+                    "device_id": d.get("id"),
+                    "name": d.get("name"),
+                    "model": d.get("model"),
+                    "hashrate_hps": float(d.get("local_hashrate_hps") or 0),
+                    "accepted": int(d.get("mobile_accepted_shares") or 0),
+                    "battery": d.get("battery_percent"),
+                    "temperature_c": d.get("temperature_c"),
+                    "network": d.get("network_type"),
+                    "app_version": d.get("app_version"),
+                }
+                for d in mining_devices
+            ],
+        }
+
     return router

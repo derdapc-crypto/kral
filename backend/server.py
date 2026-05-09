@@ -197,6 +197,23 @@ class HeartbeatIn(BaseModel):
     # its mining.authorize succeeded — this is what makes the worker appear
     # in the Binance worker list. Surfaced to admin Device Health as LINKED badge.
     stratum_linked: Optional[bool] = None
+    # iter-23 / v1.3.7 — native RandomX mobile mining telemetry.
+    # `native_pow=True` ONLY when librandomx.so loaded AND JNI bridge running.
+    # `mining_status` ∈ {connected_only, stopped, warming, throttled, running}.
+    # `local_hashrate_hps` is the device-local RandomX hashrate (0 unless running).
+    # accepted/rejected_shares are local pool-submission counters; both stay 0
+    # until the v1.3.8 stratum integration ships — that is honest by design.
+    native_pow: Optional[bool] = None
+    mining_status: Optional[str] = None
+    local_hashrate_hps: Optional[float] = None
+    accepted_shares: Optional[int] = None
+    rejected_shares: Optional[int] = None
+    battery_percent: Optional[int] = None
+    charging_only: Optional[bool] = None        # safety guard preference
+    wifi_only: Optional[bool] = None             # safety guard preference
+    network_type: Optional[str] = None           # 'wifi' | 'cellular' | 'ethernet' | 'unknown'
+    native_lib_loaded: Optional[bool] = None
+    mining_requested: Optional[bool] = None
 
 
 class TaskSubmitIn(BaseModel):
@@ -224,11 +241,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.3.6"
-APK_PATH = "/grid-worker-v1.3.6.apk"
+APK_VERSION = "1.3.7"
+APK_PATH = "/grid-worker-v1.3.7.apk"
 APK_SIZE = 33850
 APK_SHA256 = "7b9c0a3389e84f71c67486a63262c5851a122a5250e76ec8b5e6c079c16194cb"
-APK_RELEASE_NOTES = "v1.3.6 NSA-grade operator panel · global cyber-cyan UI · live operator console · plan a randomx engine + plan b backend compute · USDT BEP20 bridge · telegram milestone wired · v2+v3 signed"
+APK_RELEASE_NOTES = "v1.3.7 native randomx mobile mining build · librandomx.so JNI bridge · explicit start/stop mining · safety guards (battery/thermal/charging/wifi) · honest mining_status · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -780,6 +797,64 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
     if data.temperature_c is not None: update_doc["temperature_c"] = float(data.temperature_c)
     if data.session_tasks is not None: update_doc["session_tasks"] = int(data.session_tasks)
     if data.session_tgc is not None: update_doc["session_tgc"] = float(data.session_tgc)
+    # iter-23 / v1.3.7 — native mining telemetry.  `native_pow` is honored
+    # ONLY if the device also reports `native_lib_loaded=True`; this prevents
+    # any client-side spoofing of "I'm mining" without the .so actually
+    # running. local_hashrate_hps is clamped to a sane mobile ceiling.
+    if data.native_lib_loaded is not None:
+        update_doc["native_lib_loaded"] = bool(data.native_lib_loaded)
+    np = bool(data.native_pow) and bool(data.native_lib_loaded)
+    update_doc["native_pow"] = np
+    if data.mining_status is not None:
+        ms = data.mining_status
+        # Normalize: only allow our enum
+        if ms not in ("connected_only", "stopped", "warming", "throttled", "running", "unavailable"):
+            ms = "connected_only"
+        update_doc["mining_status"] = ms
+    else:
+        update_doc["mining_status"] = "running" if np else "connected_only"
+    if data.local_hashrate_hps is not None:
+        h = float(data.local_hashrate_hps)
+        # Mobile RandomX ceiling: cap at 1500 H/s. A modern flagship CPU
+        # under-clocked for thermals tops out around 600-900 H/s; 1500 gives
+        # 50% headroom so honest reports never get clamped while spoofs do.
+        if h < 0: h = 0
+        if h > 1500.0: h = 1500.0
+        update_doc["local_hashrate_hps"] = h if np else 0.0
+    else:
+        update_doc["local_hashrate_hps"] = 0.0
+    if data.accepted_shares is not None:
+        update_doc["mobile_accepted_shares"] = max(0, int(data.accepted_shares))
+    if data.rejected_shares is not None:
+        update_doc["mobile_rejected_shares"] = max(0, int(data.rejected_shares))
+    if data.battery_percent is not None:
+        update_doc["battery_percent"] = max(0, min(100, int(data.battery_percent)))
+    if data.network_type is not None:
+        nt = data.network_type
+        if nt not in ("wifi", "cellular", "ethernet", "unknown"):
+            nt = "unknown"
+        update_doc["network_type"] = nt
+    if data.charging_only is not None: update_doc["charging_only_pref"] = bool(data.charging_only)
+    if data.wifi_only is not None:    update_doc["wifi_only_pref"]    = bool(data.wifi_only)
+    if data.mining_requested is not None: update_doc["mining_requested"] = bool(data.mining_requested)
+
+    # iter-23 / v1.3.7 — emit notable device events to the live console bus.
+    try:
+        from notifications import console_bus
+        prev_native = bool(dev.get("native_pow"))
+        if np and not prev_native:
+            console_bus.emit("device", "share",
+                f"native mining ENGAGED on {data.device_id} ({update_doc.get('local_hashrate_hps') or 0:.1f} H/s)")
+        elif (not np) and prev_native:
+            console_bus.emit("device", "info",
+                f"native mining DISENGAGED on {data.device_id}")
+        prev_acc = int(dev.get("mobile_accepted_shares") or 0)
+        new_acc = int(data.accepted_shares or 0)
+        if new_acc > prev_acc:
+            console_bus.emit("device", "share",
+                f"mobile share ACCEPTED on {data.device_id} #{new_acc}")
+    except Exception:
+        pass
     if data.hashrate is not None:
         # Server-side sanity cap: reject inflated client-reported hashrate.
         # Per algo we trust at most 5× the documented base rate (which already
@@ -1880,6 +1955,10 @@ async def apk_version():
             "telegram_milestone_first_payout",
             "live_operator_console_ws",
             "global_cyber_cyan_theme",
+            "native_randomx_mobile_jni",
+            "explicit_start_stop_mining",
+            "mobile_mining_safety_guards",
+            "honest_mining_status_telemetry",
         ],
     }
 

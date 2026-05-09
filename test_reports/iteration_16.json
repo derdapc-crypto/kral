@@ -1,0 +1,30 @@
+{
+  "summary": "v1.3.7 Native RandomX Mobile Mining build — full backend + frontend pass. 15/15 new pytest cases green covering heartbeat schema additions, anti-spoof clamp, hashrate ceiling, mining_status enum normalization, /admin/mobile-mining/metrics shape + auth, /api/apk/version v1.3.7 metadata + leak guards, APK binary 33850 bytes, and 5 regression endpoints. Frontend admin Android tab renders MobileMiningMetricsCard with all 6 testid cells and honest disclosure phrase; WeaponDeployBanner pill shows 1.3.7. Worker /mobile shows native-mining-control-fallback (correct browser state — no GridNative bridge). Live console WS streaming verified.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration16_v137_native_mobile.py",
+    "/app/test_reports/pytest/iter16_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/app/backend/server.py is 2536 lines — well over the 700-line guideline. v1.3.7 added another ~50 lines of heartbeat anti-spoof + clamp logic. Strongly recommend extracting routers (devices, apk, notifications, jobs, payouts) into separate files following the pattern already established by /app/backend/routers/pool.py.",
+    "Heartbeat schema (HeartbeatIn) now has 26 optional fields; consider grouping native-mining telemetry into a nested `native_mining: Optional[NativeMiningTelemetry]` sub-model for clarity and forward compatibility once v1.3.8 stratum integration ships.",
+    "Anti-spoof relies entirely on the client-supplied `native_lib_loaded` flag (and we trust an honest .so to set it). Future hardening: server should challenge devices with a signed nonce that only librandomx.so can answer (HMAC over the loaded .so's SHA256), otherwise a malicious client can still set both native_pow=true and native_lib_loaded=true. Acceptable for v1.3.7 since the goal is 'no PROXY hashrate counted' rather than full attestation.",
+    "MobileMiningMetricsCard polls but no error/loading state was visually verified — recommend the main agent confirm UI behaves gracefully when /admin/mobile-mining/metrics 5xxs."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration16_v137_native_mobile.py (new)"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100%"},
+  "test_credentials": "admin@thegrid.io / Grid@Admin2026 (verified) · worker@thegrid.io / Worker@2026 (verified)",
+  "seed_data_creation": "5 TEST_dev_* devices created via /api/devices/register under worker user during pytest (anti-spoof, honest, clamp, enum, metricspoof). They all share the worker's user_id and have name prefix TEST_; main agent can drop them with `db.devices.delete_many({'name':{'$regex':'^TEST_dev_'}})` if cleanup desired — they are also flagged is_real_apk=False so they don't pollute admin views.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "v1.3.7 verified live on https://grid-supercomputer.preview.emergentagent.com. Backend admin payload: {connected_phones:1, mining_phones:0, mobile_native_hashrate_hps:0, mobile_accepted_shares:0, mobile_rejected_shares:0, server_miner_hashrate_hps:9.61KH/s, server_accepted_shares:0} — phones=1 is the seeded First Real Worker (pubg121ade@gmail.com) which is connected_only, correctly contributing 0 to mining metrics. APK /grid-worker-v1.3.7.apk = 33850 bytes (still v1.3.6 bytes per agent_to_agent_context_note — librandomx.so will be dropped in by user's GitHub Actions workflow). HeartbeatIn schema: native_pow/native_lib_loaded/mining_status/local_hashrate_hps/accepted_shares/rejected_shares/battery_percent/charging_only/wifi_only/network_type/mining_requested all wired through with anti-spoof (native_pow=False unless native_lib_loaded=True) and 1500 H/s clamp. mining_status enum: {connected_only,stopped,warming,throttled,running,unavailable}; bad values normalize to connected_only. All regression endpoints (external-pool, console/snapshot, randomx-miner/status, backend-miner/status, telegram/status) PASS. Live console WS streams 'rx new job' messages. Public landing leaks NO BEP20/XMR/pool/worker_id/thegrid.io strings (only the API host appears in QR-code download URL inside admin panel which is auth-gated). NativeMiningControl correctly renders browser-fallback state because window.GridNative bridge is absent (only the v1.3.7 APK injects it).",
+  "rca of the issue": "n/a — no defects found; all 11 review-request criteria PASS."
+}

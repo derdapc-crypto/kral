@@ -207,9 +207,22 @@ def test_matrix_signature_known_seeds_are_deterministic(seed, size):
     assert ns["_matrix_signature"](seed, size) == out
 
 
-# ---------- Terminology cleanup ----------
-def test_no_user_visible_mining_terms_in_apk_release_notes():
+# ---------- Public-surface PII / credential leak guard (v1.3.7) ----------
+# v1.3.7 explicitly mandates "Mining active" notification text and "Native
+# RandomX Mobile Mining Build" version name, so terminology is no longer
+# banned.  What MUST never leak into public APK release_notes:
+#   • Pool/stratum credentials (account ID, password, worker secret, JWT)
+#   • Wallet addresses (BTC/ETH/USDT/XMR/RVN format hashes)
+#   • Stratum URLs
+#   • Operator email
+def test_no_credentials_or_wallet_addresses_in_apk_release_notes():
     body = requests.get(f"{API}/apk/version").json()
-    notes = body["release_notes"].lower()
-    for banned in ("mining", "miner ", "hashrate", "stratum", "pow ", "sha-256"):
-        assert banned not in notes, f"'{banned}' leaked into APK release notes"
+    notes = body["release_notes"]
+    # No 0x… BEP20 hashes
+    import re as _re
+    assert not _re.search(r"0x[a-fA-F0-9]{40}", notes), "BEP20 wallet leaked"
+    assert not _re.search(r"\b4[0-9A-Za-z]{94}\b", notes), "XMR wallet leaked"
+    # No stratum endpoints
+    for banned in ("rx.unmineable.com", "sha256.unmineable.com",
+                   "supportxmr.com:443", "117423210", "thegrid.io"):
+        assert banned.lower() not in notes.lower(), f"'{banned}' leaked"

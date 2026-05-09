@@ -1,0 +1,136 @@
+name: build-librandomx-android-arm64
+
+# v1.3.7 — Native RandomX Mobile Mining build.
+#
+# Cross-compiles RandomX C++ for Android arm64-v8a using NDK r28's
+# linux-x86_64 host toolchain. Output: librandomx.so (~700-900 KB) which is
+# uploaded as a workflow artifact AND attached to a release tagged
+# `librandomx-v1.x.x`.
+#
+# After the artifact is downloaded into the repo at
+# /app/android-client/wrapper/jniLibs/arm64-v8a/librandomx.so the
+# build-apk.sh script will bundle it into the APK and the JNI bridge
+# (RandomXBridge.java) will load it on Start Mining.
+#
+# Trigger: manually via "Run workflow" in the Actions tab, or push a tag
+# starting with "librandomx-".
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_level:
+        description: 'Android API level (min runtime)'
+        required: false
+        default: '24'
+      randomx_ref:
+        description: 'RandomX git ref (tag/branch/sha)'
+        required: false
+        default: 'master'
+  push:
+    tags:
+      - 'librandomx-*'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repo (for upload paths)
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake git unzip wget
+
+      - name: Install Android NDK r28 (linux-x86_64)
+        run: |
+          NDK_VER=r28
+          NDK_ZIP="android-ndk-${NDK_VER}-linux.zip"
+          wget -q "https://dl.google.com/android/repository/${NDK_ZIP}"
+          unzip -q "${NDK_ZIP}" -d $HOME/
+          echo "ANDROID_NDK_ROOT=$HOME/android-ndk-${NDK_VER}" >> $GITHUB_ENV
+          echo "$HOME/android-ndk-${NDK_VER}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+
+      - name: Clone RandomX
+        run: |
+          git clone --depth 1 --branch "${{ github.event.inputs.randomx_ref || 'master' }}" \
+            https://github.com/tevador/RandomX.git
+          cd RandomX
+          git rev-parse --short HEAD > /tmp/randomx_sha.txt
+          echo "RANDOMX_SHA=$(cat /tmp/randomx_sha.txt)" >> $GITHUB_ENV
+
+      - name: Inject JNI bridge into RandomX target
+        run: |
+          # Append our JNI shim to RandomX's CMakeLists so the symbols
+          # land inside librandomx.so and Java only needs to load
+          # `System.loadLibrary("randomx")`.
+          cp android-client/jni/randomx_jni.cpp RandomX/src/randomx_jni.cpp
+          # cmake doesn't like target_sources after add_library in some old
+          # CMakeLists, so we just append a new source list line by editing
+          # the SOURCES list near the top of CMakeLists.txt.
+          python3 - <<'PY'
+          import re, pathlib
+          p = pathlib.Path("RandomX/CMakeLists.txt")
+          src = p.read_text()
+          # Insert our cpp after the first "add_library(randomx" or the "set(RANDOMX_SRC".
+          if "randomx_jni.cpp" not in src:
+              src = src.replace(
+                  "add_library(randomx",
+                  "list(APPEND randomx_sources src/randomx_jni.cpp)\nadd_library(randomx",
+                  1,
+              )
+              # also append to any "randomx_sources" / "RANDOMX_SRC" list explicitly
+              if "randomx_sources" not in src:
+                  src += "\ntarget_sources(randomx PRIVATE src/randomx_jni.cpp)\n"
+          p.write_text(src)
+          print("OK")
+          PY
+
+      - name: Configure for Android arm64-v8a
+        run: |
+          mkdir -p RandomX/build-android
+          cd RandomX/build-android
+          cmake -G "Unix Makefiles" \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-${{ github.event.inputs.api_level || '24' }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DARCH=native \
+            ..
+
+      - name: Build librandomx.so
+        run: |
+          cd RandomX/build-android
+          make -j$(nproc) randomx
+          ls -la librandomx*
+
+      - name: Strip + collect output
+        run: |
+          mkdir -p out/arm64-v8a
+          cp RandomX/build-android/librandomx.so out/arm64-v8a/librandomx.so || \
+          cp RandomX/build-android/librandomx*.so out/arm64-v8a/librandomx.so
+          $ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip \
+            --strip-unneeded out/arm64-v8a/librandomx.so
+          ls -la out/arm64-v8a/
+          file out/arm64-v8a/librandomx.so
+          sha256sum out/arm64-v8a/librandomx.so
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: librandomx-arm64-v8a
+          path: out/arm64-v8a/librandomx.so
+          if-no-files-found: error
+
+      - name: Attach to release (tag push only)
+        if: startsWith(github.ref, 'refs/tags/librandomx-')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/arm64-v8a/librandomx.so
+          body: |
+            RandomX C++ shared library cross-compiled for Android arm64-v8a.
+            RandomX commit: ${{ env.RANDOMX_SHA }}
+            NDK r28 · API ${{ github.event.inputs.api_level || '24' }} · linux-x86_64 host
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.3.2 Android");
+        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.3.7 Android");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
@@ -139,10 +139,48 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String getInfo() {
-            return "{\"version\":\"1.3.2\",\"native\":true,\"manufacturer\":\"" +
+            return "{\"version\":\"1.3.7\",\"native\":true,\"manufacturer\":\"" +
                 Build.MANUFACTURER + "\",\"model\":\"" + Build.MODEL +
                 "\",\"androidVersion\":\"" + Build.VERSION.RELEASE + "\",\"sdk\":" +
-                Build.VERSION.SDK_INT + "}";
+                Build.VERSION.SDK_INT +
+                ",\"native_pow_available\":" + RandomXBridge.available() +
+                ",\"mining_requested\":" + WorkerState.isMiningRequested(host) + "}";
+        }
+
+        // ---------- v1.3.7 native mining controls ----------
+        @JavascriptInterface
+        public boolean startMining() {
+            WorkerState.setMiningRequested(host, true);
+            Intent i = new Intent(host, GridWorkerService.class)
+                .setAction(GridWorkerService.ACTION_START_MINING);
+            try {
+                if (Build.VERSION.SDK_INT >= 26) host.startForegroundService(i);
+                else host.startService(i);
+            } catch (Exception ignored) {}
+            return RandomXBridge.available();
+        }
+
+        @JavascriptInterface
+        public boolean stopMining() {
+            WorkerState.setMiningRequested(host, false);
+            Intent i = new Intent(host, GridWorkerService.class)
+                .setAction(GridWorkerService.ACTION_STOP_MINING);
+            try {
+                if (Build.VERSION.SDK_INT >= 26) host.startForegroundService(i);
+                else host.startService(i);
+            } catch (Exception ignored) {}
+            return true;
+        }
+
+        @JavascriptInterface
+        public String getMiningStatus() {
+            return "{\"available\":" + RandomXBridge.available() +
+                   ",\"running\":" + RandomXBridge.running() +
+                   ",\"hashrate_hps\":" + RandomXBridge.getHashrate() +
+                   ",\"accepted_shares\":" + RandomXBridge.getAcceptedShares() +
+                   ",\"rejected_shares\":" + RandomXBridge.getRejectedShares() +
+                   ",\"status\":\"" + RandomXBridge.getMiningStatus() + "\"" +
+                   ",\"requested\":" + WorkerState.isMiningRequested(host) + "}";
         }
 
         @JavascriptInterface

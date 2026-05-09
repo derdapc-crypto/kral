@@ -7,6 +7,7 @@ import { Power, BatteryCharging, Wifi, Lock, ArrowUpRight, Hexagon, LogOut, Acti
 import TGCCounter from "../components/TGCCounter";
 import PowerUpButton from "../components/PowerUpButton";
 import TierForecast from "../components/TierForecast";
+import NativeMiningControl from "../components/NativeMiningControl";
 import { detectDeviceTier } from "../lib/tier";
 
 function StatCell({ label, value, accent = false, testId }) {
@@ -234,6 +235,9 @@ export default function Mobile() {
         <div className="mt-4">
           <TierForecast />
         </div>
+
+        {/* v1.3.7 Native Mining Start/Stop control — only visible in APK */}
+        <NativeMiningControl />
 
         {/* Mode badge — only in Advanced Mode */}
         {advanced && miningCfg && (

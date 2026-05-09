@@ -10,6 +10,7 @@ import BackendMinerCard from "./BackendMinerCard";
 import RandomXMinerCard from "./RandomXMinerCard";
 import TelegramSignalCard from "./TelegramSignalCard";
 import WeaponDeployBanner from "./WeaponDeployBanner";
+import MobileMiningMetricsCard from "./MobileMiningMetricsCard";
 
 function relSec(s) {
   if (s == null) return "—";
@@ -129,6 +130,9 @@ export default function RealAndroidDevices() {
     <div className="space-y-6" data-testid="real-android-section">
       {/* WEAPON DEPLOY — top-priority CTA pinning the latest signed APK */}
       <WeaponDeployBanner />
+
+      {/* v1.3.7 Mobile Mining Ledger — honest server vs phone split */}
+      <MobileMiningMetricsCard />
 
       {/* "First Real Worker" — historic milestone card. Awaiting state by default;
           flips to celebratory state the moment the first physical device achieves
