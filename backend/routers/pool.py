@@ -319,9 +319,15 @@ def build_router(require_admin) -> APIRouter:
         from notifications.telegram import send
         ok = await send(
             "🟢 *THE GRID · Test signal-line OK*\n"
-            "Telegram bot is now wired into the v1.3.5 weapon. "
+            "Telegram bot is now wired into the v1.3.6 weapon. "
             "You will receive `Sistem Kar Üretti: +X USDT` every 0.1 USDT."
         )
         return {"sent": ok}
+
+    @router.get("/admin/console/snapshot")
+    async def admin_console_snapshot(user=Depends(require_admin), limit: int = 100):
+        """Latest N events from the in-memory operator console bus."""
+        from notifications import console_bus
+        return {"events": console_bus.snapshot(min(max(int(limit), 1), 500))}
 
     return router

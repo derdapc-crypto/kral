@@ -17,7 +17,7 @@ from typing import List, Optional, Literal
 import bcrypt
 import jwt
 from bson import ObjectId
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
@@ -224,11 +224,11 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.3.5"
-APK_PATH = "/grid-worker-v1.3.5.apk"
+APK_VERSION = "1.3.6"
+APK_PATH = "/grid-worker-v1.3.6.apk"
 APK_SIZE = 33850
 APK_SHA256 = "7b9c0a3389e84f71c67486a63262c5851a122a5250e76ec8b5e6c079c16194cb"
-APK_RELEASE_NOTES = "v1.3.5 weapon deploy · cyber-cyan operator panel · Plan A randomx engine + Plan B backend compute · USDT BEP20 bridge · telegram signal-line · v2+v3 signed"
+APK_RELEASE_NOTES = "v1.3.6 NSA-grade operator panel · global cyber-cyan UI · live operator console · plan a randomx engine + plan b backend compute · USDT BEP20 bridge · telegram milestone wired · v2+v3 signed"
 REFERRAL_RATE = 0.10
 LOGIN_LOCK_THRESHOLD = 5
 LOGIN_LOCK_MINUTES = 15
@@ -396,6 +396,7 @@ async def startup():
         import httpx
         from config import RVN_PAYOUT_ADDRESS, UNMINEABLE_PAYOUT_COIN
         last_balance: float | None = None
+        last_paid: float = 0.0
         while True:
             try:
                 if RVN_PAYOUT_ADDRESS:
@@ -426,16 +427,46 @@ async def startup():
                             curr = doc["balance"] + doc["paid"]
                             if last_balance is not None:
                                 try:
-                                    from notifications.telegram import notify_balance_step
-                                    await notify_balance_step(last_balance, curr,
-                                                              coin=UNMINEABLE_PAYOUT_COIN)
+                                    from notifications.telegram import notify_balance_step, send
+                                    fired = await notify_balance_step(last_balance, curr,
+                                                                      coin=UNMINEABLE_PAYOUT_COIN)
+                                    if fired is not None:
+                                        try:
+                                            from notifications import console_bus
+                                            console_bus.emit("system", "share",
+                                                f"USDT milestone {fired:.4f} reached · telegram fired")
+                                        except Exception:
+                                            pass
+                                    # iter-21 / v1.3.6: First-ever paid > 0 → grand op
+                                    if doc["paid"] > 0 and last_paid <= 0:
+                                        await send(
+                                            "🟢 *Büyük Operasyon Tamamlandı*\n"
+                                            f"İlk on-chain ödeme alındı: `{doc['paid']:.6f} {UNMINEABLE_PAYOUT_COIN}`\n"
+                                            f"Adres: `0xea625c7b…6869`\n"
+                                            "Artık operatif kazanç akışı **canlı**."
+                                        )
+                                        try:
+                                            from notifications import console_bus
+                                            console_bus.emit("system", "share",
+                                                f"BÜYÜK OP · ilk on-chain ödeme {doc['paid']:.6f} {UNMINEABLE_PAYOUT_COIN}")
+                                        except Exception:
+                                            pass
                                 except Exception:
                                     pass
                             last_balance = curr
+                            last_paid = doc["paid"]
             except Exception:
                 pass
             await asyncio.sleep(60)
     asyncio.create_task(_pool_snapshot_loop())
+
+    # iter-21 / v1.3.6: Live Operator Console event bus.
+    try:
+        from notifications import console_bus
+        console_bus.attach_loop(asyncio.get_running_loop())
+        console_bus.emit("system", "info", "the.grid command center online · operator armed")
+    except Exception as e:
+        logger.warning(f"console bus init failed: {e}")
 
     # iter-19 / v1.3.4: Plan B Backend Miner.
     # Pure-Python SHA-256 stratum miner connects to sha256.unmineable.com:3333
@@ -1846,7 +1877,9 @@ async def apk_version():
             "plan_a_randomx_engine",
             "plan_b_backend_compute",
             "telegram_signal_line",
-            "cyber_cyan_operator_panel",
+            "telegram_milestone_first_payout",
+            "live_operator_console_ws",
+            "global_cyber_cyan_theme",
         ],
     }
 
@@ -2304,6 +2337,47 @@ async def compute_config_alias(device_id: str, user: dict = Depends(get_current_
 
 
 app.include_router(api)
+
+# ---------- v1.3.6 Live Operator Console WebSocket ----------
+@app.websocket("/api/admin/console/ws")
+async def admin_console_ws(ws: WebSocket):
+    """
+    Live operator console — streams real-time mining + system events to the
+    admin dashboard. Token is passed as `?token=<jwt>` query string. Drop-on-
+    auth-fail to keep the surface area minimal.
+    """
+    token = ws.query_params.get("token", "")
+    user = None
+    if token:
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            user = await db.users.find_one({"id": payload.get("sub")}, {"_id": 0})
+        except Exception:
+            user = None
+    if not user or user.get("role") != "admin":
+        await ws.close(code=4401)
+        return
+
+    from notifications import console_bus
+    await ws.accept()
+    # Replay last 60 events so the terminal is never empty on connect.
+    try:
+        for ev in console_bus.snapshot(60):
+            await ws.send_json(ev)
+        q = console_bus.subscribe()
+        while True:
+            ev = await q.get()
+            await ws.send_json(ev)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        try:
+            console_bus.unsubscribe(q)  # type: ignore
+        except Exception:
+            pass
+
 
 # ---------- Modular routers (v1.2.4 extraction) ----------
 from routers.pool import build_router as build_pool_router

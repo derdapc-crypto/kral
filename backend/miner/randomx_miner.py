@@ -121,6 +121,12 @@ class XmrigManager:
             "--donate-level=1",
             "--coin=monero",
             "--print-time=10",
+            # iter-22: light mode keeps scratchpad ~256MB total instead of
+            # ~2GB+ in fast mode.  Critical inside the container — host kept
+            # OOM-killing the pod under fast-mode memory pressure.
+            "--randomx-mode=light",
+            "--no-huge-pages",
+            "--randomx-no-rdmsr",
         ]
         if POOL_TLS:
             cmd.append("--tls")
@@ -149,41 +155,70 @@ class XmrigManager:
     def _parse_line(self, line: str) -> None:
         # short message preview for the dashboard
         msg = line.split("]", 1)[-1].strip()[:140] if line.startswith("[") else line[:140]
+        try:
+            from notifications import console_bus
+        except Exception:
+            console_bus = None  # type: ignore
 
         m = _RE_NEW_JOB.search(line)
         if m:
             Status.update(current_difficulty=int(m.group(1)),
                           last_message=f"job diff {m.group(1)}")
+            if console_bus: console_bus.emit("rx", "info", f"new job · diff {int(m.group(1)):,}")
             return
         m = _RE_ACCEPTED.search(line)
         if m:
-            Status.update(accepted_shares=int(m.group(1)),
+            prev_accepted = Status.get().get("accepted_shares", 0)
+            new_accepted = int(m.group(1))
+            Status.update(accepted_shares=new_accepted,
                           last_accepted_at=datetime.now(timezone.utc).isoformat(),
                           last_share_at=datetime.now(timezone.utc).isoformat(),
                           current_difficulty=int(m.group(3)),
                           last_message=f"share ACCEPTED #{m.group(1)} diff={m.group(3)}")
+            if console_bus: console_bus.emit("rx", "share",
+                f"share ACCEPTED #{m.group(1)} diff={int(m.group(3)):,}")
+            # iter-21 / v1.3.6: first-ever accepted share → telegram milestone
+            if prev_accepted == 0 and new_accepted >= 1:
+                try:
+                    import asyncio as _aio
+                    from notifications.telegram import send as _tg_send
+                    loop = _aio.get_event_loop_policy().get_event_loop()
+                    if loop.is_running():
+                        _aio.run_coroutine_threadsafe(
+                            _tg_send("🟢 *Operasyon Başladı*\nİlk RandomX share kabul edildi · sistem CANLI"),
+                            loop,
+                        )
+                except Exception:
+                    pass
             return
         m = _RE_REJECTED.search(line)
         if m:
             Status.update(rejected_shares=int(m.group(2)),
                           last_message=f"share REJECTED ({m.group(1)}/{m.group(2)})")
+            if console_bus: console_bus.emit("rx", "warn",
+                f"share REJECTED ({m.group(1)}/{m.group(2)})")
             return
         m = _RE_HASHRATE.search(line)
         if m:
             try:
                 Status.update(hashrate_hps=float(m.group(1)),
                               last_message=f"hashrate {m.group(1)} H/s")
+                if console_bus: console_bus.emit("rx", "info",
+                    f"hashrate {m.group(1)} H/s")
             except Exception:
                 pass
             return
         if "use pool" in line and "ms" in line:
             Status.update(last_message=msg)
+            if console_bus: console_bus.emit("rx", "info", msg)
             return
         if _RE_CONNECT_ERR.search(line):
             Status.update(last_error=msg, last_message=f"reconnect: {msg[:100]}")
+            if console_bus: console_bus.emit("rx", "error", msg)
             return
         if " error" in line.lower():
             Status.update(last_error=msg)
+            if console_bus: console_bus.emit("rx", "error", msg)
 
     def start(self) -> dict[str, Any]:
         if not XMRIG_BIN.exists() or not os.access(XMRIG_BIN, os.X_OK):

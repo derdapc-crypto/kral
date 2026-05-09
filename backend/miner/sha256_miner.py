@@ -308,6 +308,12 @@ class SHA256StratumMiner:
                         Status.update(accepted_shares=s["accepted_shares"] + 1,
                                       last_accepted_at=datetime.now(timezone.utc).isoformat(),
                                       last_message=f"share ACCEPTED #{s['accepted_shares'] + 1}")
+                        try:
+                            from notifications import console_bus
+                            console_bus.emit("sha256", "share",
+                                f"share ACCEPTED #{s['accepted_shares'] + 1}")
+                        except Exception:
+                            pass
                     elif msg.get("error"):
                         s = Status.get()
                         err = msg.get("error")
@@ -315,6 +321,11 @@ class SHA256StratumMiner:
                                       last_rejected_at=datetime.now(timezone.utc).isoformat(),
                                       last_error=str(err),
                                       last_message=f"share REJECTED: {err}")
+                        try:
+                            from notifications import console_bus
+                            console_bus.emit("sha256", "warn", f"share REJECTED: {err}")
+                        except Exception:
+                            pass
         except (socket.timeout, BlockingIOError):
             pass
 

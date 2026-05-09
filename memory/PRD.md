@@ -249,3 +249,22 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - Admin.jsx 459 satır → tab componentlerine bölünebilir P2.
 
 
+
+**Iter 21-22 (2026-05-09)** — **v1.3.6 NSA-grade Operator Panel + Live Console**
+- **GLOBAL CYBER-CYAN THEME** — `index.css` global override eklendi: tüm `gold-text` / `glass` / `glass-strong` / `grid-bg` / `grid-lines` / `gold-border` / `gold-glow` artık cyber-cyan tokens kullanıyor + `text-[#F2C94C] / text-[#D4AF37] / bg-[#F2C94C] / border-[#F2C94C]` hardcoded hex'ler için CSS attribute selector ile override. Bu sayede Landing/Dashboard/CustomerPortal/Mobile/Register/Referrals/Device dahil TÜM sayfalar tek bir CSS düzenlemesiyle cyber-cyan'a geçti (her dosyayı tek tek değiştirmeye gerek kalmadı). Body fontları artık `'JetBrains Mono', 'Share Tech Mono', monospace`. Navbar logo + linkler + JOIN THE GRID button yeniden styled (cyan→matrix gradient + neural-pulse).
+- **LIVE OPERATOR CONSOLE** — `notifications/console_bus.py` (in-memory ring buffer 500 events + asyncio queue subscribers + thread-safe `emit()`). `WebSocket /api/admin/console/ws?token=<jwt>` admin-only stream; HTTP poll fallback `/api/admin/console/snapshot`. xmrig stdout reader (`miner/randomx_miner.py:_parse_line`) ve sha256 stratum miner (`miner/sha256_miner.py:_drain_messages`) artık her job/share/error event'ini console_bus'a push ediyor. `<LiveOperatorConsole />` React component WebSocket bağlanır → son 60 event replay → 200 cap'li real-time stream + auto-scroll + level-based renkler (share=matrix-green type-in animation, info=cyan, warn=amber, error=red). Admin sayfasının ALTINDA tüm tab'larda görünür.
+- **TELEGRAM MILESTONE NOTIFIER** — Pool snapshot loop'una hook'landı: ilk on-chain `paid > 0` aşıldığında "🟢 Büyük Operasyon Tamamlandı" mesajı. xmrig `_parse_line`'da ilk RandomX accepted share için "🟢 Operasyon Başladı · sistem CANLI" milestone Telegram (env empty fail-closed). 0.1 USDT step notifier de çalışmaya devam ediyor.
+- **MEMORY-SAFE RANDOMX** — Pod iki kez OOM-killed oldu (xmrig fast-mode scratchpad ~2GB). Switch: `--randomx-mode=light` + `--no-huge-pages` → ~256MB total scratchpad. Hashrate 480→24 H/s düştü ama pod stabil. accepted_shares=6 önceki run'da kanıtlandı. libuv.so.1 binary yanına `/app/backend/miner/lib/` dizinine bundle edildi → pod re-init'te apt cache silinse bile çalışır.
+- **APK v1.3.6** — `/grid-worker-v1.3.6.apk` (33850 bytes, byte-identical). Yeni feature flag'ler: `live_operator_console_ws`, `telegram_milestone_first_payout`, `global_cyber_cyan_theme`. `WeaponDeployBanner`'daki DEPLOY_WEAPON CTA otomatik 1.3.6'ya işaret ediyor.
+- **Mobile NDK librandomx.so** — Bir kez daha araştırıldı: NDK r28 sadece linux-x86_64 toolchain shipping (linux-aarch64 yok). qemu-user-static ile çalıştırma denedik, libc6:amd64 multi-arch package'leri eksik (zlib1g:amd64 unavailable). Pre-built libRandomX arm64 GitHub'da public yok. Statik xmrig Android için derlenebilir teorik olarak ama Android Bionic libc, glibc xmrig binary'si Android'de çalışmaz. **KARAR**: mobil proxy/keepalive modunda kalmaya devam ediyor; gerçek mobil RandomX hashing için **GitHub Actions x86_64 runner üzerinde NDK build → librandomx.so artifact** yolu net olarak document edildi (ROADMAP P1).
+- **Test sonuçları** — Backend 60/60 PASS (iter-8/11/12/13). Smoke screenshots kanıtladı: Login + Admin Live Console (LIVE, 28 events streaming) + Landing (Global Supercomputer cyan/matrix headline). WebSocket stream Python websockets client ile manuel test edildi: 5 events stream, hostname doğru, JWT auth çalışıyor.
+
+## Iter 21-22 — Pending / Known
+- **TELEGRAM_BOT_TOKEN + CHAT_ID** kullanıcı set etmedi; set edip restart sonrası "Operasyon Başladı" + "Büyük Operasyon Tamamlandı" + 0.1 USDT step alarmları aktif olur.
+- **XMR_PAYOUT_ADDRESS** placeholder (community demo address) — operatör kişisel Monero cüzdanını set etmeli ki kazanç onun olsun.
+- **Mobile RandomX JNI** P1 — GitHub Actions x86_64 runner'da NDK build → arm64-v8a librandomx.so artifact → APK v1.3.7'de embed.
+- **Landing/Dashboard/CustomerPortal manuel theme polish** P3 — Global CSS override işi büyük çoğunlukla yapıyor ama kart başlıklarındaki `font-display` artık monospace olduğu için bazı paragraflar daha iyi görünebilir; ileride manuel tweak yapılabilir.
+- **Admin.jsx 462 satır** P2 — tab'lar component'lere bölünebilir.
+- **server.py 2400+ satır** P2 — `routers/` modülerizasyonu devam etmeli.
+
+

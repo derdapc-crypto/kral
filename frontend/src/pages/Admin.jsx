@@ -4,6 +4,7 @@ import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, U
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Area, AreaChart } from "recharts";
 import RealAndroidDevices from "../components/RealAndroidDevices";
 import BootSequence from "../components/BootSequence";
+import LiveOperatorConsole from "../components/LiveOperatorConsole";
 
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
 
@@ -452,6 +453,11 @@ export default function Admin() {
         )}
 
         {msg && <div className="mt-4 text-xs text-red-400 font-mono-cyber">{msg}</div>}
+
+        {/* v1.3.6: Live Operator Console — visible across every admin tab */}
+        <div className="mt-10">
+          <LiveOperatorConsole height={300} />
+        </div>
       </div>
     </div>
     </BootSequence>

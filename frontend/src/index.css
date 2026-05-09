@@ -30,65 +30,98 @@
 }
 
 html, body {
-    background: #0A0A0A;
-    color: #FFFFFF;
-    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    background: #03070a;
+    color: #d6f5f2;
+    font-family: 'JetBrains Mono', 'Share Tech Mono', 'Space Grotesk', monospace;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     margin: 0;
 }
 
 .font-display {
-    font-family: 'Unbounded', 'Space Grotesk', sans-serif;
-    letter-spacing: -0.02em;
+    font-family: 'JetBrains Mono', 'Unbounded', 'Space Grotesk', monospace;
+    letter-spacing: -0.01em;
+    font-weight: 700;
 }
 .font-mono-num {
-    font-family: 'Unbounded', 'Space Grotesk', sans-serif;
+    font-family: 'JetBrains Mono', 'Share Tech Mono', monospace;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.02em;
 }
 
-/* Ambient grid background */
+/* ============================================================ */
+/* GLOBAL CYBER-CYAN OVERRIDE (v1.3.6)                           */
+/* All gold/grid utility classes redefined to cyber tokens so    */
+/* every page (Landing, Dashboard, CustomerPortal, Mobile,       */
+/* Register, Referrals, Device, Admin) inherits the hacker look  */
+/* without touching individual JSX files.                        */
+/* ============================================================ */
+
+/* Ambient grid background — now cyber-cyan */
 .grid-bg {
     background-image:
-        radial-gradient(1200px 600px at 10% -10%, rgba(212,175,55,0.12), transparent 60%),
-        radial-gradient(900px 500px at 90% 10%, rgba(212,175,55,0.08), transparent 65%),
-        linear-gradient(180deg, #0A0A0A 0%, #0A0A0A 100%);
+        radial-gradient(1400px 700px at 8% -8%, rgba(0,255,225,0.10), transparent 60%),
+        radial-gradient(1100px 550px at 92% 12%, rgba(57,255,20,0.06), transparent 70%),
+        radial-gradient(900px 900px at 50% 110%, rgba(0,179,160,0.08), transparent 70%),
+        linear-gradient(180deg, #03070a 0%, #010305 100%);
+    position: relative;
 }
+.grid-bg::before {
+    content: "";
+    position: absolute; inset: 0; pointer-events: none;
+    background-image:
+        linear-gradient(rgba(0,255,225,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,225,0.06) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 85%);
+    z-index: 0;
+}
+.grid-bg > * { position: relative; z-index: 1; }
+
 .grid-lines {
     background-image:
-        linear-gradient(rgba(212,175,55,0.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(212,175,55,0.06) 1px, transparent 1px);
-    background-size: 64px 64px;
+        linear-gradient(rgba(0,255,225,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,225,0.06) 1px, transparent 1px);
+    background-size: 56px 56px;
     mask-image: radial-gradient(ellipse at center, black 35%, transparent 80%);
 }
 
 .glass {
-    background: rgba(18,18,18,0.72);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.06);
+    background: linear-gradient(180deg, rgba(2,18,22,0.70) 0%, rgba(2,8,12,0.78) 100%);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(0,255,225,0.14);
+    box-shadow: 0 18px 60px -32px rgba(0,255,225,0.18), inset 0 0 22px rgba(0,255,225,0.03);
 }
 .glass-strong {
-    background: rgba(12,12,12,0.85);
-    backdrop-filter: blur(24px);
-    border: 1px solid rgba(212,175,55,0.18);
+    background: linear-gradient(180deg, rgba(0,40,40,0.86) 0%, rgba(2,8,12,0.92) 100%);
+    backdrop-filter: blur(22px);
+    border: 1px solid rgba(0,255,225,0.40);
+    box-shadow: 0 0 28px rgba(0,255,225,0.32), inset 0 0 22px rgba(0,255,225,0.05);
 }
 .gold-text {
-    background: linear-gradient(135deg, #F2C94C 0%, #D4AF37 50%, #8B6914 100%);
+    background: linear-gradient(135deg, #00ffe1 0%, #00ddc7 50%, #39ff14 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+    text-shadow: 0 0 18px rgba(0,255,225,0.28);
 }
-.gold-border {
-    border: 1px solid rgba(212,175,55,0.4);
-}
+.gold-border { border: 1px solid rgba(0,255,225,0.40); }
 .gold-glow {
-    box-shadow: 0 0 40px rgba(212,175,55,0.35), inset 0 0 20px rgba(212,175,55,0.05);
+    box-shadow: 0 0 32px rgba(0,255,225,0.30), inset 0 0 18px rgba(0,255,225,0.05);
 }
 .gold-glow-strong {
-    box-shadow: 0 0 60px rgba(242,201,76,0.55), 0 0 120px rgba(212,175,55,0.3);
+    box-shadow: 0 0 60px rgba(0,255,225,0.55), 0 0 120px rgba(0,255,225,0.18);
 }
+
+/* Hardcoded gold hex values that pages still reference */
+[class*="text-[#F2C94C]"], .text-\[\#F2C94C\] { color: #00ffe1 !important; }
+[class*="text-[#D4AF37]"], .text-\[\#D4AF37\] { color: #00ddc7 !important; }
+[class*="text-[#B8860B]"], .text-\[\#B8860B\] { color: #00b3a0 !important; }
+[class*="bg-[#F2C94C]"], .bg-\[\#F2C94C\] { background-color: #00ffe1 !important; }
+[class*="bg-[#D4AF37]"], .bg-\[\#D4AF37\] { background-color: #00ddc7 !important; }
+[class*="border-[#F2C94C]"], .border-\[\#F2C94C\] { border-color: rgba(0,255,225,0.6) !important; }
+[class*="border-[#D4AF37]"], .border-\[\#D4AF37\] { border-color: rgba(0,221,199,0.6) !important; }
 
 /* Start Button pulse */
 @keyframes gridPulse {
