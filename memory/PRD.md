@@ -268,3 +268,29 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **server.py 2400+ satır** P2 — `routers/` modülerizasyonu devam etmeli.
 
 
+
+**Iter 23 (2026-05-09)** — **v1.3.7 Native RandomX Mobile Mining Build**
+- **GITHUB ACTIONS WORKFLOW** — `/app/.github/workflows/build-librandomx.yml` ubuntu-22.04 x86_64 runner üzerinde NDK r28 indiriyor → tevador/RandomX clone → JNI shim'i RandomX target'ına inject ediyor → `cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 -DBUILD_SHARED_LIBS=ON ..` ile cross-compile → strip → `librandomx-arm64-v8a` artifact upload + tag push'unda GitHub Release. Manuel trigger (`workflow_dispatch`) veya `librandomx-*` tag push.
+- **JNI BRIDGE** — `/app/android-client/jni/randomx_jni.cpp` (RandomX C API üzerine ince wrapper, 1-4 thread `randomx_create_vm` light mode + atomic hashrate counter + thread-safe init/destroy). `/app/android-client/wrapper/src/io/thegrid/worker/RandomXBridge.java` 6 native method (startMining, stopMining, getHashrate, getAcceptedShares, getRejectedShares, getMiningStatus) + fail-soft `available()` check (`librandomx.so` yoksa `false` döner, exception fırlatmaz).
+- **GridWorkerService.java** — Yeni intents `ACTION_START_MINING / ACTION_STOP_MINING`. Foreground notif:
+  * `THE GRID · Mining active` (RandomXBridge running)
+  * `THE GRID · Connected only (warming up)` (requested ama henüz running değil)
+  * `THE GRID · Connected only (native engine unavailable)` (.so yok)
+  * `THE GRID · Connected only` (operatör Start Mining'e basmadı)
+- **SAFETY GUARDS** — `BATTERY_FLOOR_PCT=30` (charging değilse 30% altında start etmiyor / stop ediyor), `TEMP_THROTTLE_C=42°C`, `TEMP_HARD_STOP_C=46°C`, `Stop Mining` sonrası `WorkerState.K_MINING_REQUESTED=false` → reboot/respawn sonrası gizli auto-start YOK. Worker loop her tick'te bu guard'ları kontrol ediyor.
+- **HEARTBEAT SCHEMA** — `HeartbeatIn` 11 yeni optional alan: native_pow / mining_status / local_hashrate_hps / accepted_shares / rejected_shares / battery_percent / charging_only / wifi_only / network_type / native_lib_loaded / mining_requested. **ANTI-SPOOF**: backend `native_pow=False` clamp ediyor `native_lib_loaded=False` ise (`server.py:786`); `local_hashrate_hps` 1500 H/s'te kapatılıyor (mobil RandomX flagship üst limit ~600-900 H/s, %50 headroom). `mining_status` enum normalize ediliyor → bilinmeyen değer `connected_only`'ye düşüyor.
+- **ADMIN METRICS ENDPOINT** — `GET /api/admin/mobile-mining/metrics` 6 net sayı: connected_phones, mining_phones, mobile_native_hashrate_hps, mobile_accepted_shares, server_miner_hashrate_hps, server_accepted_shares + miners array (her cihaz: device_id, name, model, hashrate_hps, accepted, battery, temperature, network, app_version) + honest_disclosure metni. **PROXY/KEEPALIVE HASHRATE ASLA SAYILMIYOR** — sadece native_pow=True AND local_hashrate_hps>0 device'lar mobile metrics'e ekleniyor.
+- **`<MobileMiningMetricsCard />`** — Real Android tab'ında WeaponDeployBanner'dan hemen sonra, 6 büyük metrik hücresi + "ACTIVE MOBILE MINERS" detay tablosu + honest_disclosure footer + boş durumda "NO MOBILE MINERS YET" amber notice.
+- **`<NativeMiningControl />`** — Mobile.jsx'de TierForecast altında. `window.GridNative` bridge varsa Start/Stop butonları + LIVE state badge + hashrate + accepted/rejected + safety status. Bridge yoksa (browser fallback) "install the v1.3.7 APK first" mesajı.
+- **MainActivity JS Bridge** — `GridNative.startMining()` / `stopMining()` / `getMiningStatus()` JavascriptInterface'leri WebView'e expose edildi. UA bumped to `GridWorker/1.3.7 Android`.
+- **Console Bus Hooks** — Heartbeat handler `device, "share"` event'i emit ediyor: native mining ENGAGED → console'da matrix-green satır; mobile share ACCEPTED → "mobile share ACCEPTED on <device_id> #N".
+- **APK v1.3.7** — `/grid-worker-v1.3.7.apk` (33850 bytes, byte-identical to v1.3.6 — librandomx.so user'ın GH Actions build'inde drop edilecek; build-apk.sh `jniLibs/arm64-v8a/librandomx.so` varsa otomatik APK'ya zip'liyor). 4 yeni feature flag: `native_randomx_mobile_jni, explicit_start_stop_mining, mobile_mining_safety_guards, honest_mining_status_telemetry`.
+- **Test sonuçları** — Backend 15/15 v1.3.7 yeni testler PASS + iter-8/11/13 regression 49/49 PASS. Frontend %100 PASS — Admin Real Android'da MobileMiningMetricsCard 6 testid cell + honest_disclosure görünüyor, WeaponDeployBanner v1.3.7 pill, NativeMiningControl /mobile'da browser-fallback state correct, Live Console WS hala stream ediyor.
+
+## Iter 23 — Pending / Known
+- **librandomx.so** USER'IN repo'sunda `gh workflow run build-librandomx-android-arm64` ile build edilmeli → artifact'i indirip `/app/android-client/wrapper/jniLibs/arm64-v8a/librandomx.so`'ya drop → `bash /app/android-client/build-apk.sh` ile gerçek native APK build edilir.
+- **Stratum integration v1.3.8** — Şu an JNI hash-loop counter; gerçek pool share submission backend WebSocket bridge'i ile v1.3.8'de gelecek.
+- **`server.py` 2536 satır** P2 — testing agent açıkça vurguladı; `routers/devices.py`, `routers/apk.py`, `routers/notifications.py` extraction'ı yakın gelecekte.
+- **Anti-spoof v2** P2 — şu an client-side `native_lib_loaded` flag'a güveniyoruz. v1.3.8'de signed nonce challenge (HMAC over .so SHA256) ile sertleştirilecek.
+
+
