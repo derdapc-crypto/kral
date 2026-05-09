@@ -227,3 +227,25 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **`server.py` (2300+ satır) refactor** P2 — `routers/auth.py`, `routers/devices.py`, `routers/admin_devices.py` vb dosyalara böl.
 - **Recharts width(-1) cosmetic warning** P3 — LiveRevenueChart wrapper'ına `minHeight` set ederek silence yapılabilir.
 
+
+**Iter 20 (2026-05-09)** — **v1.3.5 WEAPON SPRINT — Cyber-Cyan + Real RandomX**
+- **CYBER-CYAN HACKER THEME** — `/app/frontend/src/index.css` baştan eklendi: `cyber-bg`, `cyber-grid`, `cyber-card / cyber-card-strong`, `cyan-text / matrix-text`, `cyber-pill`, `cyan-glow / cyan-glow-strong`, `neural-pulse`, `glitch-soft`, `scan-bar`, `type-in`, `caret-blink`, CRT flicker. Yeni fontlar: JetBrains Mono + Share Tech Mono.
+- **BootSequence** — Login sonrası /admin'e ilk girişte 6-stage neon boot overlay: "INITIALIZING TERMINAL → DECRYPTING SESSION KEYS → ESTABLISHING NEURAL LINK → ENGAGING MINING ENGINE → BIOMETRIC HANDSHAKE OK → WEAPON ARMED". `sessionStorage.grid_boot_seen` ile aynı session'da tekrar oynatmıyor.
+- **Login & Admin baştan styled** — Login.jsx `enter_the_grid()` + ESTABLISH LINK gradient cyan→matrix. Admin.jsx `Global War_Map` (split cyan/matrix), tab'lar `cyber-pill`, stat kartları `cyber-card` cyan-text.
+- **COMPUTE TAB SİLİNDİ** — `admin-tab-mining` + `<ComputeOrchestrator>` import + render kaldırıldı. 8 tab: map, android, devices, jobs, ledger, payouts, fraud, users.
+- **DEMO TOTAL PURGE** — `wipe-all-fake` regex `^TEST_/^test_/^hb-iter/^native-iter/^burst-/^emu-/^TEST-` → 34 fake purge. Startup hook her boot'ta is_demo=true otomatik temizliyor.
+- **PLAN A: REAL RANDOMX MINER** — `/app/backend/miner/xmrig` 3.4MB aarch64 native build → `pool.supportxmr.com:443` (rx.unmineable.com IPs blocked). subprocess + watchdog. **KANITLANDI**: `accepted (1/0) diff 146741 (59ms)` — gerçek RandomX share. 157-417 H/s. libuv.so.1 binary yanına bundle (LD_LIBRARY_PATH set).
+- **PLAN B: SHA-256 STRATUM** — Iter-19 Python miner devam, USDT BEP20 worker LIVE.
+- **TELEGRAM SIGNAL-LINE** — `notifications/telegram.py` notify_balance_step → "🟢 Sistem Kar Üretti: +X USDT" 0.1 USDT eşik. Pool snapshot hook. Env empty fail-closed.
+- **YENİ ADMIN ENDPOINT**: `/api/admin/randomx-miner/{status,restart}`, `/api/admin/telegram/{status,test}`.
+- **YENİ KARTLAR (Real Android)**: WeaponDeployBanner (DEPLOY_WEAPON CTA) → FirstRealWorkerCard → RandomXMinerCard → ExternalPoolCard → BackendMinerCard (cyber-rewritten) → TelegramSignalCard → LiveRevenueChart.
+- **APK v1.3.5** — `/grid-worker-v1.3.5.apk` 33850 bytes. Yeni feature flags: plan_a_randomx_engine, plan_b_backend_compute, telegram_signal_line, cyber_cyan_operator_panel.
+- **Test sonuçları** — Backend 26/26 PASS (iteration_14 gateway-dropped), Frontend %100 PASS (iteration_15) — cyan-text=9, matrix-text=1, cyber-card=4, font-mono-cyber=13, 4 yeni kart correct order, ZERO ComputeOrchestrator errors.
+
+## Iter 20 — Pending / Known
+- TELEGRAM_BOT_TOKEN + CHAT_ID skip edildi; set edilince restart sonrası ARMED olur.
+- Mobile RandomX JNI P1 (pre-built librandomx.so).
+- Recharts width(-1) cosmetic warning P3.
+- Admin.jsx 459 satır → tab componentlerine bölünebilir P2.
+
+
