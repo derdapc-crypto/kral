@@ -1,91 +1,167 @@
 {
   "theme": "dark",
-  "archetype": "5",
-  "archetype_name": "Jewel & Luxury with Cyber-Futuristic elements",
-  "mood": "Premium, High-End Enterprise SaaS, Investor-Grade, Cinematic, Wealthy, Trustworthy",
-  "colors": {
-    "background": "#0A0A0A",
-    "surface": "#121212",
-    "surface_glass": "rgba(0, 0, 0, 0.6)",
-    "primary": "#D4AF37",
-    "primary_hover": "#F2C94C",
-    "secondary": "#B8860B",
-    "text_primary": "#FFFFFF",
-    "text_secondary": "#A0A0A0",
-    "accent_glow": "rgba(212, 175, 55, 0.5)",
-    "success": "#10B981",
-    "danger": "#EF4444",
-    "border": "rgba(255, 255, 255, 0.1)"
-  },
+  "archetype": "Archetype 4 (Swiss & High-Contrast) + Archetype 5 (Jewel & Luxury) Dark Hybrid",
+  "mood": "Premium Dark Infrastructure, Professional, Trustworthy, Technical",
   "typography": {
-    "heading_font": "Cabinet Grotesk",
-    "body_font": "Inter",
-    "number_font": "Unbounded",
-    "scales": {
-      "h1": "text-5xl sm:text-6xl tracking-tighter font-black",
-      "h2": "text-3xl sm:text-4xl tracking-tight font-bold",
-      "h3": "text-2xl font-bold",
-      "h4": "text-xl font-semibold",
-      "body": "text-base leading-relaxed text-gray-300",
-      "small": "text-sm uppercase tracking-[0.2em] text-gray-400"
+    "headings": {
+      "family": "Outfit, Cabinet Grotesk, or Plus Jakarta Sans",
+      "style": "Modern geometric, premium feel. NO Inter/Roboto for headings.",
+      "weights": ["400", "600", "700"],
+      "tracking": "tracking-tight"
+    },
+    "body": {
+      "family": "IBM Plex Sans, Geist, or Inter",
+      "style": "Clean SaaS style, highly readable.",
+      "weights": ["400", "500"]
+    },
+    "mono": {
+      "family": "JetBrains Mono or Fira Code",
+      "style": "Used for metrics, live console snippets, and status pills.",
+      "weights": ["400", "500"]
+    }
+  },
+  "colors": {
+    "background": {
+      "main": "bg-[#050814]",
+      "gradient": "bg-gradient-to-b from-[#050814] to-black"
+    },
+    "surface": {
+      "glass": "bg-white/[0.02] backdrop-blur-xl border border-white/[0.05]",
+      "card": "bg-slate-950 border border-slate-800"
+    },
+    "text": {
+      "primary": "text-white",
+      "muted": "text-slate-400",
+      "accent": "text-[#00ffe1]"
+    },
+    "accents": {
+      "primary_cyber_cyan": "#00ffe1",
+      "secondary_neon_green": "#00ff88",
+      "premium_soft_gold": "#facc15",
+      "warning_electric_orange": "#ff7a18"
     }
   },
   "spacing_and_layout": {
-    "section_padding": "py-24 sm:py-32",
-    "container_padding": "px-6 sm:px-12",
-    "card_padding": "p-6 sm:p-8",
-    "grid_gap": "gap-8 sm:gap-12",
-    "bento_dashboard": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
-    "borderRadius": "rounded-2xl"
+    "general": "Generous spacing. Use py-24 to py-32 for main sections. Containers should use px-6 or px-8.",
+    "grids": "Bento-style grids for features. gap-8 or gap-12 between large cards.",
+    "radius": "rounded-2xl or rounded-3xl for premium glass panels. Avoid sharp corners for primary surfaces to maintain Apple Keynote feel."
   },
-  "surfaces_and_micro_themes": {
-    "header": "backdrop-blur-xl bg-black/60 border-b border-white/10 sticky top-0 z-50",
-    "hero_overlay": "bg-gradient-to-b from-black/40 via-black/60 to-[#0A0A0A]",
-    "card_glass": "bg-[#121212]/80 backdrop-blur-2xl border border-white/5 shadow-lg",
-    "card_glow": "hover:shadow-[0_0_30px_rgba(212,175,55,0.15)] transition-shadow duration-300",
-    "button_primary": "bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black font-bold hover:from-[#F2C94C] hover:to-[#D4AF37] transition-all",
-    "glow_accent": "drop-shadow-[0_0_12px_rgba(212,175,55,0.6)]"
-  },
-  "animations": {
-    "hover_state": "transition-all duration-300 ease-in-out",
-    "data_stream": "animate-pulse",
-    "start_button": "animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite] shadow-[0_0_40px_rgba(212,175,55,0.8)]"
-  },
-  "components": {
-    "strategy": "Hybrid",
-    "marketing_pages": "Custom HTML/Tailwind to allow extreme layout flexibility and bento grids.",
-    "dashboard": "Shadcn UI components heavily customized with dark mode + gold accents (Cards, Tables, Dialogs, Progress).",
-    "charts": "Recharts for PetaFLOPS live counter and earnings history with gold stroke/fill.",
-    "icons": "lucide-react"
+  "animation_strategy": {
+    "scroll_reveal": "Framer Motion 'whileInView' with opacity 0 to 1, y: 20 to 0, duration 0.6s.",
+    "hover_states": "Subtle translate-y (-translate-y-1), border color glow on hover (e.g., hover:border-[#00ffe1]/30).",
+    "metrics": "Framer motion count-up for numbers in the Trust Metrics Bar.",
+    "live_feed": "Smooth upward slide animations for the live console snippets."
   },
   "media": {
-    "images": {
-      "hero_background": {
-        "url": "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/de66970575fd0c962a0ae5998fbd3ca1fb71b7d5fc3bbccec837805a15b80cb7.png",
-        "description": "3D render of a futuristic global supercomputer network, glowing golden nodes across a dark obsidian world. Use as full-screen hero background."
-      },
-      "data_stream_abstract": {
-        "url": "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png",
-        "description": "Abstract data stream visualization with glowing gold data lines. Use for Dashboard background elements or Admin Command Center."
-      },
-      "geometric_accent": {
-        "url": "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/4d4b52ae803faae43333ad2470ef88109640608954e1850204ed0c18a52bc593.png",
-        "description": "Minimalist glowing gold geometric shape. Use for feature section illustrations or marketing graphics."
-      },
-      "texture_background": {
-        "url": "https://images.unsplash.com/photo-1704354428728-24b8ccab5c3d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxNzV8MHwxfHNlYXJjaHwzfHxvYnNpZGlhbiUyMGJsYWNrJTIwZ29sZCUyMGFic3RyYWN0JTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3NzgwMDQ0NzZ8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Close up of a black and gold abstract texture. Great for section dividers or footer background."
+    "image_strategy": "Avoid generic stock. Use CSS-based abstract geometry, blurred glowing radial gradients, and Framer Motion particle effects. For specific visuals like the Hero and Command Center, use abstract UI mockups built with HTML/CSS or high-quality dark geometric backgrounds.",
+    "image_urls": [
+      {
+        "category": "abstract_background_lines",
+        "url": "https://images.unsplash.com/photo-1775057154553-0f3e8902fea3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MDV8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGRhcmslMjBuZXR3b3JrJTIwdGVjaG5vbG9neXxlbnwwfHx8fDE3Nzg0NDMzMjR8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Abstract geometric lines and shapes on black background. Use as a very low opacity (opacity-10) background layer behind specific sections like the CTA or Footer."
       }
-    }
+    ],
+    "icons": "lucide-react (stroke-width: 1.5, sizes: 24 to 32)"
   },
+  "sections": [
+    {
+      "name": "Hero Section",
+      "description": "Premium abstract compute core visualization.",
+      "components": [
+        "Status Pills: Top of section, using JetBrains Mono (e.g., 'Native Engine v1.3.8 Ready'). data-testid='hero-status-pill'",
+        "H1: 'Turn idle smartphones into a verified compute network.'",
+        "Subtitle: 'THE GRID connects Android devices into a distributed compute layer...'",
+        "CTA Buttons: 'Download Android Node' (data-testid='hero-cta-download'), 'View Live Network', 'Open Customer Portal' (data-testid='hero-cta-portal').",
+        "Visual: Center glowing compute core built with Framer Motion (animated pulsing div with radial gradients and cyan shadows), surrounding phone node capsules (lucide Smartphone icons in glass cards) connected by dashed SVG lines."
+      ]
+    },
+    {
+      "name": "Trust Metrics Bar",
+      "description": "5 honest live counters displayed in a clean, horizontal or grid layout.",
+      "components": [
+        "Metrics: Connected Devices, Active Mining Devices, Mobile Native Hashrate, Accepted Shares, Backend Miner Status.",
+        "Labels: 'Pending / simulation / example' if not real.",
+        "Test IDs: 'metric-devices', 'metric-active', 'metric-hashrate', 'metric-shares', 'metric-status'"
+      ],
+      "style": "Glassmorphism strip spanning the container width. Monospace large numbers, uppercase muted labels."
+    },
+    {
+      "name": "How THE GRID Works",
+      "description": "4-step linear flow.",
+      "components": [
+        "Cards: (1) Install the Android Node, (2) Device Joins the Grid, (3) Safe Compute Starts, (4) Verified Contribution Pays.",
+        "Visual: Custom minimal icon for each, perhaps connected by a thin subtle dashed line (border-t border-slate-800)."
+      ]
+    },
+    {
+      "name": "Product Pillars",
+      "description": "4 premium bento cards.",
+      "components": [
+        "Cards: Mobile Compute Network, Native RandomX Engine, Verified Reward Ledger, Operator Command Center.",
+        "Style: Soft animated border on hover (Tracing beam effect). Short description + monospace tech detail line."
+      ]
+    },
+    {
+      "name": "Safety & Consent Section",
+      "description": "6 cards emphasizing user control and safety. No aggressive keywords.",
+      "components": [
+        "Cards: Explicit user permission, Charging-only mode, Wi-Fi-only transport, Thermal guard, Battery threshold, Stop anytime.",
+        "Style: Dark glass panels with green/cyan subtle glow icons indicating safety/security."
+      ]
+    },
+    {
+      "name": "Live Network Visualization",
+      "description": "Abstract node mesh + right side mini live feed.",
+      "components": [
+        "Left: Framer Motion animated abstract nodes (dots connected by lines). Colors: gray, blue, green, orange based on state.",
+        "Right: Live feed console snippets. Small monospace text sliding up. data-testid='live-network-feed'"
+      ]
+    },
+    {
+      "name": "Revenue Flow Section",
+      "description": "Sankey-style or horizontal arrow flow diagram.",
+      "components": [
+        "Flow: Customer workload -> THE GRID verification layer -> contributor reward pool -> user wallet.",
+        "Include honest trust signals like 'payout wallet verified' in small monospace pills."
+      ]
+    },
+    {
+      "name": "Command Center Preview",
+      "description": "Small premium product preview of the admin dashboard.",
+      "components": [
+        "Visual: A polished, blurred-edge mockup of an admin UI (NOT full screen). Rendered using HTML/CSS mock UI elements (mini charts, HUD panels, live console) inside a rotated perspective container."
+      ]
+    },
+    {
+      "name": "Customer / Operator CTA",
+      "description": "Two paths for conversion.",
+      "components": [
+        "Path 1: 'For Contributors: Install Android Node...'",
+        "Path 2: 'For Customers: Route workloads...'",
+        "Test IDs: 'cta-contributor-download', 'cta-customer-portal'"
+      ]
+    },
+    {
+      "name": "Footer",
+      "description": "Professional SaaS footer.",
+      "components": [
+        "Links: Product, Network, Rewards, Docs, Privacy, Terms, Contact.",
+        "Test IDs: 'footer-link-privacy', 'footer-link-terms'"
+      ]
+    }
+  ],
+  "forbidden_elements": [
+    "Stealth, weapon, war, hidden keywords",
+    "Fake/exaggerated metrics without 'pending' label",
+    "Overly aggressive neon/cyberpunk aesthetics (keep neon minimal and purposeful)",
+    "Old background images and prototype feel"
+  ],
   "instructions_to_main_agent": [
-    "Strictly follow the color palette. Do not use generic tailwind grays for backgrounds; use the specified #0A0A0A and #121212.",
-    "Implement a massive, pulsing 'Grid Connection' start button in the user dashboard that toggles connection state.",
-    "Use Cabinet Grotesk for all primary headings (H1, H2, H3). Use Unbounded for large numbers like the PetaFLOPS counter and Earnings.",
-    "Ensure all cards in the dashboard utilize the 'card_glass' class styles with internal p-6 or p-8 padding.",
-    "Add 'data-testid' attributes to all interactive elements (buttons, links, forms, toggles).",
-    "For the Admin Command Center Global War Map, use glowing dots (absolute positioning or a canvas library) on top of the 'data_stream_abstract' image.",
-    "Withdraw Now button should have a disabled state (dimmed, gray) until the $5 threshold is reached, then apply the 'glow_accent' and 'button_primary' styling.",
-    "Do not use the standard Shadcn UI aesthetic. Apply the custom borders, gold hover states, and dark mode background colors."
+    "DO NOT use generic Shadcn components out of the box; heavily customize them with the 'surface' and 'colors' specified above to achieve the premium Apple/Stripe keynote look.",
+    "Implement the hero compute core using Framer Motion and custom CSS radial-gradients. Do not rely on external images for the main focal point.",
+    "Use JetBrains Mono or similar for all technical readouts, metrics, and live logs.",
+    "Ensure the layout has massive whitespace (py-32 between major sections).",
+    "Implement the Live Network Visualization using an array of simulated events mapped to a list with Framer Motion AnimatePresence for smooth entry/exit.",
+    "Wire up existing endpoints (/api/stats/network, /api/apk/version) for the live metric pills if possible, otherwise use the labeled dummy state."
   ]
 }
