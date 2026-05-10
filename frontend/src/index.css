@@ -465,10 +465,14 @@ html, body {
     100% { transform: rotate(360deg); }
 }
 .fleet-dot { transform-origin: center; }
-.fleet-dot.idle    { fill: rgba(160,180,200,0.55); }
-.fleet-dot.connect { fill: var(--cyber-blue);     filter: drop-shadow(0 0 4px var(--cyber-blue)); animation: dot-blink 1.8s ease-in-out infinite; }
-.fleet-dot.mining  { fill: var(--neon-green);     filter: drop-shadow(0 0 6px var(--neon-green)); animation: dot-pulse-strong 1.2s ease-in-out infinite; }
-.fleet-dot.flagged { fill: #ff5152;               filter: drop-shadow(0 0 5px #ff5152); }
+.fleet-dot.idle       { fill: rgba(160,180,200,0.55); }
+.fleet-dot.connect,
+.fleet-dot.connected  { fill: var(--cyber-blue);     filter: drop-shadow(0 0 4px var(--cyber-blue)); animation: dot-blink 1.8s ease-in-out infinite; }
+.fleet-dot.mining,
+.fleet-dot.processing { fill: var(--neon-green);     filter: drop-shadow(0 0 6px var(--neon-green)); animation: dot-pulse-strong 1.2s ease-in-out infinite; }
+.fleet-dot.paused     { fill: #ff7a18;               filter: drop-shadow(0 0 5px #ff7a18); animation: dot-blink 2.4s ease-in-out infinite; }
+.fleet-dot.flagged,
+.fleet-dot.attention  { fill: #ff5152;               filter: drop-shadow(0 0 5px #ff5152); }
 @keyframes dot-blink { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
 @keyframes dot-pulse-strong { 0%,100% { transform: scale(1); } 50% { transform: scale(1.4); } }
 

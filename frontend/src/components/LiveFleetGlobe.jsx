@@ -38,9 +38,10 @@ function project(lat, lng, rotDeg) {
 }
 
 function deviceState(d) {
-  if (d.flagged) return "flagged";
-  if (d.native_pow || d.mining_status === "mining") return "mining";
-  if (d.status === "active") return "connect";
+  if (d.flagged) return "attention";
+  if (d.thermal === "warm" || d.thermal === "hot") return "paused";
+  if (d.native_pow || d.mining_status === "mining") return "processing";
+  if (d.status === "active") return "connected";
   return "idle";
 }
 
@@ -68,20 +69,23 @@ export default function LiveFleetGlobe({ devices = [], testId = "live-fleet-glob
   const counts = dots.reduce((a, d) => { a[d.state] = (a[d.state] || 0) + 1; return a; }, {});
 
   return (
-    <div className="hud-card p-6 relative overflow-hidden" data-testid={testId}>
+    <div className="landing-glass-strong p-6 relative overflow-hidden" data-testid={testId}>
       <div className="absolute -inset-1 pointer-events-none"
-           style={{ background: "radial-gradient(circle at 50% 30%, rgba(0,255,225,0.08), transparent 60%)" }} />
-      <div className="relative flex flex-wrap items-start justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2 font-mono-cyber">
-          <Globe2 className="w-4 h-4 cyber-blue-text" />
-          <span className="text-sm font-bold cyber-blue-text">canlı_filo_haritası</span>
-          <span className="text-[10px] text-white/40">/ {devices.length} nodes</span>
+           style={{ background: "radial-gradient(circle at 50% 30%, rgba(0,212,255,0.06), transparent 60%)" }} />
+      <div className="relative flex flex-wrap items-start justify-between gap-3 mb-2">
+        <div>
+          <div className="landing-pill info mb-2"><Globe2 className="w-3 h-3" /> Live Network</div>
+          <h2 className="font-grotesk font-semibold text-white text-[20px]">Live Compute Fleet</h2>
+          <p className="text-[12.5px] text-white/45 mt-1 font-sans-saas max-w-md">
+            Your devices are connected to THE GRID's distributed compute layer.
+          </p>
         </div>
-        <div className="flex items-center gap-3 text-[10px] tracking-widest uppercase font-mono-cyber">
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{background:"var(--neon-green)", boxShadow:"0 0 6px var(--neon-green)"}}/> mining {counts.mining || 0}</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{background:"var(--cyber-blue)", boxShadow:"0 0 6px var(--cyber-blue)"}}/> connect {counts.connect || 0}</span>
+        <div className="flex flex-wrap items-center gap-3 text-[10.5px] tracking-widest uppercase font-mono-tech">
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{background:"#00ff88", boxShadow:"0 0 6px #00ff88"}}/> processing {counts.processing || 0}</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{background:"#00d4ff", boxShadow:"0 0 6px #00d4ff"}}/> connected {counts.connected || 0}</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-white/40"/> idle {counts.idle || 0}</span>
-          {counts.flagged ? <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400"/> flagged {counts.flagged}</span> : null}
+          {counts.paused ? <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{background:"#ff7a18"}}/> paused {counts.paused}</span> : null}
+          {counts.attention ? <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400"/> attention {counts.attention}</span> : null}
         </div>
       </div>
 
@@ -135,11 +139,11 @@ export default function LiveFleetGlobe({ devices = [], testId = "live-fleet-glob
             const p = project(d.lat, d.lng, rot);
             if (!p.visible) return null;
             const cls = `fleet-dot ${d.state}`;
-            const isMining = d.state === "mining";
-            const r = isMining ? 4.5 : d.state === "connect" ? 3.2 : 2.4;
+            const isProcessing = d.state === "processing";
+            const r = isProcessing ? 4.5 : d.state === "connected" ? 3.2 : 2.4;
             return (
               <g key={d.id}>
-                {isMining && (
+                {isProcessing && (
                   <path d={`M ${p.x} ${p.y} Q ${(p.x + CX) / 2} ${(p.y + CY) / 2 - 40} ${CX} ${CY}`}
                         className="fleet-arc" />
                 )}

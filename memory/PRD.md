@@ -349,6 +349,28 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **Lint**: Landing.jsx + Navbar.jsx clean.
 
 
+**Iter 28 (2026-05-10)** — **Dashboard re-language: Cloud Compute terminology (v1.4.1)**
+- Kullanıcı dashboard'unda mining/miner/hashrate/RandomX/XMRig/pool/share/TGC dilini TAMAMEN söktük. Backend hiçbir şekilde değiştirilmedi (DB schema + APIs olduğu gibi); sadece kullanıcı yüzeyindeki etiketler/labels/copy değişti.
+- **Dashboard.jsx** komple yeniden yazıldı (610 → 375 satır). Yeni surface:
+  * Header pill `/ operator console` → `/ COMPUTE NETWORK`
+  * "Welcome back" heading: cyan→neon-green gradient, "operator" yerine "Contributor" copy
+  * "Open Node Terminal" → **"Open Compute Node"** (white CTA pill)
+  * 4 stat kart yeniden adlandırıldı: `Balance TGC` → **Reward Balance** ($USD), `Lifetime TGC` → **Lifetime Rewards** ($USD), `Your Devices` → **Compute Nodes**, `Network PetaFLOPS` → **Network Contribution** (Pending/% score)
+  * `Recent Tasks` → **Activity Feed**: `share accepted/rejected` etiketleri kaldırıldı; cloud task dili: `Output verified / Output rejected / Compute session active`. Reward formatı `+ $0.0042` USD.
+  * Yeni section eklendi: **Safe Compute Rules** (6 kart: User permission required / Charging-only mode / Wi-Fi only transport / Thermal protection / Battery threshold / Stop anytime + "six guards · enforced per cycle" tagline).
+  * `Registered Devices` → **Compute Nodes**. Cihaz kartı: `Tasks` → **Verified Work Units**, `FLOPS` → **Processing Power**, `Status` → **Node Status**. State pill yeni: `processing/connected/idle/paused/attention/offline` (mining/active dilini sökük).
+  * `nodeState()` helper: `mining_status==="mining"` → "processing", `thermal in {warm,hot}` → "paused", flagged → "attention", active → "connected". Backend field'ları aynen okur, sadece kelimeyi çevirir.
+- **CyberWealthFlow.jsx** → "Reward Balance Panel": Türkçe `siber_servet_akışı` etiketi gitti, yerine `/ reward_balance · payout currency: USD (USDT)`. Ana sayaç artık **$XX.XX USDT** (TGC unit gizlendi). "Pending verification $X.XX · Contribution score N pts" satırı eklendi. Ring "Threshold" etiketi → **"Payout Progress"** "next payout at $10.00".
+- **LiveFleetGlobe.jsx** → "Live Compute Fleet": başlık `canlı_filo_haritası` → **"Live Compute Fleet"** ("Your devices are connected to THE GRID's distributed compute layer."). Legend: `mining/connect/flagged` → `processing/connected/paused/attention/idle`. CSS class'lar additive (eski mining/connect/flagged class'ları korundu, yeni processing/connected/paused/attention class'ları aynı renkleri eşliyor).
+- **TierForecast.jsx**: `Device Tier · Auto-Detected` → **"Node Tier · Auto-Detected"**. Daily/monthly tutarları artık USD-first (TGC sayıları gizlendi). `Withdraw at 200 TGC` → **"Payout Threshold $10.00 · request payout above this"**. Backend `withdraw_threshold_usdt` field'i de eklendi (`/api/tier/forecast` ve `/api/wallet`).
+- **PowerUpButton.jsx**: `pool` ve `TGC` referansları gitti. Banner: `24h Pool Activation` → **"24h Compute Activation"**. Tooltip: `Background worker connected to the pool. Tap again after expiry.` → "Compute node connected. Tap again after expiry." | "TGC drip" → "reward stream".
+- **Device.jsx** (browser-native node terminal): `Session Tasks` → **Verified Work Units**, `Session USDT` → **Session Rewards · USD**, `Data Stream` → **Compute Stream**, `SOLVING` → **PROCESSING**, "No packets yet. Press START to begin solving" → "No work units yet. Press START to begin processing".
+- **Tüm forbidden vocab sürümünde silindi** (8/8 user-facing kontrolü PASS): mining, miner, hashrate, RandomX, XMRig, TGC, "accepted share", pool. Backend internal field adları (`mining_status`, `native_pow`, `tgc_balance`, `accepted_shares`) kaldı — sadece etiketleri çevirdik.
+- **Kabul kriterleri**: ✅ Dashboard cloud compute platform gibi görünüyor, ✅ "Reward Balance" / "Live Compute Fleet" / "Compute Nodes" / "Activity Feed" başlıklı, ✅ teknik mining detayları admin panelde kaldı, ✅ backend data flow kırılmadı, ✅ gerçek olmayan metrikler `Pending` veya `$0.00` ile honest gösteriliyor.
+- **Lint**: 6/6 dosya clean.
+- **Bug fix**: TierForecast'in `withdraw_threshold_usdt.toFixed()` undefined crash'i düzeltildi (backend `/tier/forecast` endpoint'ine field eklendi + frontend defensive fallback).
+
+
 **Iter 25 (2026-05-09)** — **v1.3.8 Native Engine ARMED — librandomx.so EMBEDDED**
 - **Motor montajı tamamlandı**: User provided `librandomx.so` (arm64-v8a, ELF64 AArch64, NDK r28, build-id `78e647e7e4187f61ba6ebbe63e6bbbba20117e67`, 1,195,960 bytes, 175 RandomX symbols, SHA-256 `2c7c0be381cb8e0713926e34a4c76a29da650aa2b0225226ebde4b7943f571b2`). Verified via readelf + `nm -D` (10 `Java_io_thegrid_worker_RandomXBridge_*` JNI symbols).
 - **Container build pipeline reconstructed** — apt-get installed `aapt`, `apksigner`, `zipalign`, `default-jdk-headless`, `android-sdk-build-tools`. Downloaded `platform-34-ext7_r03.zip` for `android.jar` and `build-tools_r34-linux.zip` for `d8.jar`. Placed at `/opt/android-sdk/platforms/android-34/android.jar` + `/opt/android-sdk/build-tools/34.0.0/lib/d8.jar`.

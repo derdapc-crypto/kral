@@ -1404,6 +1404,7 @@ async def tier_forecast(tier: str = "mid", user: dict = Depends(get_current_user
         "shield_factor": shield,
         "tgc_value_usdt": USDT_PER_TGC,
         "withdraw_threshold_tgc": WITHDRAW_THRESHOLD_TGC,
+        "withdraw_threshold_usdt": round(WITHDRAW_THRESHOLD_TGC * USDT_PER_TGC, 2),
     }
 
 

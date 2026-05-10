@@ -3,12 +3,10 @@ import { motion } from "framer-motion";
 import { Wallet, TrendingUp } from "lucide-react";
 
 /**
- * CyberWealthFlow — replaces the static "TheGrid Coin Wallet 0.0" panel with
- * an investor-grade neon counter. The number itself glows + breathes; the
- * USDT equivalent flows under it like a stock-ticker ribbon. A radial ring
- * orbits the counter showing distance to withdrawal threshold.
- *
- * Pure visual upgrade — wallet data still comes from /api/wallet via parent.
+ * CyberWealthFlow (rename: RewardBalancePanel) — professional payout ledger
+ * surface for contributors. NO mining/hash/pool/share vocabulary on the
+ * user-facing surface. Backend wallet data still arrives via /api/wallet,
+ * but the labels speak the language of a cloud-compute reward ledger.
  */
 
 function useTickToValue(target, dur = 1100) {
@@ -33,16 +31,17 @@ function useTickToValue(target, dur = 1100) {
 }
 
 export default function CyberWealthFlow({
-  tgcBalance = 0,
-  tgcUsdt = 0,
-  threshold = 200,
-  thresholdUsdt = 10,
-  children, // withdraw form rendered inside the panel
-  testId = "cyber-wealth-flow",
+  tgcBalance = 0,           // raw internal unit (kept for back-compat — NOT shown to user)
+  tgcUsdt = 0,              // USD value of available rewards (PRIMARY user-facing number)
+  threshold = 200,          // internal payout threshold (work units) — kept for back-compat
+  thresholdUsdt = 10,       // USD payout threshold — PRIMARY user-facing
+  pendingRewardsUsdt = 0,
+  children,                  // payout form rendered inside the panel
+  testId = "reward-balance-panel",
 }) {
-  const tgc = useTickToValue(Number(tgcBalance) || 0);
-  const usdt = useTickToValue(Number(tgcUsdt) || 0);
-  const pct = Math.min(100, (tgcBalance / (threshold || 1)) * 100);
+  const available = useTickToValue(Number(tgcUsdt) || 0);
+  const pending = useTickToValue(Number(pendingRewardsUsdt) || 0);
+  const pct = thresholdUsdt > 0 ? Math.min(100, (tgcUsdt / thresholdUsdt) * 100) : 0;
 
   // SVG radial ring config
   const size = 220, stroke = 4;
@@ -51,42 +50,47 @@ export default function CyberWealthFlow({
   const off = c - (pct / 100) * c;
 
   return (
-    <div className="hud-card p-8 relative overflow-hidden" data-testid={testId}>
+    <div className="landing-glass-strong p-8 relative overflow-hidden" data-testid={testId}>
       <div className="absolute -right-24 -top-24 w-72 h-72 rounded-full blur-3xl"
-           style={{ background: "rgba(0,255,136,0.18)" }} />
+           style={{ background: "rgba(0,255,136,0.10)" }} />
       <div className="absolute -left-20 -bottom-24 w-72 h-72 rounded-full blur-3xl"
-           style={{ background: "rgba(0,212,255,0.12)" }} />
+           style={{ background: "rgba(0,212,255,0.08)" }} />
 
       <div className="relative">
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-white/45 font-mono-cyber">
-          <Wallet className="w-3.5 h-3.5" style={{ color: "var(--neon-green)" }} />
-          <span className="neon-green-text">/ siber_servet_akışı</span>
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/45 font-mono-tech">
+          <Wallet className="w-3.5 h-3.5" style={{ color: "#00ff88" }} />
+          <span className="text-[#00ff88]">/ reward_balance</span>
           <span className="text-white/30">·</span>
-          <span className="text-white/40">1 TGC = $0.05</span>
+          <span className="text-white/40">payout currency: USD (USDT)</span>
         </div>
 
         <div className="mt-7 grid grid-cols-[1fr_auto] gap-6 items-center">
-          {/* Counter + ribbon */}
+          {/* Primary counter */}
           <div className="min-w-0">
-            <motion.div
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="flex items-baseline gap-3">
-              <div className="font-display font-black wealth-glow leading-none"
-                   style={{ fontSize: "clamp(56px, 8vw, 84px)" }}>
-                {tgc.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40 font-mono-tech mb-1">Available Rewards</div>
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6 }}
+                        className="flex items-baseline gap-3">
+              <div className="font-grotesk font-bold wealth-glow leading-none"
+                   style={{ fontSize: "clamp(48px, 7vw, 72px)", color: "#00ff88" }}>
+                ${available.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="text-white/55 text-base font-mono-cyber tracking-widest">TGC</div>
+              <div className="text-white/50 text-base font-mono-tech tracking-wider">USDT</div>
             </motion.div>
-            <div className="mt-2 flex items-center gap-2 text-sm font-mono-cyber" data-testid="wealth-usdt">
-              <TrendingUp className="w-3.5 h-3.5 cyber-blue-text" />
-              <span className="usdt-ribbon font-bold tracking-wider">
-                ≈ ${usdt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] font-mono-tech" data-testid="reward-pending">
+              <span className="text-white/45 inline-flex items-center gap-1.5">
+                <TrendingUp className="w-3 h-3" style={{ color: "#00d4ff" }} />
+                Pending verification
+                <span className="text-white/70">${pending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </span>
+              <span className="text-white/30">·</span>
+              <span className="text-white/45">Contribution score
+                <span className="text-white/70 ml-1.5">{Math.min(100, pct).toFixed(0)} pts</span>
               </span>
             </div>
           </div>
 
-          {/* Threshold radial ring */}
+          {/* Payout threshold radial ring */}
           <div className="relative grid place-items-center" style={{ width: size, height: size }}>
             <svg width={size} height={size} className="-rotate-90 absolute inset-0">
               <circle cx={size / 2} cy={size / 2} r={r} className="ring-track" strokeWidth={stroke} fill="none" />
@@ -95,12 +99,13 @@ export default function CyberWealthFlow({
                       strokeDasharray={c} strokeDashoffset={off} />
             </svg>
             <div className="text-center">
-              <div className="text-[9px] tracking-[0.3em] uppercase text-white/40 font-mono-cyber">Threshold</div>
-              <div className="text-2xl font-display font-black neon-green-text mt-1" data-testid="wealth-progress-pct">
+              <div className="text-[9px] tracking-[0.3em] uppercase text-white/40 font-mono-tech">Payout Progress</div>
+              <div className="font-grotesk font-bold text-[#00ff88] mt-1"
+                   data-testid="wealth-progress-pct" style={{ fontSize: "26px" }}>
                 {pct.toFixed(0)}%
               </div>
-              <div className="text-[10px] text-white/45 mt-1 font-mono-cyber">
-                {threshold.toFixed(0)} TGC · ${thresholdUsdt.toFixed(2)}
+              <div className="text-[10.5px] text-white/45 mt-1 font-mono-tech">
+                next payout at ${thresholdUsdt.toFixed(2)}
               </div>
             </div>
           </div>
@@ -108,6 +113,9 @@ export default function CyberWealthFlow({
 
         {/* Withdraw form / msg — caller-supplied */}
         {children}
+
+        {/* Back-compat hidden numeric for legacy selectors */}
+        <span className="hidden">{Number(tgcBalance).toFixed(1)} · {threshold.toFixed(0)}</span>
       </div>
     </div>
   );

@@ -201,22 +201,22 @@ export default function Device() {
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="p-6 rounded-2xl glass" data-testid="session-tasks">
-                <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Session Tasks</div>
+                <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Verified Work Units</div>
                 <div className="mt-3 text-4xl font-display font-black gold-text font-mono-num">{tasksDone}</div>
               </div>
               <div className="p-6 rounded-2xl glass" data-testid="session-earned">
-                <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Session USDT</div>
-                <div className="mt-3 text-4xl font-display font-black gold-text font-mono-num">{earned.toFixed(5)}</div>
+                <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Session Rewards · USD</div>
+                <div className="mt-3 text-4xl font-display font-black gold-text font-mono-num">${earned.toFixed(5)}</div>
               </div>
             </div>
 
             <div className="rounded-3xl glass p-6 h-[440px] flex flex-col relative overflow-hidden">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-white/40">
-                  <Activity className="w-3.5 h-3.5" /> Data Stream
+                  <Activity className="w-3.5 h-3.5" /> Compute Stream
                 </div>
                 {running && <span className="text-[10px] tracking-[0.25em] uppercase text-[#F2C94C] flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#F2C94C] dot-pulse" /> SOLVING
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#F2C94C] dot-pulse" /> PROCESSING
                 </span>}
               </div>
 
@@ -229,7 +229,7 @@ export default function Device() {
               </div>
 
               <div className="flex-1 overflow-auto relative z-10 pr-2" data-testid="stream-log">
-                {log.length === 0 && <div className="text-sm text-white/40 text-center py-16">No packets yet. Press START to begin solving.</div>}
+                {log.length === 0 && <div className="text-sm text-white/40 text-center py-16">No work units yet. Press START to begin processing.</div>}
                 {log.map((l, idx) => (
                   <div key={idx} className="flex items-center justify-between py-1.5 text-xs border-b border-white/5">
                     <div className="flex items-center gap-3">
@@ -242,7 +242,7 @@ export default function Device() {
                     </div>
                     <div className="text-right">
                       <div className={`text-[10px] uppercase tracking-widest ${l.status === "verified" ? "text-[#F2C94C]" : "text-white/50"}`}>{l.status}</div>
-                      {l.earned > 0 && <div className="text-[9px] text-white/40">+{l.earned.toFixed(5)}</div>}
+                      {l.earned > 0 && <div className="text-[9px] text-white/40">+${l.earned.toFixed(5)}</div>}
                     </div>
                   </div>
                 ))}

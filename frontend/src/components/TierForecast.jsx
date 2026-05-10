@@ -5,8 +5,9 @@ import { Cpu, TrendingUp, Sparkles } from "lucide-react";
 
 /**
  * Dynamic Tier Forecasting card. Detects device hardware tier on launch and
- * shows the user "Potential Daily Earnings" in TGC for their tier, plus a
- * comparison bar across all three tiers.
+ * shows the user "Estimated Daily Rewards" (USD) for their tier, plus a
+ * comparison bar across all three tiers. NO mining/share vocabulary on
+ * surface; backend "tgc" units are translated to USD on the user side.
  */
 export default function TierForecast({ onTierDetected }) {
   const [forecast, setForecast] = useState(null);
@@ -29,28 +30,26 @@ export default function TierForecast({ onTierDetected }) {
   const max = Math.max(0.001, ...Object.values(allTiers).map((t) => t.daily_tgc || 0));
 
   return (
-    <div className="rounded-3xl glass-strong p-6 relative overflow-hidden" data-testid="tier-forecast-card">
-      <div className="absolute -left-16 -bottom-16 w-48 h-48 rounded-full bg-[#F2C94C]/15 blur-3xl" />
+    <div className="landing-glass p-6 relative overflow-hidden" data-testid="tier-forecast-card">
+      <div className="absolute -left-16 -bottom-16 w-48 h-48 rounded-full blur-3xl"
+           style={{ background: "rgba(0,255,136,0.10)" }} />
       <div className="relative">
         <div className="flex items-start justify-between">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.3em] text-[#F2C94C] flex items-center gap-1.5">
-              <Cpu className="w-3 h-3" /> Device Tier · Auto-Detected
-            </div>
-            <h3 className="font-display text-2xl font-black mt-1" data-testid="tier-detected-label">
+            <div className="landing-pill info mb-2"><Cpu className="w-3 h-3" /> Node Tier · Auto-Detected</div>
+            <h3 className="font-grotesk font-bold text-white text-[20px] mt-1" data-testid="tier-detected-label">
               {tier ? TIER_LABEL[tier] : "Detecting…"}
             </h3>
           </div>
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Est. Daily</div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-mono-tech">Est. Daily Rewards</div>
             <div className="mt-1 flex items-baseline gap-1.5 justify-end">
-              <span className="text-3xl font-display font-black gold-text font-mono-num" data-testid="tier-daily-tgc">
-                {forecast ? forecast.daily_tgc.toFixed(1) : "—"}
+              <span className="text-2xl font-grotesk font-bold text-[#00ff88] font-mono-tech" data-testid="tier-daily-tgc">
+                {forecast ? `$${forecast.daily_usdt.toFixed(2)}` : "—"}
               </span>
-              <span className="text-xs text-white/60">TGC</span>
             </div>
-            <div className="text-[10px] text-white/40 mt-0.5" data-testid="tier-daily-usdt">
-              ≈ ${forecast ? forecast.daily_usdt.toFixed(2) : "—"} USDT
+            <div className="text-[10px] text-white/40 mt-0.5 font-mono-tech" data-testid="tier-daily-usdt">
+              USDT · payout currency
             </div>
           </div>
         </div>
@@ -62,15 +61,16 @@ export default function TierForecast({ onTierDetected }) {
             const isMine = t === tier;
             return (
               <div key={t} className="flex items-center gap-3" data-testid={`tier-row-${t}`}>
-                <div className={`w-20 text-[10px] tracking-[0.25em] uppercase ${isMine ? "text-[#F2C94C]" : "text-white/40"}`}>
+                <div className={`w-20 text-[10px] tracking-[0.2em] uppercase font-mono-tech ${isMine ? "text-[#00ff88]" : "text-white/40"}`}>
                   {TIER_LABEL[t]}
                 </div>
                 <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                  <div className={`h-full transition-all ${isMine ? "bg-gradient-to-r from-[#F2C94C] to-[#B8860B]" : "bg-white/20"}`}
-                       style={{ width: `${pct}%` }} />
+                  <div className={`h-full transition-all ${isMine ? "" : "bg-white/15"}`}
+                       style={{ width: `${pct}%`,
+                                background: isMine ? "linear-gradient(90deg, #00ff88, #00d4ff)" : undefined }} />
                 </div>
-                <div className={`w-24 text-right text-xs font-mono-num ${isMine ? "text-[#F2C94C]" : "text-white/60"}`}>
-                  {v.daily_tgc.toFixed(1)} TGC/d
+                <div className={`w-24 text-right text-[12px] font-mono-tech ${isMine ? "text-[#00ff88]" : "text-white/55"}`}>
+                  ${v.daily_usdt.toFixed(2)}/d
                 </div>
               </div>
             );
@@ -78,23 +78,29 @@ export default function TierForecast({ onTierDetected }) {
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="p-3 rounded-xl bg-black/40 border border-white/10">
-            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40 inline-flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-[#F2C94C]" /> Monthly
+          <div className="bento-card p-3.5">
+            <span className="accent-bar" />
+            <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 inline-flex items-center gap-1 font-mono-tech">
+              <TrendingUp className="w-3 h-3" style={{ color: "#00ff88" }} /> Monthly
             </div>
-            <div className="mt-1 text-lg font-display font-black gold-text font-mono-num">
-              {forecast ? `${forecast.monthly_tgc.toFixed(0)} TGC` : "—"}
+            <div className="mt-1 text-lg font-grotesk font-bold text-[#00ff88] font-mono-tech">
+              {forecast ? `$${forecast.monthly_usdt.toFixed(2)}` : "—"}
             </div>
-            <div className="text-[10px] text-white/40">≈ ${forecast ? forecast.monthly_usdt.toFixed(2) : "—"}</div>
+            <div className="text-[10px] text-white/40 font-mono-tech">USDT estimate</div>
           </div>
-          <div className="p-3 rounded-xl bg-black/40 border border-white/10">
-            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40 inline-flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-[#F2C94C]" /> 1 TGC
+          <div className="bento-card p-3.5">
+            <span className="accent-bar" />
+            <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 inline-flex items-center gap-1 font-mono-tech">
+              <Sparkles className="w-3 h-3" style={{ color: "#00d4ff" }} /> Payout Threshold
             </div>
-            <div className="mt-1 text-lg font-display font-black gold-text font-mono-num">
-              ${forecast ? forecast.tgc_value_usdt.toFixed(2) : "0.05"}
+            <div className="mt-1 text-lg font-grotesk font-bold text-white font-mono-tech">
+              {forecast
+                ? `$${(forecast.withdraw_threshold_usdt
+                    ?? (forecast.withdraw_threshold_tgc * (forecast.tgc_value_usdt || 0.05))
+                    ?? 10).toFixed(2)}`
+                : "—"}
             </div>
-            <div className="text-[10px] text-white/40">Withdraw at {forecast ? forecast.withdraw_threshold_tgc.toFixed(0) : 200} TGC</div>
+            <div className="text-[10px] text-white/40 font-mono-tech">request payout above this</div>
           </div>
         </div>
       </div>

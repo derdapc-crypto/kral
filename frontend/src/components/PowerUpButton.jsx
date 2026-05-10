@@ -11,7 +11,7 @@ function fmtRemaining(sec) {
 
 /**
  * Pi-style 24h Power-Up button.
- * Tap once every 24 hours to keep the background worker connected to the pool.
+ * Tap once every 24 hours to keep the background worker connected to the network.
  */
 export default function PowerUpButton({ onChange, compact = false }) {
   const [status, setStatus] = useState(null);
@@ -80,15 +80,15 @@ export default function PowerUpButton({ onChange, compact = false }) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-[10px] uppercase tracking-[0.3em] text-[#F2C94C] flex items-center gap-1.5">
-              <Zap className="w-3 h-3" /> 24h Pool Activation
+              <Zap className="w-3 h-3" /> 24h Compute Activation
             </div>
             <h3 className="font-display text-xl font-black mt-1">
               {active ? "Worker is LIVE" : "Power Up Required"}
             </h3>
             <div className="text-xs text-white/50 mt-1">
               {active
-                ? "Background worker connected to the pool. Tap again after expiry."
-                : "Tap once every 24h to keep your TGC drip flowing."}
+                ? "Compute node connected. Tap again after expiry."
+                : "Tap once every 24h to keep your reward stream flowing."}
             </div>
           </div>
           <button onClick={activate} disabled={busy || active} data-testid="power-up-btn"
