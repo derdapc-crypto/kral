@@ -5,6 +5,8 @@ import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianG
 import RealAndroidDevices from "../components/RealAndroidDevices";
 import BootSequence from "../components/BootSequence";
 import LiveOperatorConsole from "../components/LiveOperatorConsole";
+import WarRoomHUD from "../components/WarRoomHUD";
+import HonorPodium from "../components/HonorPodium";
 
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
 
@@ -187,10 +189,10 @@ export default function Admin() {
                 </div>
               </div>
 
-              <div className="rounded-3xl glass p-6">
+              <div className="hud-card p-6">
                 <div className="flex justify-between items-center mb-4">
-                  <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 flex items-center gap-2">
-                    <Zap className="w-3.5 h-3.5 text-[#F2C94C]" /> Total Compute Rate · 30 min
+                  <div className="text-[10px] uppercase tracking-[0.3em] text-white/45 flex items-center gap-2 font-mono-cyber">
+                    <Zap className="w-3.5 h-3.5" style={{ color: "var(--neon-green)" }} /> Total Compute Rate · 30 min
                   </div>
                   <div className="text-[10px] tracking-widest uppercase text-white/40">{hashrate.total_tasks} tasks</div>
                 </div>
@@ -199,37 +201,42 @@ export default function Admin() {
                     <AreaChart data={hashrate.series} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                       <defs>
                         <linearGradient id="hashGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#F2C94C" stopOpacity={0.55}/>
-                          <stop offset="100%" stopColor="#F2C94C" stopOpacity={0}/>
+                          <stop offset="0%" stopColor="#00ff88" stopOpacity={0.7}/>
+                          <stop offset="55%" stopColor="#00d4ff" stopOpacity={0.35}/>
+                          <stop offset="100%" stopColor="#00d4ff" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
-                      <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fill: "#666", fontSize: 10 }} stroke="rgba(255,255,255,0.1)" interval={5} />
-                      <YAxis tick={{ fill: "#666", fontSize: 10 }} stroke="rgba(255,255,255,0.1)" />
-                      <Tooltip contentStyle={{ background: "#0A0A0A", border: "1px solid #D4AF37", borderRadius: 8, fontSize: 12 }} />
-                      <Area type="monotone" dataKey="hashes" stroke="#F2C94C" strokeWidth={2} fill="url(#hashGrad)" />
+                      <CartesianGrid stroke="rgba(0,255,225,0.06)" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: "#5a8e95", fontSize: 10 }} stroke="rgba(0,255,225,0.10)" interval={5} />
+                      <YAxis tick={{ fill: "#5a8e95", fontSize: 10 }} stroke="rgba(0,255,225,0.10)" />
+                      <Tooltip contentStyle={{ background: "#040912", border: "1px solid #00ff88", borderRadius: 10, fontSize: 12, color: "#00ff88" }} />
+                      <Area type="monotone" dataKey="hashes" stroke="#00ff88" strokeWidth={2} fill="url(#hashGrad)"
+                            style={{ filter: "drop-shadow(0 0 6px rgba(0,255,136,0.55))" }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-3xl glass p-6">
-              <div className="relative w-full aspect-[2/1] rounded-2xl overflow-hidden border border-white/10"
+            {/* WAR MAP — flat backdrop with rotating fleet dots (deterministic) */}
+            <div className="hud-card p-6">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-white/45 flex items-center gap-2 font-mono-cyber mb-4">
+                <Globe2 className="w-3.5 h-3.5 cyber-blue-text" /> global_war_map · classified
+              </div>
+              <div className="relative w-full aspect-[2/1] rounded-2xl overflow-hidden border border-[#00ffe1]/15"
                 style={{ backgroundImage: `url(${DATA_BG})`, backgroundSize: "cover", backgroundPosition: "center" }}>
-                <div className="absolute inset-0 bg-black/60" />
+                <div className="absolute inset-0 bg-[#040912]/75" />
                 {mapDots.map((d) => (
                   <div key={d.id}
-                    className={`absolute rounded-full ${d.flagged ? "bg-red-400" : d.active ? "bg-[#F2C94C] dot-pulse" : "bg-white/40"}`}
+                    className={`absolute rounded-full ${d.flagged ? "fleet-dot flagged" : d.active ? "fleet-dot mining" : "fleet-dot idle"}`}
                     style={{ left: `${d.x}%`, top: `${d.y}%`, width: d.active ? 8 : 4, height: d.active ? 8 : 4,
-                      transform: "translate(-50%,-50%)",
-                      boxShadow: d.active ? "0 0 18px rgba(242,201,76,0.9)" : d.flagged ? "0 0 12px rgba(239,68,68,0.8)" : "none" }}
+                      transform: "translate(-50%,-50%)" }}
                     data-testid={`map-dot-${d.id}`} />
                 ))}
-                <div className="absolute bottom-5 left-5 flex gap-4 text-[10px] tracking-[0.3em] uppercase">
-                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#F2C94C]" /> Active</span>
-                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-white/40" /> Idle</span>
-                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-400" /> Flagged</span>
+                <div className="absolute bottom-5 left-5 flex gap-4 text-[10px] tracking-[0.3em] uppercase font-mono-cyber">
+                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full" style={{background:"var(--neon-green)", boxShadow:"0 0 6px var(--neon-green)"}}/> mining</span>
+                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-white/40"/> idle</span>
+                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-400"/> flagged</span>
                 </div>
               </div>
             </div>
@@ -455,8 +462,10 @@ export default function Admin() {
         {msg && <div className="mt-4 text-xs text-red-400 font-mono-cyber">{msg}</div>}
 
         {/* v1.3.6: Live Operator Console — visible across every admin tab */}
-        <div className="mt-10">
+        {/* v1.3.9: HonorPodium pinned next to console (investor demo mode) */}
+        <div className="mt-10 grid lg:grid-cols-[2fr_1fr] gap-4">
           <LiveOperatorConsole height={300} />
+          <HonorPodium height={300} />
         </div>
       </div>
     </div>

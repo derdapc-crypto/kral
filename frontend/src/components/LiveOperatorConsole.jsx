@@ -97,7 +97,7 @@ export default function LiveOperatorConsole({ height = 280 }) {
     } catch { return "--:--:--"; }
   };
   const color = (lv) => ({
-    share: "matrix-text",
+    share: "neon-green-text font-bold",
     info:  "text-[#00ddc7]",
     warn:  "text-amber-300",
     error: "text-red-400",
@@ -130,8 +130,10 @@ export default function LiveOperatorConsole({ height = 280 }) {
         {events.length === 0 && (
           <div className="text-[#00ffe1]/40 caret-blink">awaiting first event…</div>
         )}
-        {events.map((ev, i) => (
-          <div key={i} className={`flex gap-3 ${ev.level === "share" ? "type-in" : ""}`}
+        {events.map((ev, i) => {
+          const cls = ev.level === "share" ? "share-flash" : (ev.level === "share" ? "type-in" : "");
+          return (
+          <div key={i} className={`flex gap-3 ${cls} rounded-md px-1`}
                data-testid={`console-event-${i}`}>
             <span className="text-white/35 select-none">[{fmt(ev)}]</span>
             <span className="cyan-text w-12 select-none opacity-70">{srcTag(ev.src)}</span>
@@ -140,7 +142,8 @@ export default function LiveOperatorConsole({ height = 280 }) {
               {ev.msg}
             </span>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

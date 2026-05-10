@@ -6,6 +6,8 @@ import { Cpu, Wallet, Plus, Smartphone, Zap, ArrowUpRight, ShieldCheck, Radio } 
 import TGCCounter from "../components/TGCCounter";
 import PowerUpButton from "../components/PowerUpButton";
 import TierForecast from "../components/TierForecast";
+import CyberWealthFlow from "../components/CyberWealthFlow";
+import LiveFleetGlobe from "../components/LiveFleetGlobe";
 
 function StatCard({ label, value, suffix = "", testId }) {
   return (
@@ -105,57 +107,37 @@ export default function Dashboard() {
 
         {/* Wallet + Devices */}
         <div className="grid lg:grid-cols-[1.1fr_1fr] gap-6 mb-10">
-          {/* Wallet · TGC */}
-          <div className="p-8 rounded-3xl glass-strong relative overflow-hidden">
-            <div className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-[#D4AF37]/20 blur-3xl" />
-            <div className="relative">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-white/40">
-                <Wallet className="w-3.5 h-3.5" /> TheGrid Coin Wallet · 1 TGC = $0.05
-              </div>
-              <div className="mt-5 flex items-baseline gap-3">
-                <div className="text-6xl font-display font-black gold-text">
-                  <TGCCounter value={wallet?.tgc_balance ?? 0} decimals={1} testId="dashboard-tgc-balance" />
-                </div>
-                <div className="text-white/50">TGC</div>
-              </div>
-              <div className="text-xs text-white/50 mt-1" data-testid="dashboard-tgc-usdt-value">
-                ≈ ${(wallet?.tgc_balance_usdt_value ?? 0).toFixed(2)} USDT
-              </div>
-
-              <div className="mt-8">
-                <div className="flex justify-between text-xs text-white/50 mb-2">
-                  <span>Withdrawal threshold</span>
-                  <span className="text-[#F2C94C]">
-                    {(wallet?.withdraw_threshold_tgc ?? 200).toFixed(0)} TGC · ${(wallet?.withdraw_threshold_usdt ?? 10).toFixed(2)}
-                  </span>
-                </div>
-                <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] transition-all" style={{ width: `${progress}%` }} />
-                </div>
-              </div>
-
-              <div className="mt-6 flex gap-3">
+          {/* Wallet · Cyber Wealth Flow (v1.3.9 investor-grade) */}
+          <CyberWealthFlow
+            tgcBalance={wallet?.tgc_balance ?? 0}
+            tgcUsdt={wallet?.tgc_balance_usdt_value ?? 0}
+            threshold={wallet?.withdraw_threshold_tgc ?? 200}
+            thresholdUsdt={wallet?.withdraw_threshold_usdt ?? 10}
+            testId="dashboard-wealth-flow">
+            <div className="mt-7 flex gap-3">
                 <input
                   placeholder="TRC-20 address (e.g. TXYZ…)"
                   value={withdrawAddr}
                   onChange={(e) => setWithdrawAddr(e.target.value)}
                   data-testid="withdraw-address-input"
-                  className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#D4AF37] focus:outline-none" />
+                  className="flex-1 bg-black/40 border border-[#00ffe1]/15 rounded-xl px-4 py-3 text-sm text-white focus:border-[#00ff88] focus:outline-none font-mono-cyber" />
                 <button
                   onClick={withdraw}
                   disabled={!canWithdraw}
                   data-testid="withdraw-btn"
-                  className={`px-6 py-3 rounded-xl font-semibold text-sm whitespace-nowrap transition-all inline-flex items-center gap-2 ${
+                  className={`px-6 py-3 rounded-xl font-semibold text-sm whitespace-nowrap transition-all inline-flex items-center gap-2 font-mono-cyber tracking-wider ${
                     canWithdraw
-                      ? "bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black shadow-[0_0_40px_rgba(242,201,76,0.55)] hover:shadow-[0_0_60px_rgba(242,201,76,0.75)]"
+                      ? "bg-[#00ff88] text-black shadow-[0_0_30px_rgba(0,255,136,0.55)] hover:shadow-[0_0_50px_rgba(0,255,136,0.8)]"
                       : "bg-white/5 text-white/30 cursor-not-allowed"
                   }`}>
                   Withdraw TGC <ArrowUpRight className="w-4 h-4" />
                 </button>
               </div>
-              {msg && <div className="mt-4 text-xs text-[#F2C94C]" data-testid="wallet-msg">{msg}</div>}
-            </div>
-          </div>
+              {/* Hidden legacy testid for backward-compat selectors */}
+              <span className="hidden" data-testid="dashboard-tgc-balance">{(wallet?.tgc_balance ?? 0).toFixed(1)}</span>
+              <span className="hidden" data-testid="dashboard-tgc-usdt-value">{(wallet?.tgc_balance_usdt_value ?? 0).toFixed(2)}</span>
+              {msg && <div className="mt-4 text-xs neon-green-text font-mono-cyber" data-testid="wallet-msg">{msg}</div>}
+          </CyberWealthFlow>
 
           {/* Recent Tasks */}
           <div className="p-6 rounded-3xl glass overflow-hidden">
@@ -184,6 +166,11 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Live Fleet Globe — investor-grade rotating fleet view (v1.3.9) */}
+        <div className="mb-10">
+          <LiveFleetGlobe devices={devices} />
         </div>
 
         {/* Devices */}

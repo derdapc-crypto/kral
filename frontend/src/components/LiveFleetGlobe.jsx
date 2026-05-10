@@ -1,0 +1,157 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Globe2 } from "lucide-react";
+
+/**
+ * LiveFleetGlobe — investor-grade rotating globe of every device on the
+ * operator's account. Pure SVG (no three.js); ships in <12kB and runs on
+ * any device including modest Android phones.
+ *
+ * Dots are colored by device state:
+ *   gray  = idle
+ *   cyan  = connected (heartbeat fresh)
+ *   green = mining   (native_pow=true OR backend_native)
+ *   red   = flagged
+ *
+ * When a device transitions to "mining" we draw a green arc from the dot
+ * toward the globe centre — represents share flow back to the grid HQ.
+ */
+
+const W = 520, H = 520, CX = W / 2, CY = H / 2, R = 200;
+
+function deterministicLatLng(id) {
+  // Hash device id → lat/lng so dots stay stable across renders.
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  const lat = (((h % 140) - 70)); // -70..+69
+  const lng = ((((h >> 8) % 360)) - 180); // -180..+179
+  return { lat, lng };
+}
+
+function project(lat, lng, rotDeg) {
+  // Orthographic projection, sphere rotated around Y by rotDeg degrees.
+  const phi   = (lat * Math.PI) / 180;
+  const theta = ((lng + rotDeg) * Math.PI) / 180;
+  const x = Math.cos(phi) * Math.sin(theta);
+  const y = -Math.sin(phi);
+  const z = Math.cos(phi) * Math.cos(theta); // > 0 → front face
+  return { x: CX + x * R, y: CY + y * R, visible: z > 0, z };
+}
+
+function deviceState(d) {
+  if (d.flagged) return "flagged";
+  if (d.native_pow || d.mining_status === "mining") return "mining";
+  if (d.status === "active") return "connect";
+  return "idle";
+}
+
+export default function LiveFleetGlobe({ devices = [], testId = "live-fleet-globe" }) {
+  const [rot, setRot] = useState(0);
+  const rafRef = useRef();
+  const startedAt = useRef(Date.now());
+
+  useEffect(() => {
+    const tick = () => {
+      const elapsed = (Date.now() - startedAt.current) / 1000;
+      setRot((elapsed * 6) % 360); // 60 sec per full revolution
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  const dots = useMemo(() => devices.map((d) => {
+    const ll = deterministicLatLng(d.id || d._id || String(d.name || "x"));
+    return { id: d.id || d._id || d.name, lat: ll.lat, lng: ll.lng,
+             state: deviceState(d), name: d.name || d.id };
+  }), [devices]);
+
+  const counts = dots.reduce((a, d) => { a[d.state] = (a[d.state] || 0) + 1; return a; }, {});
+
+  return (
+    <div className="hud-card p-6 relative overflow-hidden" data-testid={testId}>
+      <div className="absolute -inset-1 pointer-events-none"
+           style={{ background: "radial-gradient(circle at 50% 30%, rgba(0,255,225,0.08), transparent 60%)" }} />
+      <div className="relative flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2 font-mono-cyber">
+          <Globe2 className="w-4 h-4 cyber-blue-text" />
+          <span className="text-sm font-bold cyber-blue-text">canlı_filo_haritası</span>
+          <span className="text-[10px] text-white/40">/ {devices.length} nodes</span>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] tracking-widest uppercase font-mono-cyber">
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{background:"var(--neon-green)", boxShadow:"0 0 6px var(--neon-green)"}}/> mining {counts.mining || 0}</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{background:"var(--cyber-blue)", boxShadow:"0 0 6px var(--cyber-blue)"}}/> connect {counts.connect || 0}</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-white/40"/> idle {counts.idle || 0}</span>
+          {counts.flagged ? <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400"/> flagged {counts.flagged}</span> : null}
+        </div>
+      </div>
+
+      <div className="relative grid place-items-center">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[520px] aspect-square">
+          <defs>
+            <radialGradient id="globeFill" cx="35%" cy="30%" r="80%">
+              <stop offset="0%"  stopColor="#0a3a4a" stopOpacity="0.95" />
+              <stop offset="60%" stopColor="#03171f" stopOpacity="1" />
+              <stop offset="100%" stopColor="#01080c" stopOpacity="1" />
+            </radialGradient>
+            <radialGradient id="globeAtmos" cx="50%" cy="50%" r="55%">
+              <stop offset="80%"  stopColor="rgba(0,212,255,0)" />
+              <stop offset="98%"  stopColor="rgba(0,212,255,0.45)" />
+              <stop offset="100%" stopColor="rgba(0,212,255,0)" />
+            </radialGradient>
+          </defs>
+
+          {/* atmosphere */}
+          <circle cx={CX} cy={CY} r={R + 14} fill="url(#globeAtmos)" />
+          {/* sphere */}
+          <circle cx={CX} cy={CY} r={R} fill="url(#globeFill)"
+                  stroke="rgba(0,212,255,0.45)" strokeWidth="1" />
+
+          {/* meridians + parallels (rotating) */}
+          <g style={{ transformOrigin: `${CX}px ${CY}px`, transform: `rotate(${rot * 0.5}deg)` }}>
+            {[-60, -30, 0, 30, 60].map((lat) => (
+              <ellipse key={`p${lat}`} cx={CX} cy={CY + Math.sin(lat * Math.PI / 180) * R * 0.35}
+                       rx={R * Math.cos(lat * Math.PI / 180)}
+                       ry={R * Math.cos(lat * Math.PI / 180) * 0.18}
+                       fill="none" stroke="rgba(0,255,225,0.13)" strokeWidth="0.5" />
+            ))}
+            {[0, 30, 60, 90, 120, 150].map((lng) => (
+              <ellipse key={`m${lng}`} cx={CX} cy={CY}
+                       rx={R * Math.abs(Math.sin((lng + rot * 0.4) * Math.PI / 180))}
+                       ry={R}
+                       fill="none" stroke="rgba(0,255,225,0.10)" strokeWidth="0.5" />
+            ))}
+          </g>
+
+          {/* HQ pulse at centre */}
+          <circle cx={CX} cy={CY} r="3.5" fill="var(--neon-green)"
+                  style={{ filter: "drop-shadow(0 0 8px var(--neon-green))" }} />
+          <circle cx={CX} cy={CY} r="3.5" fill="none" stroke="var(--neon-green)" strokeWidth="1">
+            <animate attributeName="r" values="3.5;22;3.5" dur="2.6s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="1;0;1" dur="2.6s" repeatCount="indefinite" />
+          </circle>
+
+          {/* device dots + arcs */}
+          {dots.map((d) => {
+            const p = project(d.lat, d.lng, rot);
+            if (!p.visible) return null;
+            const cls = `fleet-dot ${d.state}`;
+            const isMining = d.state === "mining";
+            const r = isMining ? 4.5 : d.state === "connect" ? 3.2 : 2.4;
+            return (
+              <g key={d.id}>
+                {isMining && (
+                  <path d={`M ${p.x} ${p.y} Q ${(p.x + CX) / 2} ${(p.y + CY) / 2 - 40} ${CX} ${CY}`}
+                        className="fleet-arc" />
+                )}
+                <circle cx={p.x} cy={p.y} r={r} className={cls}
+                        data-testid={`fleet-dot-${d.id}`}>
+                  <title>{d.name} · {d.state}</title>
+                </circle>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}

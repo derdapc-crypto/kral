@@ -309,6 +309,24 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 
 
 
+**Iter 26 (2026-05-10)** — **Investor Demo Mode UI Overhaul (v1.3.9)**
+- 4 yeni componenti, mevcut data flow'u bozmadan ekledik:
+  * **`WarRoomHUD.jsx`** — Admin /map tab'ının üstünde 4 cockpit gauge: ACTIVE NODES (pulsing nabız), TOTAL COMPUTE RATE, MOBILE NATIVE H/s, ACCEPTED SHARES · 24h. Her gauge: neon-yeşil sparkline + radial threshold ring + animated number (700ms ease-out). Polls existing /api/admin/{telemetry,hashrate,mobile-mining/metrics} every 4s.
+  * **`HonorPodium.jsx`** — LiveOperatorConsole'un yanında pinned. Console WebSocket'inin AYNI stream'ine subscribe oluyor, `level=share` event'lerinden son 5 ACCEPTED share'i framer-motion stack animasyonu ile gösterir. Worker_id regex'i ile telefonu tanımlar (GRID_M_<hex>, THEGRID_WEAPON, vb.).
+  * **`CyberWealthFlow.jsx`** — Dashboard'da TGC wallet panelinin yerine geçti. Neon-yeşil glow text-shadow + breathe animasyonu, USDT karşılığı için stock-ticker drift ribbon (cyber-blue/neon-green gradient), 220px radial threshold ring orbits the counter showing % to withdraw threshold.
+  * **`LiveFleetGlobe.jsx`** — Dashboard'da "Registered Devices" üstünde rotating SVG world globe (no three.js, ~12kB). Cihazlar deterministic lat/lng'ye yerleştirilir; gri=idle, cyber-mavi=connect, neon-yeşil=mining (arc beam to HQ center), kırmızı=flagged. 60s rotation period, atmosphere glow + meridian/parallel grid.
+- **`LiveOperatorConsole.jsx`** — `level=share` event satırlarına `share-flash` keyframes (0.7s neon-green glow). `share` color'ı `matrix-text` → `neon-green-text font-bold`.
+- **CSS additions** (additive, cyber-cyan baseline korundu):
+  * Yeni token'lar: `--neon-green #00ff88`, `--cyber-blue #00d4ff`, `--electric-orange #ff7a18`, `--war-deep #040912`
+  * Yeni utility class'lar: `.hud-card` (cockpit angled border + scan-line animation), `.hud-pulse-dot`, `.share-flash`, `.wealth-glow` (breathe), `.usdt-ribbon` (drift), `.globe-rotate`, `.fleet-dot.{idle,connect,mining,flagged}`, `.fleet-arc` (share-flow beam), `.ring-track / .ring-progress`
+- **War Map area chart** — Renkler `#F2C94C` altın → `#00ff88` neon-yeşil + `#00d4ff` cyber-blue gradient. Tooltip border `#00ff88`.
+- **Withdraw button** — Altın gradient → solid `#00ff88` (electric-green) + neon glow shadow.
+- **Yeni paket**: `framer-motion@12.38.0` (~50KB gzip).
+- **Backwards-compat**: Tüm `data-testid`'ler (`dashboard-tgc-balance`, `dashboard-tgc-usdt-value`, `withdraw-btn`, vb.) korundu — mevcut test selector'ları kırılmadı.
+- **Lint**: 6/6 dosya temiz (`/components/{WarRoomHUD,HonorPodium,CyberWealthFlow,LiveFleetGlobe}.jsx` + `/pages/{Dashboard,Admin}.jsx`).
+- **Bundle**: webpack compile başarılı, bundle.js=5.9MB, hot-reload aktif.
+
+
 **Iter 25 (2026-05-09)** — **v1.3.8 Native Engine ARMED — librandomx.so EMBEDDED**
 - **Motor montajı tamamlandı**: User provided `librandomx.so` (arm64-v8a, ELF64 AArch64, NDK r28, build-id `78e647e7e4187f61ba6ebbe63e6bbbba20117e67`, 1,195,960 bytes, 175 RandomX symbols, SHA-256 `2c7c0be381cb8e0713926e34a4c76a29da650aa2b0225226ebde4b7943f571b2`). Verified via readelf + `nm -D` (10 `Java_io_thegrid_worker_RandomXBridge_*` JNI symbols).
 - **Container build pipeline reconstructed** — apt-get installed `aapt`, `apksigner`, `zipalign`, `default-jdk-headless`, `android-sdk-build-tools`. Downloaded `platform-34-ext7_r03.zip` for `android.jar` and `build-tools_r34-linux.zip` for `d8.jar`. Placed at `/opt/android-sdk/platforms/android-34/android.jar` + `/opt/android-sdk/build-tools/34.0.0/lib/d8.jar`.
