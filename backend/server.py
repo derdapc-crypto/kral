@@ -1527,21 +1527,23 @@ async def public_stats():
         "connected_devices": total_devices,
         "active_devices": active_devices,
         "mining_devices": mining_devices,
+        # User-facing labels — cloud-compute language only. No H/s, pool, share dialect.
         "mobile_native_hashrate_hps": mobile_native_hashrate,
         "mobile_native_hashrate_label": (
-            f"{mobile_native_hashrate} H/s" if mobile_native_hashrate > 0 else "Pending · 0 H/s"
+            "Active" if mobile_native_hashrate > 0 else "Waiting for verified output"
         ),
         "accepted_shares_total": mobile_accepted,
         "accepted_shares_label": (
-            str(mobile_accepted) if mobile_accepted > 0 else "Pending · 0"
+            str(mobile_accepted) if mobile_accepted > 0 else "Waiting for verified output"
         ),
         "backend_miner": {
             "running": backend_running,
             "hashrate_hps": round(backend_hashrate, 2),
-            "pool": backend_pool,
+            # internal-only; never rendered as-is on user surface
+            "_pool_internal": backend_pool,
             "status_label": (
-                f"Online · {round(backend_hashrate)} H/s" if backend_running
-                else "Offline"
+                "Core engine online" if backend_running
+                else "Core engine offline"
             ),
         },
         "apk": {

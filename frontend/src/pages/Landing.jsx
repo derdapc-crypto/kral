@@ -105,8 +105,8 @@ function Hero({ stats, apk }) {
             <HeroStatusPill tone={stats == null ? "info" : stats?.mining_devices > 0 ? "ok" : "info"}>
               {stats == null ? "Checking network…" :
                stats?.mining_devices > 0
-                ? `${stats.mining_devices} Device${stats.mining_devices === 1 ? "" : "s"} Mining`
-                : "Mobile Mining Test Pending"}
+                ? `${stats.mining_devices} Active Compute Node${stats.mining_devices === 1 ? "" : "s"}`
+                : "Awaiting first verified output"}
             </HeroStatusPill>
           </div>
           <h1 className="font-grotesk font-bold leading-[1.02] text-white"
@@ -120,9 +120,9 @@ function Hero({ stats, apk }) {
           </h1>
           <p className="mt-7 text-[17px] leading-relaxed text-white/70 max-w-2xl font-sans-saas">
             THE GRID connects Android devices into a distributed compute layer
-            for mobile mining, AI preprocessing, document workloads and
-            verified micro-tasks. Users opt in, devices work only under safe
-            conditions, and contributors earn from verified output.
+            for AI preprocessing, document workloads and verified micro-tasks.
+            Devices opt in, run only under safe conditions, and contributors
+            earn from verified compute output.
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
             <a href={apk?.download_url || "/grid-worker-v1.3.8.apk"}
@@ -188,23 +188,23 @@ function TrustMetrics({ stats }) {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <MetricCard label="Connected Devices" value={safe.connected_devices ?? 0}
                       sublabel="registered nodes" testId="metric-devices" />
-          <MetricCard label="Active Mining Devices" value={safe.mining_devices ?? 0}
-                      sublabel={(safe.mining_devices ?? 0) === 0 ? "test pending" : "live now"}
+          <MetricCard label="Active Compute Nodes" value={safe.mining_devices ?? 0}
+                      sublabel={(safe.mining_devices ?? 0) === 0 ? "awaiting first cycle" : "processing now"}
                       tone={(safe.mining_devices ?? 0) > 0 ? "ok" : "white"}
                       testId="metric-active" />
-          <MetricCard label="Mobile Native Hashrate"
-                      value={safe.mobile_native_hashrate_label ?? "Pending · 0 H/s"}
-                      sublabel="aggregated across phones"
+          <MetricCard label="Verified Compute Rate"
+                      value={safe.mobile_native_hashrate_label ?? "Waiting for verified output"}
+                      sublabel="aggregated from verified nodes"
                       tone={(safe.mobile_native_hashrate_hps ?? 0) > 0 ? "ok" : "warn"}
                       testId="metric-hashrate" />
-          <MetricCard label="Accepted Shares"
-                      value={safe.accepted_shares_label ?? "Pending · 0"}
-                      sublabel="pool-verified"
+          <MetricCard label="Verified Outputs"
+                      value={safe.accepted_shares_label ?? "Waiting for verified output"}
+                      sublabel="checked by verification layer"
                       tone={(safe.accepted_shares_total ?? 0) > 0 ? "ok" : "warn"}
                       testId="metric-shares" />
-          <MetricCard label="Backend Miner"
-                      value={safe.backend_miner?.status_label || "Pending"}
-                      sublabel={safe.backend_miner?.pool || "supportxmr · RandomX"}
+          <MetricCard label="Backend Compute Engine"
+                      value={safe.backend_miner?.status_label || "Core engine pending"}
+                      sublabel="core processing layer"
                       tone={safe.backend_miner?.running ? "ok" : "warn"}
                       testId="metric-status" />
         </div>
@@ -222,7 +222,7 @@ function HowItWorks() {
       icon: Wifi, accent: "#00ffe1" },
     { n: "03", title: "Safe Compute Starts", desc: "Compute begins only when the user permits and every safety rule passes.",
       icon: ShieldCheck, accent: "#00ff88" },
-    { n: "04", title: "Verified Contribution Pays", desc: "Rewards are based on real hashrate, accepted shares or verified output.",
+    { n: "04", title: "Verified Contribution Pays", desc: "Rewards are based on verified compute output — every work unit cleared by the verification layer.",
       icon: Wallet, accent: "#facc15" },
   ];
   return (
@@ -234,7 +234,7 @@ function HowItWorks() {
             How THE GRID works
           </h2>
           <p className="mt-4 text-white/60 text-[16px] font-sans-saas">
-            From a phone in a desk drawer to a pool-verified payout — every step is consent-driven and observable.
+            From a phone in a desk drawer to a verified payout — every step is consent-driven and observable.
           </p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -264,14 +264,14 @@ function ProductPillars() {
     { icon: Layers,    title: "Mobile Compute Network",
       desc: "Distributed across Android devices in pockets, drawers and shelves — a verified compute layer that scales horizontally.",
       tech: "REST + WebSocket · device heartbeat & job scheduling", accent: "#00d4ff" },
-    { icon: Cpu,       title: "Native RandomX Engine",
-      desc: "NDK r28 RandomX implementation runs natively on arm64 phones — not a JavaScript proxy, real on-device hashing.",
-      tech: "librandomx.so · light mode · 1–4 threads · v2+v3 signed", accent: "#00ffe1" },
+    { icon: Cpu,       title: "Native Compute Engine",
+      desc: "An NDK r28 native compute layer runs on arm64 phones — not a JavaScript proxy. Real on-device work, supervised by the safety contract.",
+      tech: "native engine · light mode · 1–4 threads · v2+v3 signed", accent: "#00ffe1" },
     { icon: FileCheck2, title: "Verified Reward Ledger",
-      desc: "Every share, every contribution and every payout reconciles against the pool. No phantom credits.",
-      tech: "SHA-256 share chain · pool ACK reconciliation", accent: "#00ff88" },
+      desc: "Every contribution, every work unit and every payout is reconciled by the verification layer. No phantom credits.",
+      tech: "audit chain · verification ACK reconciliation", accent: "#00ff88" },
     { icon: Terminal,  title: "Operator Command Center",
-      desc: "Live observability for the entire fleet — gauges, console, share podium and device-health risk signals.",
+      desc: "Live observability for the entire fleet — gauges, console, contribution podium and device-health risk signals.",
       tech: "WebSocket streams · sub-second event latency", accent: "#facc15" },
   ];
   return (
@@ -414,12 +414,12 @@ function NodeMesh({ stats }) {
 }
 
 const SYNTHETIC_FEED = [
-  { t: 0,    src: "node", lvl: "info", msg: "device · connected · GRID_M_a3f9b2" },
-  { t: 1500, src: "node", lvl: "info", msg: "native engine · loaded · librandomx.so" },
-  { t: 3000, src: "rx",   lvl: "ok",   msg: "mining · engaged · rx/0 · 4 threads" },
-  { t: 4500, src: "rx",   lvl: "ok",   msg: "share · submitted · diff 75,000" },
-  { t: 6000, src: "rx",   lvl: "ok",   msg: "share · ACCEPTED · pool ack" },
-  { t: 7500, src: "node", lvl: "info", msg: "heartbeat · device 412e· battery 78% · charging" },
+  { t: 0,    src: "node", lvl: "info", msg: "device · connected · NODE_a3f9b2" },
+  { t: 1500, src: "node", lvl: "info", msg: "native engine · loaded · safety contract accepted" },
+  { t: 3000, src: "core", lvl: "ok",   msg: "compute session · engaged · 4 threads" },
+  { t: 4500, src: "core", lvl: "ok",   msg: "work unit · submitted to verification layer" },
+  { t: 6000, src: "core", lvl: "ok",   msg: "output VERIFIED · credited to reward ledger" },
+  { t: 7500, src: "node", lvl: "info", msg: "heartbeat · device 412e · battery 78% · charging" },
   { t: 9000, src: "node", lvl: "warn", msg: "thermal guard · throttling 2/4 cores · 41°C" },
   { t: 10500,src: "node", lvl: "ok",   msg: "thermal recovered · resuming · 36°C" },
 ];
@@ -444,7 +444,7 @@ function LiveNetwork({ stats }) {
             Watch the network breathe.
           </h2>
           <p className="mt-4 text-white/60 text-[16px] font-sans-saas">
-            Live event feed from connected nodes — every join, every share, every safety event surfaces in the operator console.
+            Live event feed from connected nodes — every join, every verified output, every safety event surfaces in the operator console.
           </p>
         </div>
         <div className="grid lg:grid-cols-[1.4fr_1fr] gap-5">
@@ -454,7 +454,7 @@ function LiveNetwork({ stats }) {
                 <Globe2 className="w-3.5 h-3.5" /> Network topology · live preview
               </div>
               <div className="flex items-center gap-3 text-[10px] font-mono-tech text-white/45">
-                <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#00ff88]" /> mining</span>
+                <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#00ff88]" /> processing</span>
                 <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#00d4ff]" /> online</span>
                 <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-white/40" /> idle</span>
                 <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#ff7a18]" /> throttled</span>
@@ -495,9 +495,10 @@ function LiveNetwork({ stats }) {
 /* ----------------------------- REVENUE FLOW ----------------------------- */
 function RevenueFlow({ stats, apk }) {
   const steps = [
-    { label: "Customer workload", sub: "or mining pool reward", icon: Briefcase, accent: "#00d4ff" },
-    { label: "Verification layer", sub: "share / output validation", icon: ShieldCheck, accent: "#00ffe1" },
-    { label: "Contributor pool",  sub: "weighted by accepted work", icon: Layers, accent: "#00ff88" },
+    { label: "Customer workload", sub: "or verified compute task", icon: Briefcase, accent: "#00d4ff" },
+    { label: "Distribution layer", sub: "splits into small work units", icon: Layers, accent: "#00ffe1" },
+    { label: "Verification layer", sub: "validates each output", icon: ShieldCheck, accent: "#00ffe1" },
+    { label: "Contributor reward", sub: "weighted by verified output", icon: Layers, accent: "#00ff88" },
     { label: "User wallet",       sub: "threshold-gated payout", icon: Wallet, accent: "#facc15" },
   ];
   return (
@@ -509,7 +510,7 @@ function RevenueFlow({ stats, apk }) {
             From verified compute to user rewards.
           </h2>
           <p className="mt-4 text-white/60 text-[16px] font-sans-saas">
-            Every reward originates from a pool ACK or a verified customer workload — never from extrapolated estimates.
+            Every reward originates from a verification-layer ACK or a verified customer workload — never from extrapolated estimates.
           </p>
         </div>
         <div className="landing-glass-strong p-6 sm:p-10">
@@ -540,8 +541,8 @@ function RevenueFlow({ stats, apk }) {
           </div>
           <div className="mt-8 pt-6 border-t border-white/[0.06] flex flex-wrap gap-2">
             <span className="landing-pill ok"><Check className="w-3 h-3" />payout wallet {stats?.payout_wallet_verified ? "verified" : "pending"}</span>
-            <span className="landing-pill info"><span className="dot" />pool ACK reconciliation</span>
-            <span className="landing-pill info"><span className="dot" />reward = accepted shares × pool weight</span>
+            <span className="landing-pill info"><span className="dot" />verification layer reconciliation</span>
+            <span className="landing-pill info"><span className="dot" />reward = verified outputs × tier weight</span>
             <span className="landing-pill warn"><span className="dot" />minimum payout threshold</span>
             <span className="landing-pill gold"><span className="dot" />contribution score per user</span>
           </div>
@@ -562,11 +563,11 @@ function CommandCenterPreview() {
             Grid Command Center
           </h2>
           <p className="mt-4 text-white/60 text-[16px] font-sans-saas max-w-xl">
-            A purpose-built console for the team running the fleet — gauges, live operator feed, share podium and risk signals. Built for visibility and response, not for spectacle.
+            A purpose-built console for the team running the fleet — gauges, live operator feed, verified-output podium and risk signals. Built for visibility and response, not for spectacle.
           </p>
           <ul className="mt-7 space-y-3 text-[14.5px] text-white/70 font-sans-saas">
-            <li className="flex items-start gap-3"><Check className="w-4 h-4 mt-0.5 text-[#00ff88] shrink-0" /> Active nodes, mining devices, native hashrate at-a-glance</li>
-            <li className="flex items-start gap-3"><Check className="w-4 h-4 mt-0.5 text-[#00ff88] shrink-0" /> Live operator feed with share-acceptance highlights</li>
+            <li className="flex items-start gap-3"><Check className="w-4 h-4 mt-0.5 text-[#00ff88] shrink-0" /> Active nodes, processing devices, compute throughput at-a-glance</li>
+            <li className="flex items-start gap-3"><Check className="w-4 h-4 mt-0.5 text-[#00ff88] shrink-0" /> Live operator feed with verified-output highlights</li>
             <li className="flex items-start gap-3"><Check className="w-4 h-4 mt-0.5 text-[#00ff88] shrink-0" /> Device health, risk signals, payout queue</li>
             <li className="flex items-start gap-3"><Check className="w-4 h-4 mt-0.5 text-[#00ff88] shrink-0" /> WebSocket-streamed, sub-second latency</li>
           </ul>
@@ -600,9 +601,9 @@ function CommandCenterPreview() {
               <span className="landing-pill ok"><span className="dot" /> live</span>
             </div>
             <div className="space-y-1.5">
-              <div className="feed-row ok">[—] rx · share ACCEPTED · diff 75,000</div>
-              <div className="feed-row info">[—] node · GRID_M_a3f9b2 · heartbeat · battery 78%</div>
-              <div className="feed-row info">[—] rx · new job · diff 75,000</div>
+              <div className="feed-row ok">[—] core · work unit VERIFIED · credited to ledger</div>
+              <div className="feed-row info">[—] node · NODE_a3f9b2 · heartbeat · battery 78%</div>
+              <div className="feed-row info">[—] core · new work unit assigned</div>
               <div className="feed-row warn">[—] node · thermal guard · throttle 2/4</div>
             </div>
           </div>
@@ -623,7 +624,7 @@ function DualCTA({ apk }) {
             Install the Android Node. Earn from verified contribution.
           </h3>
           <p className="mt-4 text-white/60 font-sans-saas">
-            Opt in once. Compute runs only when your phone is plugged in, cool and on Wi-Fi. Rewards are reconciled against pool-accepted shares.
+            Opt in once. Compute runs only when your phone is plugged in, cool and on Wi-Fi. Rewards are reconciled against verified compute output.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <a href={apk?.download_url || "/grid-worker-v1.3.8.apk"} className="landing-cta-primary inline-flex items-center gap-2"
@@ -672,7 +673,7 @@ function Footer({ apk }) {
             <span className="font-grotesk font-bold text-white text-[17px]">THE GRID</span>
           </div>
           <p className="text-[13.5px] text-white/45 leading-relaxed font-sans-saas max-w-sm">
-            Distributed mobile compute, designed for safety, observability and pool-verified rewards.
+            Distributed mobile compute, designed for safety, observability and verification-layer rewards.
           </p>
           <div className="mt-5 text-[11px] font-mono-tech text-white/30">
             APK v{apk?.version} · sha256 {apk?.sha256?.slice(0, 12) || "—"}…
@@ -694,7 +695,7 @@ function Footer({ apk }) {
       <div className="max-w-7xl mx-auto mt-12 pt-6 border-t border-white/[0.05] flex flex-wrap items-center justify-between gap-3">
         <div className="text-[12px] text-white/35 font-sans-saas">© THE GRID · All rights reserved.</div>
         <div className="flex items-center gap-2 text-[11px] font-mono-tech text-white/35">
-          <Lock className="w-3 h-3" /> consent-driven · audit-logged · pool-verified
+          <Lock className="w-3 h-3" /> consent-driven · audit-logged · verification-backed
         </div>
       </div>
     </footer>
@@ -713,6 +714,96 @@ function FooterCol({ title, links, testId }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+/* ----------------------------- WHY REWARDS ----------------------------- */
+function WhyRewards() {
+  return (
+    <section className="px-6 sm:px-10 pt-8 pb-20" data-testid="why-rewards">
+      <div className="max-w-7xl mx-auto landing-glass-strong p-8 sm:p-12 grid lg:grid-cols-[1fr_1.4fr] gap-10 items-start">
+        <div>
+          <div className="landing-pill gold mb-5"><span className="dot" /> Why this earns rewards</div>
+          <h2 className="font-grotesk font-bold text-white" style={{ fontSize: "clamp(26px, 3.4vw, 38px)" }}>
+            Idle device power, turned into verifiable work units.
+          </h2>
+        </div>
+        <div className="text-white/65 text-[15.5px] leading-relaxed font-sans-saas space-y-4">
+          <p>
+            THE GRID converts unused device capacity into <span className="text-white">verifiable work units</span>.
+            When a device joins the network, it only runs with the user's explicit permission and only when battery,
+            thermal and network conditions are safe.
+          </p>
+          <p>
+            Completed work passes through the <span className="text-white">verification layer</span>. Outputs that
+            fail validation are excluded from rewards. Verified contributions are added to the user's
+            <span className="text-white"> reward balance</span>.
+          </p>
+          <p>
+            Technical compute engines run quietly in the background. On the user side, the only metrics that
+            matter are <span className="text-[#00ff88]">Verified Work Units</span> and
+            <span className="text-[#00ff88]"> Reward Balance</span>.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ----------------------------- REVENUE FLOW DETAIL ----------------------------- */
+function RevenueFlowDetail() {
+  const phases = [
+    {
+      n: "01", t: "Work source",
+      d: "A customer workload or a verifiable compute task enters the system.",
+      icon: Briefcase, accent: "#00d4ff",
+    },
+    {
+      n: "02", t: "Distribution layer",
+      d: "Tasks are split into small work units and routed to suitable devices.",
+      icon: Layers, accent: "#00ffe1",
+    },
+    {
+      n: "03", t: "Verification layer",
+      d: "Outputs are checked. Fake or failed results never reach reward calculation.",
+      icon: ShieldCheck, accent: "#00ff88",
+    },
+    {
+      n: "04", t: "Reward layer",
+      d: "Verified contributions land in the user's Reward Balance. Payouts run once the threshold is met.",
+      icon: Wallet, accent: "#facc15",
+    },
+  ];
+  return (
+    <section className="px-6 sm:px-10 py-24 md:py-28 border-t border-white/[0.04]" data-testid="revenue-flow-detail">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-12 max-w-3xl">
+          <div className="landing-pill info mb-5"><span className="dot" /> Revenue flow</div>
+          <h2 className="font-grotesk font-bold text-white" style={{ fontSize: "clamp(28px, 4vw, 48px)" }}>
+            How revenue flows through the network.
+          </h2>
+          <p className="mt-4 text-white/60 text-[16px] font-sans-saas">
+            Four explicit phases, every one independently observable. No estimated metrics — only what the verification layer accepts.
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {phases.map((p, i) => (
+            <motion.div key={p.n} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }} transition={{ duration: 0.45, delay: i * 0.08 }}
+                        className="bento-card p-7" data-testid={`phase-${i + 1}`}>
+              <span className="accent-bar" />
+              <div className="text-[10px] font-mono-tech mb-3" style={{ color: p.accent, opacity: 0.85 }}>{p.n} / phase</div>
+              <div className="w-11 h-11 rounded-xl grid place-items-center mb-4"
+                   style={{ background: `${p.accent}15`, border: `1px solid ${p.accent}40` }}>
+                <p.icon className="w-5 h-5" style={{ color: p.accent }} strokeWidth={1.6} />
+              </div>
+              <div className="font-grotesk font-semibold text-white text-[17px] mb-2">{p.t}</div>
+              <div className="text-white/55 text-[13.5px] leading-relaxed font-sans-saas">{p.d}</div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -743,7 +834,9 @@ export default function Landing() {
     <main className="landing-root font-sans-saas" data-testid="landing-page">
       <Hero stats={stats} apk={apk} />
       <TrustMetrics stats={stats} />
+      <WhyRewards />
       <HowItWorks />
+      <RevenueFlowDetail />
       <ProductPillars />
       <SafetyConsent />
       <LiveNetwork stats={stats} />
