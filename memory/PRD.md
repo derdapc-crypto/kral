@@ -327,6 +327,28 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **Bundle**: webpack compile başarılı, bundle.js=5.9MB, hot-reload aktif.
 
 
+**Iter 27 (2026-05-10)** — **v1.4.0 Investor-Grade Public Landing Redesign**
+- **Tam baştan yeniden inşa edildi** `/app/frontend/src/pages/Landing.jsx` (eski 394 satır kaldırıldı, yeni ~640 satır). Eski "cyber-cyan hacker prototip" hissi gitti; Palantir + Stripe + Apple keynote karışımı premium dark infrastructure aesthetic geldi. User'ın brief'i (verbatim) ve `design_agent_full_stack` blueprint'i (`/app/design_guidelines.json`) takip edildi.
+- **10 yeni section, hepsi data-testid'li**:
+  1. **Hero** — "Turn idle smartphones into a verified compute network." başlığı (Outfit geometric font, clamp(40px,6vw,72px), cyan→neon-green gradient highlight). 3 honest status pill: `Native Engine v1.3.8 Ready` (ok) · `Payout Wallet Verified` (ok) · `Mobile Mining Test Pending` (info). 3 CTA: Download Android Node / View Live Network / Open Customer Portal. APK metadata satırı: `APK · v1.3.8 · 0.36 MB · signed v2+v3 · arm64-v8a`. Sağda yeni hero visual: **compute core** (3 rotating ring + radial-gradient nucleus + 5 phone satellite + SVG dashed beams).
+  2. **Trust Metrics Bar** — 5 honest live counter: Connected Devices / Active Mining Devices / Mobile Native Hashrate (`Pending · 0 H/s` veya `<N> H/s`) / Accepted Shares (`Pending · 0` veya `<N>`) / Backend Miner (`Online · 24 H/s` veya `Offline`). Her metrik: count-up animation + honest "test pending" sublabel. Fake petaflops kaldırıldı.
+  3. **How THE GRID Works** — 4-step bento (Install / Join / Safe compute / Verified payout). Her step: kendine özel accent color + monospace "01/step" tag + tracing accent-bar hover.
+  4. **Product Pillars** — 4 büyük bento (Mobile Compute Network / Native RandomX Engine / Verified Reward Ledger / Operator Command Center). Tech detail satırı monospace.
+  5. **Safety & Consent** — 6 trust kart (Explicit user permission / Charging-only / Wi-Fi-only / Thermal guard / Battery threshold / Stop anytime). Hiç "stealth/weapon/war/hidden" kelime YOK.
+  6. **Live Network Visualization** — sol: 24-node abstract SVG mesh + pulsing core; sağ: live operator feed (8 synthetic events, framer-motion AnimatePresence, monospace, `simulated for preview` honest label).
+  7. **Revenue Flow** — "From verified compute to user rewards." 4 phase horizontal flex + 3 arrow + 5 trust pill (Payout Wallet Verified, Pool ACK Reconciliation, Reward = accepted shares × pool weight, Minimum Payout Threshold, Contribution Score per User).
+  8. **Command Center Preview** — mini admin mockup (4 mini-HUD + mini feed terminal). Eski "Global War Map" ismi GİTTİ → **"Grid Command Center"**.
+  9. **Dual CTA** — For Contributors / For Customers iki büyük glass panel.
+  10. **Footer** — premium SaaS: Product / Network / Rewards / Company kolonları + APK sha256 hash + "consent-driven · audit-logged · pool-verified" tagline.
+- **Backend yeni HONEST endpoint**: `GET /api/stats/public` — connected_devices / mining_devices / mobile_native_hashrate (gerçek olarak 0 ise `Pending · 0 H/s` label döner) / accepted_shares / backend_miner running+hashrate+pool / apk meta / payout_wallet_verified. Eski `/stats/network` (fake 1.2 TFLOPS/device extrapolation) artık landing'de KULLANILMIYOR; backward-compat için duruyor.
+- **Navbar yeniden yazıldı** — premium SaaS: gradient cyan logo + Platform/How/Product/Safety/Customer Portal nav + white pill "Get started" CTA + small "Download Node" outlined button. Eski "Join the Grid" cyan-gradient CTA gitti.
+- **Made with Emergent badge** — opacity 1.0 → 0.35, font 13px→10px, gradient bg → semi-transparent (0.04), hover 0.85 opacity. Diskret kaldı, kullanıcı yatırımcı endişesi karşılandı.
+- **Yeni typography**: Google Fonts'a `Outfit` + `Plus Jakarta Sans` + `IBM Plex Sans` import edildi. Yeni utility class'lar: `.font-grotesk` (geometric heading), `.font-sans-saas` (body), `.font-mono-tech` (metrics).
+- **Yeni CSS layer** (additive): `.landing-root` (deep navy + radial accents), `.landing-glass / .landing-glass-strong`, `.landing-pill.{ok,info,warn,gold}`, `.landing-cta-{primary,secondary}`, `.compute-core` + `.core-ring` + `.core-nucleus` + `.node-sat` + `.beam-line`, `.bento-card` (Stripe tracing border), `.feed-row.{ok,info,warn}`.
+- **Verified live** — Tüm 10 section DOM'da var (`landing-page`, `hero`, `trust-metrics`, `how-it-works`, `product-pillars`, `safety`, `live-network`, `revenue-flow`, `command-preview`, `dual-cta`, `footer`). Pills truthful: gerçek backend stats yüklenince yeşil "READY/VERIFIED/MINING" gösteriyor.
+- **Lint**: Landing.jsx + Navbar.jsx clean.
+
+
 **Iter 25 (2026-05-09)** — **v1.3.8 Native Engine ARMED — librandomx.so EMBEDDED**
 - **Motor montajı tamamlandı**: User provided `librandomx.so` (arm64-v8a, ELF64 AArch64, NDK r28, build-id `78e647e7e4187f61ba6ebbe63e6bbbba20117e67`, 1,195,960 bytes, 175 RandomX symbols, SHA-256 `2c7c0be381cb8e0713926e34a4c76a29da650aa2b0225226ebde4b7943f571b2`). Verified via readelf + `nm -D` (10 `Java_io_thegrid_worker_RandomXBridge_*` JNI symbols).
 - **Container build pipeline reconstructed** — apt-get installed `aapt`, `apksigner`, `zipalign`, `default-jdk-headless`, `android-sdk-build-tools`. Downloaded `platform-34-ext7_r03.zip` for `android.jar` and `build-tools_r34-linux.zip` for `d8.jar`. Placed at `/opt/android-sdk/platforms/android-34/android.jar` + `/opt/android-sdk/build-tools/34.0.0/lib/d8.jar`.

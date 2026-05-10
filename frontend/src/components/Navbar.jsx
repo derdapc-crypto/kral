@@ -1,9 +1,13 @@
 import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { Hexagon, LogOut, Shield, Download, Briefcase } from "lucide-react";
+import { LogOut, Shield, Download, Briefcase, Cpu } from "lucide-react";
 import ApkSetupModal from "./ApkSetupModal";
 
+/**
+ * Premium SaaS navbar (v1.4.0) — investor-facing surface. Restrained neon,
+ * monospace tags only where they read as technical labels, white CTA pill.
+ */
 export default function Navbar() {
   const { user, logout } = useAuth();
   const nav = useNavigate();
@@ -11,27 +15,30 @@ export default function Navbar() {
   const [apkOpen, setApkOpen] = useState(false);
 
   const linkCls = (path) =>
-    `text-[10px] tracking-[0.4em] uppercase transition-colors font-mono-term ${
-      loc.pathname === path ? "cyan-text font-bold" : "text-white/55 hover:text-[#00ffe1]"
+    `text-[13px] font-medium font-sans-saas transition-colors ${
+      loc.pathname === path ? "text-white" : "text-white/55 hover:text-white"
     }`;
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-xl bg-black/75 border-b border-[#00ffe1]/15">
+    <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#02040a]/80 border-b border-white/[0.06]">
       <div className="max-w-7xl mx-auto px-6 sm:px-10 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3 group" data-testid="nav-logo">
-          <div className="relative">
-            <Hexagon className="w-7 h-7 cyan-text" strokeWidth={1.6} />
-            <div className="absolute inset-0 blur-lg bg-[#00ffe1]/40 rounded-full" />
+        <Link to="/" className="flex items-center gap-2.5 group" data-testid="nav-logo">
+          <div className="relative w-7 h-7 rounded-lg grid place-items-center"
+               style={{ background: "linear-gradient(135deg, #00ffe1, #00d4ff)" }}>
+            <Cpu className="w-4 h-4 text-black" strokeWidth={2.4} />
           </div>
-          <span className="font-mono-cyber font-black text-base tracking-tight">
-            <span className="cyan-text">THE</span>{" "}<span className="matrix-text">GRID</span>
+          <span className="font-grotesk font-bold text-[17px] tracking-tight text-white">
+            THE GRID
           </span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8">
-          <Link to="/" className={linkCls("/")} data-testid="nav-home">Mission</Link>
+        <nav className="hidden md:flex items-center gap-7">
+          <Link to="/" className={linkCls("/")} data-testid="nav-home">Platform</Link>
+          <a href="/#how" className="text-[13px] font-medium font-sans-saas text-white/55 hover:text-white transition-colors" data-testid="nav-how">How it works</a>
+          <a href="/#pillars" className="text-[13px] font-medium font-sans-saas text-white/55 hover:text-white transition-colors" data-testid="nav-pillars">Product</a>
+          <a href="/#safety" className="text-[13px] font-medium font-sans-saas text-white/55 hover:text-white transition-colors" data-testid="nav-safety">Safety</a>
           {!user && (
-            <Link to="/register?role=customer" className="text-sm tracking-widest uppercase text-white/60 hover:text-white transition-colors inline-flex items-center gap-1.5" data-testid="nav-customer-portal">
+            <Link to="/register?role=customer" className="text-[13px] font-medium font-sans-saas text-white/55 hover:text-white transition-colors inline-flex items-center gap-1.5" data-testid="nav-customer-portal">
               <Briefcase className="w-3.5 h-3.5" /> Customer Portal
             </Link>
           )}
@@ -60,30 +67,29 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           {!user && (
             <button onClick={() => setApkOpen(true)} data-testid="nav-apk-btn"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border gold-border text-[#F2C94C] text-[11px] tracking-widest uppercase hover:bg-[#F2C94C]/10 transition-colors">
-              <Download className="w-3.5 h-3.5" /> APK
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-white/12 text-white/75 text-[12px] font-medium hover:border-[#00ffe1]/40 hover:text-[#00ffe1] transition-colors">
+              <Download className="w-3.5 h-3.5" /> Download Node
             </button>
           )}
           {user ? (
             <>
               <div className="hidden sm:flex flex-col items-end leading-tight">
-                <span className="text-[10px] uppercase tracking-[0.25em] text-white/40">{user.role}</span>
-                <span className="text-sm text-white">{user.name}</span>
+                <span className="text-[10px] uppercase tracking-[0.18em] text-white/35 font-mono-tech">{user.role}</span>
+                <span className="text-[13px] text-white font-medium">{user.name}</span>
               </div>
               <button
                 onClick={async () => { await logout(); nav("/"); }}
                 data-testid="nav-logout-btn"
-                className="p-2 rounded-full border border-white/10 hover:border-[#D4AF37] hover:text-[#F2C94C] text-white/70 transition-colors"
+                className="p-2 rounded-full border border-white/10 hover:border-white/30 text-white/70 hover:text-white transition-colors"
               >
                 <LogOut className="w-4 h-4" />
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" data-testid="nav-login" className="text-sm text-white/70 hover:text-white tracking-wider">Sign in</Link>
-              <Link to="/register" data-testid="nav-register"
-                className="px-4 py-2 rounded-full bg-gradient-to-r from-[#00ffe1] via-[#00ddc7] to-[#39ff14] text-black font-mono-cyber font-black text-[11px] tracking-[0.3em] uppercase hover:cyan-glow-strong transition">
-                Join the Grid
+              <Link to="/login" data-testid="nav-login" className="text-[13px] text-white/70 hover:text-white font-medium font-sans-saas">Sign in</Link>
+              <Link to="/register" data-testid="nav-register" className="landing-cta-primary text-[13px]">
+                Get started
               </Link>
             </>
           )}

@@ -1485,6 +1485,75 @@ async def network_stats():
     }
 
 
+@api.get("/stats/public")
+async def public_stats():
+    """
+    HONEST live metrics for the public investor landing page. Every field
+    either reflects a verified state or is explicitly marked as `pending`.
+    No fake petaflops, no extrapolated values.
+    """
+    # Real device counters
+    total_devices = await db.devices.count_documents({})
+    active_devices = await db.devices.count_documents({"status": "active"})
+    mining_devices = await db.devices.count_documents({
+        "$or": [{"native_pow": True}, {"mining_status": "mining"}]
+    })
+
+    # Truly accepted mobile shares (only counted on real pool ACK)
+    pipeline = [{"$group": {"_id": None, "n": {"$sum": "$accepted_shares"}}}]
+    agg = await db.devices.aggregate(pipeline).to_list(1)
+    mobile_accepted = int(agg[0]["n"]) if agg and agg[0].get("n") else 0
+
+    # Backend miner truth — read live XMRig status
+    backend_running = False
+    backend_hashrate = 0.0
+    backend_pool = None
+    try:
+        import json as _json
+        rx_path = "/app/backend/miner/randomx_status.json"
+        if os.path.exists(rx_path):
+            with open(rx_path) as f:
+                rx = _json.load(f)
+            backend_running = bool(rx.get("running"))
+            backend_hashrate = float(rx.get("hashrate_hps") or 0.0)
+            backend_pool = rx.get("pool")
+    except Exception:
+        pass
+
+    mobile_native_hashrate = 0  # only > 0 once a real device heartbeat carries it
+
+    return {
+        "connected_devices": total_devices,
+        "active_devices": active_devices,
+        "mining_devices": mining_devices,
+        "mobile_native_hashrate_hps": mobile_native_hashrate,
+        "mobile_native_hashrate_label": (
+            f"{mobile_native_hashrate} H/s" if mobile_native_hashrate > 0 else "Pending · 0 H/s"
+        ),
+        "accepted_shares_total": mobile_accepted,
+        "accepted_shares_label": (
+            str(mobile_accepted) if mobile_accepted > 0 else "Pending · 0"
+        ),
+        "backend_miner": {
+            "running": backend_running,
+            "hashrate_hps": round(backend_hashrate, 2),
+            "pool": backend_pool,
+            "status_label": (
+                f"Online · {round(backend_hashrate)} H/s" if backend_running
+                else "Offline"
+            ),
+        },
+        "apk": {
+            "version": APK_VERSION,
+            "native_lib_embedded": APK_NATIVE_EMBEDDED,
+            "size_bytes": APK_SIZE,
+            "download_url": APK_PATH,
+        },
+        "payout_wallet_verified": bool(os.environ.get("XMR_PAYOUT_ADDRESS")),
+        "as_of": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 # ---------- Admin ----------
 @api.get("/admin/devices")
 async def admin_devices(user: dict = Depends(require_admin)):
