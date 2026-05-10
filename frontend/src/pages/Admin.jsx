@@ -118,12 +118,12 @@ export default function Admin() {
               <Terminal className="w-3 h-3" /> ./command_center · operator_only
             </div>
             <h1 className="font-mono-cyber text-4xl sm:text-5xl font-black tracking-tight mt-2 glitch-soft">
-              <span className="cyan-text">Global</span>{" "}
-              <span className="matrix-text">War_Map</span>
+              <span className="cyan-text">Grid</span>{" "}
+              <span className="matrix-text">Command_Center</span>
             </h1>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Tab active={tab === "map"} onClick={() => setTab("map")} testId="admin-tab-map">War Map</Tab>
+            <Tab active={tab === "map"} onClick={() => setTab("map")} testId="admin-tab-map">Command Center</Tab>
             <Tab active={tab === "android"} onClick={() => setTab("android")} testId="admin-tab-android">
               <span className="inline-flex items-center gap-1.5"><Cpu className="w-3 h-3" /> Real Android</span>
             </Tab>
@@ -221,7 +221,7 @@ export default function Admin() {
             {/* WAR MAP — flat backdrop with rotating fleet dots (deterministic) */}
             <div className="hud-card p-6">
               <div className="text-[10px] uppercase tracking-[0.3em] text-white/45 flex items-center gap-2 font-mono-cyber mb-4">
-                <Globe2 className="w-3.5 h-3.5 cyber-blue-text" /> global_war_map · classified
+                <Globe2 className="w-3.5 h-3.5 cyber-blue-text" /> grid_command_center · operations view
               </div>
               <div className="relative w-full aspect-[2/1] rounded-2xl overflow-hidden border border-[#00ffe1]/15"
                 style={{ backgroundImage: `url(${DATA_BG})`, backgroundSize: "cover", backgroundPosition: "center" }}>

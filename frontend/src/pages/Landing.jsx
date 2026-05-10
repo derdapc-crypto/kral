@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -41,9 +41,9 @@ function useCountUp(target, dur = 900) {
 }
 
 /* ----------------------------- HERO ----------------------------- */
-function HeroStatusPill({ tone = "info", children, testId }) {
+function HeroStatusPill({ tone = "info", flash = false, children, testId }) {
   return (
-    <span className={`landing-pill ${tone}`} data-testid={testId}>
+    <span className={`landing-pill ${tone} ${flash ? "pill-flash" : ""}`} data-testid={testId}>
       <span className="dot" /> {children}
     </span>
   );
@@ -89,6 +89,35 @@ function ComputeCoreVisual() {
 }
 
 function Hero({ stats, apk }) {
+  // Detect when an important live signal changes and pulse the matching pill.
+  const [flashNodes, setFlashNodes] = useState(false);
+  const [flashShares, setFlashShares] = useState(false);
+  const prevNodes = useRef(null);
+  const prevShares = useRef(null);
+
+  useEffect(() => {
+    if (!stats) return;
+    const newNodes = stats.mining_devices ?? 0;
+    const newShares = stats.accepted_shares_total ?? 0;
+    if (prevNodes.current !== null && newNodes !== prevNodes.current) {
+      setFlashNodes(true);
+      const t = setTimeout(() => setFlashNodes(false), 1200);
+      return () => clearTimeout(t);
+    }
+    if (prevShares.current !== null && newShares > prevShares.current) {
+      setFlashShares(true);
+      const t = setTimeout(() => setFlashShares(false), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [stats?.mining_devices, stats?.accepted_shares_total]);
+
+  useEffect(() => {
+    if (stats) {
+      prevNodes.current = stats.mining_devices ?? 0;
+      prevShares.current = stats.accepted_shares_total ?? 0;
+    }
+  }, [stats]);
+
   return (
     <section className="relative pt-20 pb-28 md:pt-28 md:pb-36 px-6 sm:px-10 overflow-hidden" data-testid="hero">
       <div className="max-w-7xl mx-auto grid lg:grid-cols-[1.15fr_1fr] gap-12 lg:gap-16 items-center">
@@ -102,12 +131,18 @@ function Hero({ stats, apk }) {
               {stats == null ? "Checking wallet…" :
                stats?.payout_wallet_verified ? "Payout Wallet Verified" : "Payout Wallet Pending"}
             </HeroStatusPill>
-            <HeroStatusPill tone={stats == null ? "info" : stats?.mining_devices > 0 ? "ok" : "info"}>
+            <HeroStatusPill tone={stats == null ? "info" : stats?.mining_devices > 0 ? "ok" : "info"}
+                            flash={flashNodes} testId="pill-active-nodes">
               {stats == null ? "Checking network…" :
                stats?.mining_devices > 0
                 ? `${stats.mining_devices} Active Compute Node${stats.mining_devices === 1 ? "" : "s"}`
                 : "Awaiting first verified output"}
             </HeroStatusPill>
+            {(stats?.accepted_shares_total ?? 0) > 0 && (
+              <HeroStatusPill tone="gold" flash={flashShares} testId="pill-verified-outputs">
+                {stats.accepted_shares_total} Verified Output{stats.accepted_shares_total === 1 ? "" : "s"}
+              </HeroStatusPill>
+            )}
           </div>
           <h1 className="font-grotesk font-bold leading-[1.02] text-white"
               style={{ fontSize: "clamp(40px, 6vw, 72px)", letterSpacing: "-0.025em" }}>
@@ -161,9 +196,23 @@ function MetricCard({ label, value, sublabel, tone = "white", testId }) {
   // Render value either as a number (count-up) or as a raw label string
   const isNum = typeof value === "number";
   const animated = useCountUp(isNum ? value : 0);
+  const [flash, setFlash] = useState(false);
+  const prevRef = useRef(value);
+  useEffect(() => {
+    const changed = isNum
+      ? Number(value) !== Number(prevRef.current)
+      : String(value) !== String(prevRef.current);
+    if (changed && prevRef.current !== undefined) {
+      setFlash(true);
+      const t = setTimeout(() => setFlash(false), 1100);
+      prevRef.current = value;
+      return () => clearTimeout(t);
+    }
+    prevRef.current = value;
+  }, [value, isNum]);
   const toneCls = tone === "ok" ? "text-[#00ff88]" : tone === "warn" ? "text-[#ff7a18]" : tone === "info" ? "text-[#00d4ff]" : "text-white";
   return (
-    <div className="landing-glass p-6 sm:p-7" data-testid={testId}>
+    <div className={`landing-glass p-6 sm:p-7 transition-all ${flash ? "metric-flash" : ""}`} data-testid={testId}>
       <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-mono-tech mb-3">{label}</div>
       <div className={`font-grotesk font-bold leading-none ${toneCls}`} style={{ fontSize: "clamp(28px, 3.6vw, 40px)" }}>
         {isNum

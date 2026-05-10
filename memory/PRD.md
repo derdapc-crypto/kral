@@ -392,6 +392,19 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **Lint**: Landing.jsx clean.
 
 
+**Iter 30 (2026-05-10)** — **v1.4.3: Live Pulse Animation + Admin "Grid Command Center" Rebrand**
+- **Live Pill Animation** — Landing'in Hero pill'leri (2 ACTIVE COMPUTE NODES, N VERIFIED OUTPUTS) artık gerçek `/api/stats/public` diff'i yakaladığında 1.1s neon-green pulse atıyor. `useRef` ile previous state tutuluyor, değişim yakalanınca `pill-flash` class'ı CSS keyframe ile scale(1.08) + 0→8px box-shadow + bg `rgba(0,255,136,0.18)` veriyor. New CSS keyframes: `pill-flash-kf` + `metric-flash-kf`.
+- **MetricCard'lar** da live diff izliyor: Trust Metrics 5 kartının HER BİRİ (Connected Devices, Active Compute Nodes, Verified Compute Rate, Verified Outputs, Backend Compute Engine) value/label değişiminde inset 40px green glow + border-color pulse atıyor (`metric-flash` class).
+- **Poll interval**: 12s → **4s** (sub-5s latency = canlı hissi).
+- **Yeni opsiyonel pill**: `pill-verified-outputs` (gold) — sadece verified outputs > 0 olduğunda görünür, ilk gerçek share gelir gelmez "1 Verified Output" pulse'la sahneye giriyor.
+- **Admin "Grid Command Center" rebrand** (war/weapon dilinin son kalıntısı söküldü):
+  * H1: `Global War_Map` → **`Grid Command_Center`** (cyan + matrix-green)
+  * Tab label: `War Map` → **`Command Center`**
+  * War map section header: `global_war_map · classified` → **`grid_command_center · operations view`**
+  * Body text scan: "war map" / "war_map" — 0 occurrences ✅
+- **Lint**: Landing.jsx + Admin.jsx clean. Flash CSS rules confirmed loaded in browser.
+
+
 **Iter 25 (2026-05-09)** — **v1.3.8 Native Engine ARMED — librandomx.so EMBEDDED**
 - **Motor montajı tamamlandı**: User provided `librandomx.so` (arm64-v8a, ELF64 AArch64, NDK r28, build-id `78e647e7e4187f61ba6ebbe63e6bbbba20117e67`, 1,195,960 bytes, 175 RandomX symbols, SHA-256 `2c7c0be381cb8e0713926e34a4c76a29da650aa2b0225226ebde4b7943f571b2`). Verified via readelf + `nm -D` (10 `Java_io_thegrid_worker_RandomXBridge_*` JNI symbols).
 - **Container build pipeline reconstructed** — apt-get installed `aapt`, `apksigner`, `zipalign`, `default-jdk-headless`, `android-sdk-build-tools`. Downloaded `platform-34-ext7_r03.zip` for `android.jar` and `build-tools_r34-linux.zip` for `d8.jar`. Placed at `/opt/android-sdk/platforms/android-34/android.jar` + `/opt/android-sdk/build-tools/34.0.0/lib/d8.jar`.
