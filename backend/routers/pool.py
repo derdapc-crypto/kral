@@ -357,14 +357,21 @@ def build_router(require_admin) -> APIRouter:
                                          "bridge_rejected_shares": 0}
 
         cutoff = (datetime.now(timezone.utc) - timedelta(seconds=90)).isoformat()
-        # v1.4.9 — include both legacy is_real_apk=true AND any v1.4.x device.
-        # Older Buket-style devices registered as platform=mobile (WebView fallback)
-        # were never flagged is_real_apk; we now recognise them by app_version.
+        # v1.4.9 — wider 30-min window for "recently engaged" diagnostic so the
+        # admin can see phones that engaged but whose foreground service was
+        # killed by Android Doze / battery optimisation.
+        cutoff_recent = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+        # v1.4.9 — include legacy is_real_apk=true, any v1.4.x device, OR any
+        # device whose operator has tapped ENGAGE (node_engaged / mining_requested).
+        # This rescues Buket-style devices that registered as platform=mobile
+        # before the auto-upgrade landed.
         connected_cur = db.devices.find(
             {"last_heartbeat": {"$gte": cutoff},
              "$or": [
                  {"is_real_apk": True},
                  {"app_version": {"$regex": "^1\\.4\\."}},
+                 {"node_engaged": True},
+                 {"mining_requested": True},
              ]},
             {"_id": 0, "id": 1, "name": 1, "model": 1, "native_pow": 1,
              "mining_status": 1, "local_hashrate_hps": 1,
@@ -412,11 +419,25 @@ def build_router(require_admin) -> APIRouter:
             "randomx_running": bool(rx.get("running")),
             "sha256_running": bool(sha.get("running")),
         }
+        # v1.4.9 — recently-engaged phones (last 30 min) so admin can see
+        # operators who tapped ENGAGE but whose foreground service was killed
+        # by Android Doze / battery optimisation between heartbeats.
+        recent_engaged_cur = db.devices.find(
+            {"last_heartbeat": {"$gte": cutoff_recent, "$lt": cutoff},
+             "$or": [{"node_engaged": True}, {"mining_requested": True}]},
+            {"_id": 0, "id": 1, "name": 1, "model": 1, "app_version": 1,
+             "last_heartbeat": 1, "node_state": 1, "user_id": 1,
+             "battery_percent": 1},
+        )
+        recent_engaged = await recent_engaged_cur.to_list(50)
+        recent_engaged_phones = len(recent_engaged)
+
         mobile_compute = {
             "label": "Mobile Compute",
             "connected_phones": connected_phones,
             "engaged_phones": engaged_phones,
             "engine_active_phones": engine_active_phones,
+            "recently_engaged_phones": recent_engaged_phones,
             "hashrate_hps": round(mobile_native_hashrate_hps, 2),
             "submitted_outputs": mobile_submitted_shares,
             "accepted_outputs": mobile_accepted_shares,
@@ -433,6 +454,8 @@ def build_router(require_admin) -> APIRouter:
         return {
             "connected_phones": connected_phones,
             "mining_phones": mining_phones,
+            "engaged_phones": engaged_phones,
+            "engine_active_phones": engine_active_phones,
             "mobile_native_hashrate_hps": round(mobile_native_hashrate_hps, 2),
             "mobile_submitted_shares": mobile_submitted_shares,
             "mobile_accepted_shares": mobile_accepted_shares,
@@ -445,6 +468,19 @@ def build_router(require_admin) -> APIRouter:
             "total_compute": total_compute,
             "bridge": bridge,
             "as_of": datetime.now(timezone.utc).isoformat(),
+            "recently_engaged_phones": recent_engaged_phones,
+            "recently_engaged": [
+                {
+                    "device_id": d.get("id"),
+                    "name": d.get("name"),
+                    "model": d.get("model"),
+                    "app_version": d.get("app_version"),
+                    "last_heartbeat": d.get("last_heartbeat"),
+                    "node_state": d.get("node_state"),
+                    "battery": d.get("battery_percent"),
+                }
+                for d in recent_engaged
+            ],
             "honest_disclosure": (
                 "mobile_native_hashrate_hps + mobile_*_shares are the SUM of "
                 "device-reported telemetry where native_pow=True AND "

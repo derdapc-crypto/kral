@@ -902,7 +902,15 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
     }
     if data.brand: update_doc["brand"] = data.brand
     if data.os_version: update_doc["os_version"] = data.os_version
-    if data.app_version: update_doc["app_version"] = data.app_version
+    if data.app_version:
+        update_doc["app_version"] = data.app_version
+        # v1.4.9 fix: any v1.4.x device is a real native APK — auto-upgrade
+        # is_real_apk so legacy WebView-registered devices (registered as
+        # platform=mobile, is_real_apk=False) start showing up in the admin
+        # Mobile Compute lane as soon as they heartbeat with the new client.
+        if str(data.app_version).startswith("1.4.") and not dev.get("is_real_apk"):
+            update_doc["is_real_apk"] = True
+            update_doc["is_real_apk_upgraded_at"] = now_iso
     if data.foreground is not None: update_doc["foreground"] = bool(data.foreground)
     if data.temperature_c is not None: update_doc["temperature_c"] = float(data.temperature_c)
     if data.session_tasks is not None: update_doc["session_tasks"] = int(data.session_tasks)

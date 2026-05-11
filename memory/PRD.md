@@ -469,3 +469,21 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **APK URL**: `https://grid-supercomputer.preview.emergentagent.com/grid-worker-v1.4.9.apk`
 - **Test sonuçları (iter-19 testing agent)**: **25/25 backend pytest PASS**. Frontend full validation: 9 Compute Node testids + 16 Rewards testids + Advanced vocab-pure (0 forbidden hits). 0 issues, retest_needed=False.
 
+
+
+**Iter 32 (2026-05-11)** — **STALE-ENGAGED DIAGNOSTIC + is_real_apk Auto-Upgrade**
+- **Root cause bulundu**: Buket'in v1.4.8 telefonu admin'de görünmüyordu çünkü:
+  1. WebView fallback ile `platform=mobile` olarak register olmuş → `is_real_apk=False`
+  2. Foreground service Android Doze tarafından öldürülmüş → son heartbeat 34 dakika önce (90s cutoff dışında)
+- **Fix #1: Heartbeat auto-upgrade** (`server.py`): heartbeat'te `app_version` startswith "1.4." gelirse → `is_real_apk` otomatik True'ya çekiliyor. Bu sayede legacy WebView-registered cihazlar artık admin'de doğru flag'leniyor.
+- **Fix #2: Genişletilmiş admin filter** (`pool.py /admin/mobile-mining/metrics`): `is_real_apk=True OR app_version~^1\.4\. OR node_engaged=True OR mining_requested=True` → Buket-tipi cihazlar artık yakalanıyor.
+- **Fix #3: One-time DB migration**: Mevcut tüm v1.4.x cihazlar `is_real_apk=True` olarak güncellendi (1 cihaz migrate edildi, Buket'in 1.4.8 telefonu dahil).
+- **Yeni: "recently_engaged" diagnostic** (`pool.py`): 30 dakikalık cutoff penceresi. Heartbeat 90s'den eski ama 30 dakikadan yeni olan engaged cihazlar `recently_engaged_phones` + `recently_engaged[]` array'i ile expose ediliyor (name, model, app_version, last_heartbeat, node_state, battery).
+- **Yeni: Admin yellow banner** (`MobileMiningMetricsCard.jsx`): `recently_engaged_phones > 0 && engaged_phones === 0` ise gösteriyor:
+  > "**1 PHONE ENGAGED RECENTLY — HEARTBEAT STALE**. Foreground service likely killed by Android Doze / battery optimisation. Ask the operator to re-open the APK and tap ENGAGE NODE again."
+  > Ardından her telefonun adı, versionu ve son heartbeat zamanı (`8m ago`) listeleniyor.
+- **Cosmetic fix**: `randomx_miner.py` artık her hashrate update'inde `last_error=None` set ediyor → admin LAST_ERROR card'ı miner reconnect ettikten sonra otomatik temizleniyor (eskiden "net pool.supportxmr.com:443 read error: end of file" mesajı saatlerce duruyordu, oysa miner çoktan recover etmişti).
+- **Top-level engaged_phones field exposed**: Frontend `m.engaged_phones === 0` koşulu doğru çalışsın diye `mobile_compute` içinde dönen alanlar artık response root'ta da var.
+- **Test sonuçları**: Curl smoke testi `recently_engaged_phones: 1` ile başarılı; admin tarayıcı ekran görüntüsü yellow banner'ın "Mobile Mobile · v1.4.8 · last heartbeat 8m ago" detayıyla göründüğünü doğruladı. Backend HEARTBEAT_MS=10s, ServiceWatchdog + JobSchedulerWatchdog + BootReceiver zaten manifestte mevcut.
+- **Kalıcı çözüm yolu**: Telefon operatörünün, kullanıcının cihazda THE GRID için "Pil Optimizasyonu" → "Optimize etme" ayarını yapması (Samsung/Xiaomi/Huawei agresif OEM optimizasyonu nedeniyle Doze'a karşı manifest-level watchdog yetersiz kalıyor).
+

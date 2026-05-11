@@ -129,7 +129,7 @@ export default function MobileMiningMetricsCard() {
         </div>
       )}
 
-      {m.mining_phones === 0 && (
+      {m.mining_phones === 0 && !m.recently_engaged_phones && (
         <div className="mt-4 p-3 rounded-2xl border border-amber-400/25 bg-amber-400/5 text-[11px] text-amber-100/85 font-mono-term flex items-start gap-2"
              data-testid="mmm-no-mining-phones">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
@@ -139,9 +139,32 @@ export default function MobileMiningMetricsCard() {
             </div>
             <div className="mt-1">
               {m.connected_phones === 0
-                ? "No phones connected — install the v1.4.8 APK and tap ENGAGE NODE."
+                ? "No phones connected — install the v1.4.9 APK and tap ENGAGE NODE."
                 : `${m.connected_phones} phone${m.connected_phones > 1 ? "s" : ""} connected but in idle / connected_only mode (operator hasn't tapped ENGAGE NODE yet).`}
             </div>
+          </div>
+        </div>
+      )}
+
+      {m.recently_engaged_phones > 0 && m.engaged_phones === 0 && (
+        <div className="mt-4 p-3 rounded-2xl border border-yellow-400/30 bg-yellow-400/8 text-[11px] text-yellow-100/85 font-mono-term flex items-start gap-2"
+             data-testid="mmm-recently-engaged">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <div className="font-bold uppercase tracking-widest text-[9px] text-yellow-300/90">
+              {m.recently_engaged_phones} PHONE{m.recently_engaged_phones > 1 ? "S" : ""} ENGAGED RECENTLY — HEARTBEAT STALE
+            </div>
+            <div className="mt-1">
+              Foreground service likely killed by Android Doze / battery optimisation.
+              Ask the operator to re-open the APK and tap ENGAGE NODE again.
+            </div>
+            {(m.recently_engaged || []).slice(0, 3).map((d) => (
+              <div key={d.device_id} className="mt-1 text-[10px] text-yellow-200/60 font-mono-term"
+                   data-testid={`mmm-recent-${d.device_id}`}>
+                <span className="cyan-text">{d.name || d.device_id}</span> ·{" "}
+                v{d.app_version || "?"} · last heartbeat {fmtAge(d.last_heartbeat)}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -226,4 +249,15 @@ function Big({ icon, label, value, accent, testId }) {
       <div className={`mt-1.5 font-mono-cyber font-black text-2xl ${cls}`}>{value}</div>
     </div>
   );
+}
+
+function fmtAge(iso) {
+  if (!iso) return "—";
+  try {
+    const t = new Date(iso).getTime();
+    const ageS = Math.max(0, Math.floor((Date.now() - t) / 1000));
+    if (ageS < 60) return `${ageS}s ago`;
+    if (ageS < 3600) return `${Math.floor(ageS / 60)}m ago`;
+    return `${Math.floor(ageS / 3600)}h ago`;
+  } catch { return "—"; }
 }

@@ -201,8 +201,12 @@ class XmrigManager:
         m = _RE_HASHRATE.search(line)
         if m:
             try:
+                # A live hashrate report = miner is healthy; clear any stale
+                # reconnect/"end of file" last_error so the admin doesn't see
+                # misleading error strings for many minutes after recovery.
                 Status.update(hashrate_hps=float(m.group(1)),
-                              last_message=f"hashrate {m.group(1)} H/s")
+                              last_message=f"hashrate {m.group(1)} H/s",
+                              last_error=None)
                 if console_bus: console_bus.emit("rx", "info",
                     f"hashrate {m.group(1)} H/s")
             except Exception:
