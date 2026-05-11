@@ -49,6 +49,7 @@ export default function Mobile() {
   const [engaged, setEngaged] = useState(false);
   const [allowBattery, setAllowBattery] = useState(true);
   const [nodeStatus, setNodeStatus] = useState(null);
+  const [batteryExempt, setBatteryExempt] = useState(true);  // v1.4.10 — assume true on browser; native bridge overrides
   const [tab, setTab] = useState("node");
   const [sessionEstimatedTGC, setSessionEstimatedTGC] = useState(0);
   const [forecast, setForecast] = useState(null);
@@ -68,6 +69,7 @@ export default function Mobile() {
     setNodeStatus(ns);
     if (typeof ns.engaged === "boolean") setEngaged(ns.engaged);
     if (typeof ns.allow_on_battery === "boolean") setAllowBattery(ns.allow_on_battery);
+    if (typeof ns.battery_exempt === "boolean") setBatteryExempt(ns.battery_exempt);
   };
 
   useEffect(() => {
@@ -90,7 +92,7 @@ export default function Mobile() {
             model: tier,
             platform: isNativeApk ? "android" : "mobile",
             brand,
-            app_version: isNativeApk ? "1.4.8" : undefined,
+            app_version: isNativeApk ? "1.4.10" : undefined,
             device_id: isNativeApk
               ? (localStorage.getItem("grid_native_device_id")
                 || (localStorage.setItem("grid_native_device_id",
@@ -178,7 +180,7 @@ export default function Mobile() {
           worker_state: engaged ? "active" : "stopped",
           node_engaged: engaged,
           node_state: engaged ? "engaged_standby" : "idle",
-          app_version: "1.4.8",
+          app_version: "1.4.10",
         });
       } catch {}
     };
@@ -198,6 +200,17 @@ export default function Mobile() {
       try { api.post("/worker/stop", { device_id: device.id }); } catch {}
       return;
     }
+    // v1.4.10 — On first ENGAGE, if running inside the APK AND we are not
+    // yet on the battery-optimisation allowlist, fire the Turkish explainer
+    // dialog → system prompt.  Engaging continues regardless of consent;
+    // the warning under the button stays visible until exemption is granted.
+    try {
+      if (bridge && typeof bridge.isBatteryExempt === "function"
+          && !bridge.isBatteryExempt()
+          && typeof bridge.requestBatteryExemption === "function") {
+        bridge.requestBatteryExemption();
+      }
+    } catch {}
     setEngaged(true);
     try {
       const token = localStorage.getItem("grid_token") || "";
@@ -261,7 +274,7 @@ export default function Mobile() {
           {isNative && (
             <span data-testid="native-apk-badge"
               className="ml-2 px-2 py-0.5 rounded-full text-[9px] tracking-widest uppercase border border-[#00ffe1]/40 cyan-text bg-[#00ffe1]/10">
-              Native Node · v1.4.8
+              Native Node · v1.4.10
             </span>
           )}
         </div>
@@ -322,6 +335,27 @@ export default function Mobile() {
                    data-testid="node-status-label">
                 {statusLabel.text}
               </div>
+              {/* v1.4.10 — Battery exemption warning. Visible only inside the
+                  native APK when the user has not yet granted the exemption. */}
+              {isNative && batteryExempt === false && (
+                <button
+                  onClick={() => { try { nativeBridge()?.requestBatteryExemption?.(); } catch {} }}
+                  data-testid="low-performance-warning"
+                  className="mt-3 px-4 py-2.5 rounded-2xl border border-amber-400/40 bg-amber-400/8 text-left flex items-start gap-2.5 max-w-xs">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-300 flex-shrink-0 mt-0.5" />
+                  <div className="text-[11px] leading-snug">
+                    <div className="font-bold text-amber-300 uppercase tracking-widest text-[9px]">
+                      Düşük Performans Modu
+                    </div>
+                    <div className="text-amber-100/85 mt-0.5">
+                      Pil tasarrufu açık olduğu için kazanç kesintiye uğrayabilir.
+                    </div>
+                    <div className="text-amber-200/65 mt-1 text-[10px]">
+                      <span className="cyan-text">→</span> İzin vermek için dokunun
+                    </div>
+                  </div>
+                </button>
+              )}
               {err && <div className="mt-2 text-xs text-red-400" data-testid="mobile-err">{err}</div>}
             </div>
 
@@ -519,7 +553,7 @@ export default function Mobile() {
               {!isNative ? (
                 <div className="text-[11px] text-amber-100/75 flex items-start gap-2">
                   <AlertTriangle className="w-3 h-3 mt-0.5" />
-                  Native bridge unavailable — install the v1.4.8 APK to view engine telemetry.
+                  Native bridge unavailable — install the v1.4.10 APK to view engine telemetry.
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2 text-xs font-mono-term">
@@ -531,8 +565,9 @@ export default function Mobile() {
                   <KV k="active_threads" v={String(nodeStatus?.active_threads ?? (engaged ? 1 : 0))} testId="kv-active-threads" />
                   <KV k="eco_mode" v={String(nodeStatus?.raw_status === "eco" || nodeStatus?.eco_mode ? true : false)} testId="kv-eco-mode" />
                   <KV k="battery_compute_allowed" v={String(nodeStatus?.allow_on_battery ?? true)} testId="kv-allow-battery" />
+                  <KV k="battery_exempt" v={String(nodeStatus?.battery_exempt ?? true)} testId="kv-battery-exempt" />
                   <KV k="node_state" v={String(nodeStatus?.raw_status ?? "idle")} testId="kv-node-state" />
-                  <KV k="client_version" v={nodeStatus?.version ?? "1.4.8"} testId="kv-version" />
+                  <KV k="client_version" v={nodeStatus?.version ?? "1.4.10"} testId="kv-version" />
                 </div>
               )}
             </div>

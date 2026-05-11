@@ -267,9 +267,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.4.9"
-APK_PATH = "/grid-worker-v1.4.9.apk"
-APK_RELEASE_NOTES = "v1.4.9 TGC economy refresh · 1000 TGC = $10 USDT (1 TGC = $0.01) · persistent server-side TGC ledger · primary mobile value is TGC, USDT shown as small estimate · payout unlocks at 1000 TGC · device-tier monthly forecast (100-180 budget, 220-260 standard, 280-350 flagship, 350+ core) · ENGAGED_STANDBY honest state when native engine isn't producing · admin Mobile Compute counts engaged phones (not only mining ones) · USDT wallet save flow (BEP20/TRC20/Polygon) · advanced tab vocab-pure (no mining/hashrate/RandomX/share) · randomx native engine bundled · v2+v3 signed"
+APK_VERSION = "1.4.10"
+APK_PATH = "/grid-worker-v1.4.10.apk"
+APK_RELEASE_NOTES = "v1.4.10 automatic battery exemption · auto-prompt REQUEST_IGNORE_BATTERY_OPTIMIZATIONS on first launch and first ENGAGE NODE tap · professional Turkish explainer dialog (Şebeke bağlantısı için pil tasarrufunu devre dışı bırak) · one-tap consent (system dialog, no manual settings dive) · low-performance mode warning when permission denied · persistent server-side TGC ledger (1000 TGC = $10 USDT) · ENGAGED_STANDBY honest state · admin Mobile Compute counts engaged phones · advanced tab vocab-pure · randomx native engine bundled · v2+v3 signed"
 
 
 def _compute_apk_meta() -> dict:
