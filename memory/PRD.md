@@ -487,3 +487,33 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **Test sonuçları**: Curl smoke testi `recently_engaged_phones: 1` ile başarılı; admin tarayıcı ekran görüntüsü yellow banner'ın "Mobile Mobile · v1.4.8 · last heartbeat 8m ago" detayıyla göründüğünü doğruladı. Backend HEARTBEAT_MS=10s, ServiceWatchdog + JobSchedulerWatchdog + BootReceiver zaten manifestte mevcut.
 - **Kalıcı çözüm yolu**: Telefon operatörünün, kullanıcının cihazda THE GRID için "Pil Optimizasyonu" → "Optimize etme" ayarını yapması (Samsung/Xiaomi/Huawei agresif OEM optimizasyonu nedeniyle Doze'a karşı manifest-level watchdog yetersiz kalıyor).
 
+
+
+**Iter 33 (2026-05-11)** — **v1.4.10 AUTOMATIC BATTERY EXEMPTION**
+- **Permission**: `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` AndroidManifest'e eklendi (eski iter-14'te kaldırılan yorum satırı temizlendi). versionCode=1410, versionName=1.4.10.
+- **Auto-prompt akışı** (`MainActivity.java`):
+  1. `onCreate` içinde 1.5s gecikmeyle `showBatteryExemptionExplainer()` çağrılır (eğer `isBatteryExempt()=false` ve son 6 saatte sorulmadıysa).
+  2. AlertDialog Türkçe explainer gösterir:  
+     > "**Şebeke Bağlantısı**  
+     > Şebeke (The Grid) bağlantısının kesilmemesi ve ödül kazanmaya devam etmeniz için Android pil tasarrufunun devre dışı bırakılması gerekmektedir."
+  3. "**İzin Ver**" butonu → `requestBatteryExemptionSystem()` → `Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` intent + `package:io.thegrid.worker` URI = **OS sistem dialogu açılır** (manuel ayar dalışı YOK).
+  4. "**Daha Sonra**" butonu → `SharedPreferences.K_BATT_DECLINED=true`. 6h cooldown sonrası ENGAGE NODE'a basınca tekrar sorulur.
+  5. OEM (Xiaomi/Huawei) direct intent'i bloklarsa `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` fallback.
+- **JS Bridge yeni metodlar**: `isBatteryExempt():boolean`, `requestBatteryExemption():void` (runOnUiThread ile dialog). `getNodeState()` ve `getInfo()` artık `battery_exempt` alanını döner.
+- **Mobile.jsx** (`/app/frontend/src/pages/Mobile.jsx`):
+  - `batteryExempt` state default `true` (browser-safe).
+  - `refreshNative()` `battery_exempt` alanını native bridge'den senkronize ediyor.
+  - `handleEngage()` ilk ENGAGE'de `bridge.isBatteryExempt()=false` ise `bridge.requestBatteryExemption()` tetikliyor (engage akışını engellemiyor — paralel akış).
+  - **DÜŞÜK PERFORMANS MODU** chip ENGAGE butonu altında görünür (sadece `isNative && batteryExempt===false`):  
+    > "Pil tasarrufu açık olduğu için kazanç kesintiye uğrayabilir.  
+    > → İzin vermek için dokunun"  
+    Tıklayınca `requestBatteryExemption()` tekrar tetikliyor.
+  - Native badge: **Native Node · v1.4.10**.
+  - Advanced tab'a `kv-battery-exempt` row eklendi.
+- **APK v1.4.10**: `/app/frontend/public/grid-worker-v1.4.10.apk` — **386,203 bytes**, SHA-256 `193a0b4fa9f5b6c2ac9d31e8c20c29b0dc9f8b005346f2373fb706c150927d4a`, v2+v3 signed, librandomx.so bundled. URL: `https://grid-supercomputer.preview.emergentagent.com/grid-worker-v1.4.10.apk`
+- **Test sonuçları (iter-20)**: **19/19 backend PASS + full frontend validation, 0 issues**. Mocked bridge ile her 3 senaryo doğrulandı:
+  - S1: Browser mode → badge ve warning gizli ✓
+  - S2: bridge.isBatteryExempt()=false → badge + warning gösterildi, click → requestBatteryExemption() çağrıldı (counter 0→2), engage de aynı zamanda tetikledi ✓
+  - S3: bridge.isBatteryExempt()=true → warning gizli, kv-battery-exempt='true' ✓
+- **Backend regression OK**: /wallet (TGC ledger), /node/drip, /tier/forecast (mid/flagship/budget/core), /wallet/payout-address (BEP20/TRC20/Polygon validation), /admin/mobile-mining/metrics (3-lane split + recently_engaged), /auth/me, /auth/refresh, /admin/console/snapshot, /pool/health.
+
