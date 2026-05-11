@@ -385,6 +385,33 @@ def build_router(require_admin) -> APIRouter:
         bridge = aggregate_metrics()
         total_active_workers = mining_phones + (1 if (rx.get("hashrate_hps") or 0) > 0 else 0) + (1 if (sha.get("hashrate_hps") or 0) > 0 else 0)
 
+        # v1.4.8 — explicit Backend Compute / Mobile Compute / Total Compute split.
+        backend_compute = {
+            "label": "Backend Compute",
+            "engines": ["randomx_xmrig", "sha256_stratum"],
+            "hashrate_hps": round(server_miner_hashrate_hps, 2),
+            "accepted_outputs": server_accepted_shares,
+            "active": (server_miner_hashrate_hps > 0),
+            "randomx_running": bool(rx.get("running")),
+            "sha256_running": bool(sha.get("running")),
+        }
+        mobile_compute = {
+            "label": "Mobile Compute",
+            "connected_phones": connected_phones,
+            "engaged_phones": mining_phones,
+            "hashrate_hps": round(mobile_native_hashrate_hps, 2),
+            "submitted_outputs": mobile_submitted_shares,
+            "accepted_outputs": mobile_accepted_shares,
+            "rejected_outputs": mobile_rejected_shares,
+            "active": (mobile_native_hashrate_hps > 0),
+        }
+        total_compute = {
+            "label": "Total Compute",
+            "hashrate_hps": round(server_miner_hashrate_hps + mobile_native_hashrate_hps, 2),
+            "accepted_outputs": server_accepted_shares + mobile_accepted_shares,
+            "active_workers": total_active_workers,
+        }
+
         return {
             "connected_phones": connected_phones,
             "mining_phones": mining_phones,
@@ -395,6 +422,9 @@ def build_router(require_admin) -> APIRouter:
             "server_miner_hashrate_hps": round(server_miner_hashrate_hps, 2),
             "server_accepted_shares": server_accepted_shares,
             "total_active_workers": total_active_workers,
+            "backend_compute": backend_compute,
+            "mobile_compute": mobile_compute,
+            "total_compute": total_compute,
             "bridge": bridge,
             "as_of": datetime.now(timezone.utc).isoformat(),
             "honest_disclosure": (

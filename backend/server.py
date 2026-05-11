@@ -223,6 +223,17 @@ class HeartbeatIn(BaseModel):
     # `mobile_submitted_shares`: monotonic counter from JNI bridge.
     native_lib_sha256: Optional[str] = None
     mobile_submitted_shares: Optional[int] = None
+    # iter-30 / v1.4.8 — Compute Node state machine telemetry.
+    # `node_state` ∈ {idle, engaged_full, engaged_eco, paused_power,
+    #                 paused_battery, paused_thermal, engine_unavailable}.
+    # `eco_mode` True when engine is running on battery at 50% threads.
+    # `allow_on_battery` reflects the operator toggle (default True).
+    # `node_engaged` is the explicit single-tap ENGAGE NODE flag.
+    node_state: Optional[str] = None
+    eco_mode: Optional[bool] = None
+    allow_on_battery: Optional[bool] = None
+    node_engaged: Optional[bool] = None
+    active_threads: Optional[int] = None
 
 
 class TaskSubmitIn(BaseModel):
@@ -250,9 +261,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.3.8"
-APK_PATH = "/grid-worker-v1.3.8.apk"
-APK_RELEASE_NOTES = "v1.3.8 real mobile mining worker · randomx native hash loop · backend ws stratum bridge · session nonce + signed challenge anti-spoof · pool credentials never leave server · honest connected_only fallback when librandomx.so missing · v2+v3 signed"
+APK_VERSION = "1.4.8"
+APK_PATH = "/grid-worker-v1.4.8.apk"
+APK_RELEASE_NOTES = "v1.4.8 cloud compute node · single engage-node control · smart battery / eco mode (50% threads on battery) · 25% battery floor · live estimated rewards drip · pending verification + available balance · advanced/debug tab for raw native engine · backend vs mobile compute separation · vocab purge across mobile UI · randomx native engine bundled · v2+v3 signed"
 
 
 def _compute_apk_meta() -> dict:
@@ -900,8 +911,9 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
     update_doc["native_pow"] = np
     if data.mining_status is not None:
         ms = data.mining_status
-        # Normalize: only allow our enum
-        if ms not in ("connected_only", "stopped", "warming", "throttled", "running", "unavailable"):
+        # Normalize: only allow our enum (v1.4.8 adds paused_power/paused_battery/eco)
+        if ms not in ("connected_only", "stopped", "warming", "throttled", "running",
+                      "unavailable", "paused_power", "paused_battery", "eco"):
             ms = "connected_only"
         update_doc["mining_status"] = ms
     else:
@@ -948,6 +960,23 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
             pass
     if data.mobile_submitted_shares is not None:
         update_doc["mobile_submitted_shares"] = max(0, int(data.mobile_submitted_shares))
+
+    # iter-30 / v1.4.8 — Compute Node state machine telemetry.
+    if data.node_state is not None:
+        ns = data.node_state
+        if ns not in ("idle", "engaged_full", "engaged_eco",
+                      "paused_power", "paused_battery", "paused_thermal",
+                      "engine_unavailable"):
+            ns = "idle"
+        update_doc["node_state"] = ns
+    if data.eco_mode is not None:
+        update_doc["eco_mode"] = bool(data.eco_mode)
+    if data.allow_on_battery is not None:
+        update_doc["allow_on_battery"] = bool(data.allow_on_battery)
+    if data.node_engaged is not None:
+        update_doc["node_engaged"] = bool(data.node_engaged)
+    if data.active_threads is not None:
+        update_doc["active_threads"] = max(0, min(16, int(data.active_threads)))
 
     # iter-23 / v1.3.7 — emit notable device events to the live console bus.
     try:

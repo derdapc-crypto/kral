@@ -9,7 +9,7 @@ SDK=/opt/android-sdk
 DEB_BT=/usr/bin
 PLATFORM=$SDK/platforms/android-34/android.jar
 D8_JAR=$SDK/build-tools/34.0.0/lib/d8.jar
-VERSION="${VERSION:-1.3.8}"
+VERSION="${VERSION:-1.4.8}"
 OUT_NAME="grid-worker-v${VERSION}.apk"
 OUT_DEST="/app/frontend/public/${OUT_NAME}"
 

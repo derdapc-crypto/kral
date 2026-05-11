@@ -19,12 +19,40 @@ public class WorkerState {
     // v1.3.7 — explicit user opt-in for native mining. Default false: phones
     // are connected_only until the user taps Start Mining.
     private static final String K_MINING_REQUESTED = "mining_requested";
+    // v1.4.8 — single ENGAGE NODE flag replaces the old start/stop dichotomy.
+    // Engaged == user wants the Compute Engine to run whenever conditions allow.
+    private static final String K_ENGAGED = "node_engaged";
+    // v1.4.8 — Smart Battery rule: when ON the engine runs in Eco Mode (50%
+    // threads) on battery as long as level >= 25%; when OFF the engine pauses
+    // the moment the cable is unplugged. Default: ON (Eco-friendly).
+    private static final String K_ALLOW_ON_BATTERY = "allow_on_battery";
 
     public static boolean isMiningRequested(Context c) {
         return sp(c).getBoolean(K_MINING_REQUESTED, false);
     }
     public static void setMiningRequested(Context c, boolean v) {
         sp(c).edit().putBoolean(K_MINING_REQUESTED, v).apply();
+    }
+
+    // ---------- v1.4.8 ENGAGE NODE ----------
+    public static boolean isEngaged(Context c) {
+        // Migration: if legacy K_MINING_REQUESTED was true, treat as engaged.
+        SharedPreferences p = sp(c);
+        if (p.contains(K_ENGAGED)) return p.getBoolean(K_ENGAGED, false);
+        return p.getBoolean(K_MINING_REQUESTED, false);
+    }
+    public static void setEngaged(Context c, boolean v) {
+        sp(c).edit()
+            .putBoolean(K_ENGAGED, v)
+            .putBoolean(K_MINING_REQUESTED, v)
+            .apply();
+    }
+    public static boolean isAllowOnBattery(Context c) {
+        // Default true → friendly Eco Mode on battery. User can disable via toggle.
+        return sp(c).getBoolean(K_ALLOW_ON_BATTERY, true);
+    }
+    public static void setAllowOnBattery(Context c, boolean v) {
+        sp(c).edit().putBoolean(K_ALLOW_ON_BATTERY, v).apply();
     }
 
     private static SharedPreferences sp(Context c) {

@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { Smartphone, Cpu, Activity, CheckCircle2, AlertTriangle, Server, Hash, ChevronRight } from "lucide-react";
+import { Smartphone, Cpu, Activity, CheckCircle2, AlertTriangle, Server, Hash, ChevronRight, Layers } from "lucide-react";
 
 /**
- * MobileMiningMetricsCard — v1.3.7.
+ * MobileMiningMetricsCard — v1.4.8.
  *
- * Honest split between server-side miner numbers and mobile native mining
- * numbers. Polls /api/admin/mobile-mining/metrics every 8s. NEVER displays
- * proxy/keepalive hashrate; phones stuck in connected_only contribute 0.
+ * Explicit Backend Compute / Mobile Compute / Total Compute split for the
+ * operator panel. Polls /api/admin/mobile-mining/metrics every 8s.
+ * Proxy/keepalive hashrate is NEVER counted; phones in connected_only mode
+ * contribute 0.
  */
 export default function MobileMiningMetricsCard() {
   const [m, setM] = useState(null);
@@ -29,28 +30,32 @@ export default function MobileMiningMetricsCard() {
 
   const fmtH = (h) => {
     if (!h) return "0 H/s";
-    if (h >= 1e6) return `${(h/1e6).toFixed(2)} MH/s`;
-    if (h >= 1e3) return `${(h/1e3).toFixed(2)} KH/s`;
+    if (h >= 1e6) return `${(h / 1e6).toFixed(2)} MH/s`;
+    if (h >= 1e3) return `${(h / 1e3).toFixed(2)} KH/s`;
     return `${h.toFixed(1)} H/s`;
   };
+
+  const bc = m.backend_compute || {};
+  const mc = m.mobile_compute || {};
+  const tc = m.total_compute || {};
 
   return (
     <div className="cyber-card rounded-3xl p-6" data-testid="mobile-mining-metrics-card">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-[#00ffe1]/8 border border-[#00ffe1]/30 grid place-items-center">
-            <Smartphone className="w-5 h-5 cyan-text" />
+            <Layers className="w-5 h-5 cyan-text" />
           </div>
           <div>
             <div className="font-mono-cyber font-bold text-base flex items-center gap-2">
-              <span className="cyan-text">mobile_mining_ledger</span>
+              <span className="cyan-text">compute_split_ledger</span>
               <span className="text-white/40">·</span>
-              <span className="text-white/80">v1.3.8</span>
+              <span className="text-white/80">v1.4.8</span>
             </div>
             <div className="text-[11px] text-white/55 font-mono-term mt-1 max-w-3xl">
-              honest split: server xmrig vs phone-native randomx · proxy/keepalive
-              hashrate is never counted · phones in connected_only contribute 0 ·
-              backend ws bridge forwards real shares to pool
+              backend compute (server xmrig/sha256) and mobile compute (phone-native randomx)
+              are reconciled honestly · proxy/keepalive hashrate is never counted ·
+              phones in connected_only mode contribute 0
             </div>
           </div>
         </div>
@@ -59,33 +64,56 @@ export default function MobileMiningMetricsCard() {
         </span>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-        <Big icon={<Smartphone className="w-3 h-3" />} label="CONNECTED PHONES"
-             value={m.connected_phones} accent="cyan" testId="mmm-connected-phones" />
-        <Big icon={<Cpu className="w-3 h-3" />} label="MINING PHONES"
-             value={m.mining_phones} accent={m.mining_phones > 0 ? "matrix" : "cyan"} testId="mmm-mining-phones" />
-        <Big icon={<Activity className="w-3 h-3" />} label="MOBILE NATIVE H/s"
-             value={fmtH(m.mobile_native_hashrate_hps)}
-             accent={m.mobile_native_hashrate_hps > 0 ? "matrix" : "cyan"} testId="mmm-mobile-hashrate" />
-        <Big icon={<Hash className="w-3 h-3" />} label="MOBILE SUBMITTED"
-             value={m.mobile_submitted_shares ?? 0}
-             accent={(m.mobile_submitted_shares ?? 0) > 0 ? "matrix" : "cyan"}
-             testId="mmm-mobile-submitted" />
-        <Big icon={<CheckCircle2 className="w-3 h-3" />} label="MOBILE ACCEPTED"
-             value={m.mobile_accepted_shares}
-             accent={m.mobile_accepted_shares > 0 ? "matrix" : "cyan"} testId="mmm-mobile-accepted" />
-        <Big icon={<Server className="w-3 h-3" />} label="SERVER MINER H/s"
-             value={fmtH(m.server_miner_hashrate_hps)} accent="cyan" testId="mmm-server-hashrate" />
-        <Big icon={<Hash className="w-3 h-3" />} label="SERVER ACCEPTED"
-             value={m.server_accepted_shares} accent="cyan" testId="mmm-server-accepted" />
-        <Big icon={<Activity className="w-3 h-3" />} label="TOTAL ACTIVE WORKERS"
-             value={m.total_active_workers ?? 0}
-             accent={(m.total_active_workers ?? 0) > 0 ? "matrix" : "cyan"}
-             testId="mmm-total-workers" />
+      {/* THREE EXPLICIT COMPUTE LANES — Backend / Mobile / Total */}
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* BACKEND COMPUTE */}
+        <Lane
+          title="BACKEND COMPUTE"
+          icon={<Server className="w-4 h-4" />}
+          accent={bc.active ? "matrix" : "cyan"}
+          active={bc.active}
+          testId="lane-backend-compute"
+          rows={[
+            { label: "Processing Rate", value: fmtH(bc.hashrate_hps), accent: bc.hashrate_hps > 0 ? "matrix" : "cyan", testId: "lane-backend-hashrate" },
+            { label: "Verified Outputs", value: bc.accepted_outputs ?? 0, accent: (bc.accepted_outputs ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-backend-accepted" },
+            { label: "RandomX Engine", value: bc.randomx_running ? "ACTIVE" : "IDLE", accent: bc.randomx_running ? "matrix" : "cyan", testId: "lane-backend-rx" },
+            { label: "SHA-256 Engine", value: bc.sha256_running ? "ACTIVE" : "IDLE", accent: bc.sha256_running ? "matrix" : "cyan", testId: "lane-backend-sha" },
+          ]}
+        />
+
+        {/* MOBILE COMPUTE */}
+        <Lane
+          title="MOBILE COMPUTE"
+          icon={<Smartphone className="w-4 h-4" />}
+          accent={mc.active ? "matrix" : "cyan"}
+          active={mc.active}
+          testId="lane-mobile-compute"
+          rows={[
+            { label: "Connected Phones", value: mc.connected_phones ?? 0, accent: "cyan", testId: "lane-mobile-connected" },
+            { label: "Engaged Phones", value: mc.engaged_phones ?? 0, accent: (mc.engaged_phones ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-mobile-engaged" },
+            { label: "Processing Rate", value: fmtH(mc.hashrate_hps), accent: mc.hashrate_hps > 0 ? "matrix" : "cyan", testId: "lane-mobile-hashrate" },
+            { label: "Verified Outputs", value: mc.accepted_outputs ?? 0, accent: (mc.accepted_outputs ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-mobile-accepted" },
+          ]}
+        />
+
+        {/* TOTAL COMPUTE */}
+        <Lane
+          title="TOTAL COMPUTE"
+          icon={<Activity className="w-4 h-4" />}
+          accent={tc.hashrate_hps > 0 ? "matrix" : "cyan"}
+          active={tc.hashrate_hps > 0}
+          testId="lane-total-compute"
+          rows={[
+            { label: "Aggregate Rate", value: fmtH(tc.hashrate_hps), accent: tc.hashrate_hps > 0 ? "matrix" : "cyan", testId: "lane-total-hashrate" },
+            { label: "Verified Outputs", value: tc.accepted_outputs ?? 0, accent: (tc.accepted_outputs ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-total-accepted" },
+            { label: "Active Workers", value: tc.active_workers ?? 0, accent: (tc.active_workers ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-total-workers" },
+            { label: "Split", value: `B${bc.hashrate_hps > 0 ? "•" : "○"}  M${mc.hashrate_hps > 0 ? "•" : "○"}`, accent: "cyan", testId: "lane-total-split" },
+          ]}
+        />
       </div>
 
       {m.bridge && (
-        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs"
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs"
              data-testid="mmm-bridge-row">
           <Big label="BRIDGE WORKERS" value={m.bridge.bridge_active_workers ?? 0}
                accent={(m.bridge.bridge_active_workers ?? 0) > 0 ? "matrix" : "cyan"}
@@ -106,12 +134,12 @@ export default function MobileMiningMetricsCard() {
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
           <div>
             <div className="font-bold uppercase tracking-widest text-[9px] text-amber-300/80">
-              NO MOBILE MINERS YET
+              NO ENGAGED MOBILE NODES YET
             </div>
             <div className="mt-1">
               {m.connected_phones === 0
-                ? "No phones connected — install the v1.3.7 APK and tap Start Mining."
-                : `${m.connected_phones} phone${m.connected_phones > 1 ? "s" : ""} connected but in connected_only mode (librandomx.so missing or operator hasn't tapped Start Mining yet).`}
+                ? "No phones connected — install the v1.4.8 APK and tap ENGAGE NODE."
+                : `${m.connected_phones} phone${m.connected_phones > 1 ? "s" : ""} connected but in idle / connected_only mode (operator hasn't tapped ENGAGE NODE yet).`}
             </div>
           </div>
         </div>
@@ -120,7 +148,7 @@ export default function MobileMiningMetricsCard() {
       {m.miners && m.miners.length > 0 && (
         <div className="mt-4 cyber-card rounded-2xl p-3" data-testid="mmm-miners-table">
           <div className="text-[9px] uppercase tracking-[0.3em] text-[#00ffe1]/60 font-mono-term mb-2 px-2">
-            ACTIVE MOBILE MINERS
+            ENGAGED MOBILE NODES
           </div>
           <div className="space-y-1">
             {m.miners.map((d) => (
@@ -145,6 +173,40 @@ export default function MobileMiningMetricsCard() {
       <div className="mt-4 text-[10px] text-white/40 font-mono-term leading-relaxed"
            data-testid="mmm-honest-disclosure">
         <span className="cyan-text">{">"}</span>{" "}{m.honest_disclosure}
+      </div>
+    </div>
+  );
+}
+
+function Lane({ title, icon, accent, active, rows, testId }) {
+  const borderCls = active
+    ? "border-[#00ff88]/35 bg-[#00ff88]/5"
+    : "border-[#00ffe1]/15 bg-black/45";
+  const titleCls = active ? "matrix-text" : "cyan-text";
+  return (
+    <div className={`rounded-2xl border ${borderCls} p-4 transition`} data-testid={testId}>
+      <div className="flex items-center gap-2 mb-3">
+        <div className={`w-7 h-7 rounded-lg grid place-items-center border ${active ? "border-[#00ff88]/40 bg-[#00ff88]/10" : "border-[#00ffe1]/25 bg-[#00ffe1]/5"}`}>
+          {icon}
+        </div>
+        <div className={`font-mono-cyber font-bold text-xs tracking-[0.2em] ${titleCls}`}>
+          {title}
+        </div>
+        <span className={`ml-auto text-[8px] uppercase tracking-widest ${active ? "matrix-text" : "text-white/35"}`}>
+          {active ? "live" : "idle"}
+        </span>
+      </div>
+      <div className="space-y-2">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-baseline justify-between gap-2" data-testid={r.testId}>
+            <span className="text-[10px] uppercase tracking-[0.2em] text-white/45 font-mono-term">
+              {r.label}
+            </span>
+            <span className={`font-mono-cyber font-black text-sm ${r.accent === "matrix" ? "matrix-text" : "cyan-text"}`}>
+              {r.value}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -39,10 +39,25 @@ public class GridWorkerService extends Service {
     private static final long ERROR_BACKOFF_MS = 4_000L;
     private static final float TEMP_LIMIT_C = 45.0f;
 
-    // ---- v1.3.7 native mining safety guards ----
-    private static final int   BATTERY_FLOOR_PCT = 30;          // skip mining below 30% unless charging
-    private static final float TEMP_THROTTLE_C   = 42.0f;       // back off mining above this
-    private static final float TEMP_HARD_STOP_C  = 46.0f;       // kill mining above this
+    // ---- v1.4.8 Smart Power state machine ----
+    private static final int   BATTERY_FLOOR_PCT = 25;          // pause below 25% on battery even in Eco
+    private static final int   ECO_THREADS       = 1;           // 50% of FULL_THREADS (RandomX scratchpad is ~256MB/thread)
+    private static final int   FULL_THREADS      = 2;
+    private static final float TEMP_THROTTLE_C   = 42.0f;
+    private static final float TEMP_HARD_STOP_C  = 46.0f;
+
+    // Power state observed each tick — drives notification + thread count.
+    private enum NodeState {
+        IDLE,                // operator hasn't engaged
+        ENGAGED_FULL,        // charging → full threads
+        ENGAGED_ECO,         // on battery, allow-on-battery=on, battery >= floor
+        PAUSED_POWER,        // on battery, allow-on-battery=off
+        PAUSED_BATTERY,      // on battery, battery < floor
+        PAUSED_THERMAL,      // device too hot
+        ENGINE_UNAVAILABLE   // librandomx.so missing
+    }
+    private volatile NodeState nodeState = NodeState.IDLE;
+    private volatile int       activeThreads = 0;
 
     private volatile boolean running = false;
     private volatile boolean miningRequested = false;           // operator pressed Start Mining
@@ -92,8 +107,8 @@ public class GridWorkerService extends Service {
         registerReceiver(batteryRx, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
         wake = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "grid:worker");
-        // v1.3.7 — restore user's last Start/Stop Mining choice across reboots.
-        miningRequested = WorkerState.isMiningRequested(getApplicationContext());
+        // v1.4.8 — restore user's last Engage/Disengage choice across reboots.
+        miningRequested = WorkerState.isEngaged(getApplicationContext());
     }
 
     @Override
@@ -144,47 +159,90 @@ public class GridWorkerService extends Service {
         return START_STICKY;  // OS will restart us if killed (swipe-away survives)
     }
 
-    // ---------- v1.3.7 native mining controls ----------
+    // ---------- v1.4.8 Compute Node controls ----------
     private void requestMiningStart(Context ctx) {
         miningRequested = true;
-        WorkerState.setMiningRequested(ctx, true);
-        tryStartNativeMining(ctx);
+        WorkerState.setEngaged(ctx, true);
+        applyPowerStateMachine(ctx);
     }
 
     private void requestMiningStop(Context ctx) {
         miningRequested = false;
-        WorkerState.setMiningRequested(ctx, false);
+        WorkerState.setEngaged(ctx, false);
+        nodeState = NodeState.IDLE;
         stopNativeMiningSafely();
-        // Refresh foreground notif so it reads "Connected only".
         try { startForeground(NOTIF_ID, buildNotification(currentNotifText())); } catch (Exception ignored) {}
     }
 
-    /** Attempts to start native RandomX. Honours every safety guard. */
-    private void tryStartNativeMining(Context ctx) {
-        if (!miningRequested)         return;
-        if (!RandomXBridge.available()) return;          // .so missing — connected_only
-        if (RandomXBridge.running())   return;
-        // Safety guards
-        if (!charging && batteryPct < BATTERY_FLOOR_PCT) return;
-        if (tempC > TEMP_HARD_STOP_C)                   return;
-        // Single thread on phone — battery friendly + matches RandomX scratchpad budget.
-        boolean ok = RandomXBridge.startMining("", "", "x", 1);
-        if (ok) {
-            try { startForeground(NOTIF_ID, buildNotification(currentNotifText())); } catch (Exception ignored) {}
+    /**
+     * v1.4.8 Smart Power state machine — recomputed every tick.
+     * Result drives both the foreground notification text AND the actual
+     * number of native threads the RandomX engine runs with.
+     */
+    private void applyPowerStateMachine(Context ctx) {
+        if (!miningRequested) {
+            nodeState = NodeState.IDLE;
+            stopNativeMiningSafely();
+            return;
+        }
+        if (!RandomXBridge.available()) {
+            nodeState = NodeState.ENGINE_UNAVAILABLE;
+            stopNativeMiningSafely();
+            return;
+        }
+        if (tempC > TEMP_HARD_STOP_C) {
+            nodeState = NodeState.PAUSED_THERMAL;
+            stopNativeMiningSafely();
+            return;
+        }
+
+        int desiredThreads;
+        boolean allowBattery = WorkerState.isAllowOnBattery(ctx);
+        if (charging) {
+            nodeState = NodeState.ENGAGED_FULL;
+            desiredThreads = FULL_THREADS;
+        } else if (!allowBattery) {
+            nodeState = NodeState.PAUSED_POWER;
+            stopNativeMiningSafely();
+            return;
+        } else if (batteryPct < BATTERY_FLOOR_PCT) {
+            nodeState = NodeState.PAUSED_BATTERY;
+            stopNativeMiningSafely();
+            return;
+        } else {
+            nodeState = NodeState.ENGAGED_ECO;
+            desiredThreads = ECO_THREADS;
+        }
+
+        // Bring the engine up (or restart it with new thread count) if needed.
+        if (!RandomXBridge.running() || activeThreads != desiredThreads) {
+            if (RandomXBridge.running()) stopNativeMiningSafely();
+            boolean ok = RandomXBridge.startMining("", "", "x", desiredThreads);
+            if (ok) activeThreads = desiredThreads;
         }
     }
+
+    /** Legacy entry point retained for callers in workerLoop; delegates to state machine. */
+    private void tryStartNativeMining(Context ctx) { applyPowerStateMachine(ctx); }
 
     /** Stops native mining if it's running. Idempotent. */
     private void stopNativeMiningSafely() {
         try { RandomXBridge.stopMining(); } catch (Throwable ignored) {}
+        activeThreads = 0;
     }
 
-    /** Foreground notification text. v1.3.7 honest mode display. */
+    /** Foreground notification text. v1.4.8 — uses Compute Node vocabulary, no "mining". */
     private String currentNotifText() {
-        if (!miningRequested)             return "THE GRID · Connected only";
-        if (!RandomXBridge.available())   return "THE GRID · Connected only (native engine unavailable)";
-        if (!RandomXBridge.running())     return "THE GRID · Connected only (warming up)";
-        return "THE GRID · Mining active";
+        switch (nodeState) {
+            case ENGAGED_FULL:        return "Compute Node · Active";
+            case ENGAGED_ECO:         return "Compute Node · Eco Mode";
+            case PAUSED_POWER:        return "Compute Node · Paused · Power Rule";
+            case PAUSED_BATTERY:      return "Compute Node · Paused · Low Battery";
+            case PAUSED_THERMAL:      return "Compute Node · Paused · Thermal";
+            case ENGINE_UNAVAILABLE:  return "Compute Node · Engine unavailable";
+            case IDLE:
+            default:                  return "Compute Node · Idle";
+        }
     }
 
     @Override
@@ -225,24 +283,9 @@ public class GridWorkerService extends Service {
                     updateNotification(currentNotifText());
                 }
 
-                // v1.3.7 — native mining safety state machine.
-                //   * Operator pressed Start Mining (miningRequested=true)
-                //     AND librandomx.so loaded
-                //     AND not too hot
-                //     AND (charging OR battery >= floor)
-                //   → bring up native mining if it's idle.
-                //   * Otherwise → ensure native mining is stopped.
-                if (miningRequested && RandomXBridge.available()) {
-                    boolean canMine = (charging || batteryPct >= BATTERY_FLOOR_PCT)
-                                    && tempC < TEMP_HARD_STOP_C;
-                    if (canMine && !RandomXBridge.running()) {
-                        tryStartNativeMining(ctx);
-                    } else if (!canMine && RandomXBridge.running()) {
-                        stopNativeMiningSafely();
-                    }
-                } else if (RandomXBridge.running()) {
-                    stopNativeMiningSafely();
-                }
+                // v1.4.8 — recompute power state machine every tick.
+                // Drives notification text + thread count + safe pause/resume.
+                applyPowerStateMachine(ctx);
 
                 // iter-13 / v1.2.7: refresh PARTIAL_WAKE_LOCK every 5s.
                 // Some Android 14/15 OEMs invalidate idle wake-locks; an explicit
@@ -389,12 +432,17 @@ public class GridWorkerService extends Service {
         double  localHashrate  = nativePow ? RandomXBridge.getHashrate() : 0.0;
         int     accepted       = RandomXBridge.getAcceptedShares();
         int     rejected       = RandomXBridge.getRejectedShares();
+        // v1.4.8 — node_state drives the admin UI; mining_status kept for back-compat.
+        String  nodeStateStr   = nodeState.name().toLowerCase(Locale.US);
         String  miningStatus;
-        if (!RandomXBridge.available())          miningStatus = "connected_only";
-        else if (!miningRequested)               miningStatus = "stopped";
-        else if (!RandomXBridge.running())       miningStatus = "warming";
-        else if (tempC > TEMP_THROTTLE_C)        miningStatus = "throttled";
-        else                                     miningStatus = "running";
+        if (!RandomXBridge.available())               miningStatus = "connected_only";
+        else if (!miningRequested)                    miningStatus = "stopped";
+        else if (nodeState == NodeState.PAUSED_POWER) miningStatus = "paused_power";
+        else if (nodeState == NodeState.PAUSED_BATTERY) miningStatus = "paused_battery";
+        else if (nodeState == NodeState.PAUSED_THERMAL) miningStatus = "throttled";
+        else if (nodeState == NodeState.ENGAGED_ECO)  miningStatus = "eco";
+        else if (!RandomXBridge.running())            miningStatus = "warming";
+        else                                          miningStatus = "running";
 
         String netType = onWifi ? "wifi" : "cellular";
 
@@ -402,19 +450,23 @@ public class GridWorkerService extends Service {
             "{\"device_id\":\"%s\",\"charging\":%s,\"wifi\":%s,\"permission\":true," +
             "\"battery\":%d,\"battery_percent\":%d,\"temperature_c\":%.1f,\"thermal\":\"%s\"," +
             "\"network_type\":\"%s\"," +
-            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.3.7\"," +
+            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.4.8\"," +
             "\"stratum_linked\":%s," +
-            "\"native_pow\":%s,\"mining_status\":\"%s\"," +
+            "\"native_pow\":%s,\"mining_status\":\"%s\",\"node_state\":\"%s\"," +
+            "\"eco_mode\":%s,\"allow_on_battery\":%s,\"active_threads\":%d," +
             "\"local_hashrate_hps\":%.2f,\"accepted_shares\":%d,\"rejected_shares\":%d," +
-            "\"native_lib_loaded\":%s,\"mining_requested\":%s}",
+            "\"native_lib_loaded\":%s,\"mining_requested\":%s,\"node_engaged\":%s}",
             deviceId, charging, onWifi, batteryPct, batteryPct, tempC,
             (tempC > TEMP_LIMIT_C ? "hot" : "nominal"),
             netType,
             (eligible ? "active" : "paused"),
             linked,
-            nativePow, miningStatus,
+            nativePow, miningStatus, nodeStateStr,
+            (nodeState == NodeState.ENGAGED_ECO),
+            WorkerState.isAllowOnBattery(ctx),
+            activeThreads,
             localHashrate, accepted, rejected,
-            RandomXBridge.available(), miningRequested);
+            RandomXBridge.available(), miningRequested, miningRequested);
         try {
             String resp = GridApi.post(ctx, "/api/devices/heartbeat", body);
             WorkerState.markHeartbeat(ctx);

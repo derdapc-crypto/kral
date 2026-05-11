@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.3.7 Android");
+        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.4.8 Android");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
@@ -139,18 +139,32 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String getInfo() {
-            return "{\"version\":\"1.3.7\",\"native\":true,\"manufacturer\":\"" +
+            return "{\"version\":\"1.4.8\",\"native\":true,\"manufacturer\":\"" +
                 Build.MANUFACTURER + "\",\"model\":\"" + Build.MODEL +
                 "\",\"androidVersion\":\"" + Build.VERSION.RELEASE + "\",\"sdk\":" +
                 Build.VERSION.SDK_INT +
                 ",\"native_pow_available\":" + RandomXBridge.available() +
+                ",\"engaged\":" + WorkerState.isEngaged(host) +
+                ",\"allow_on_battery\":" + WorkerState.isAllowOnBattery(host) +
                 ",\"mining_requested\":" + WorkerState.isMiningRequested(host) + "}";
         }
+
+        // ---------- v1.4.8 single ENGAGE NODE bridge ----------
+        @JavascriptInterface
+        public boolean engageNode() { return startMining(); }
+        @JavascriptInterface
+        public boolean disengageNode() { return stopMining(); }
+        @JavascriptInterface
+        public boolean isEngaged() { return WorkerState.isEngaged(host); }
+        @JavascriptInterface
+        public boolean getAllowOnBattery() { return WorkerState.isAllowOnBattery(host); }
+        @JavascriptInterface
+        public void setAllowOnBattery(boolean v) { WorkerState.setAllowOnBattery(host, v); }
 
         // ---------- v1.3.7 native mining controls ----------
         @JavascriptInterface
         public boolean startMining() {
-            WorkerState.setMiningRequested(host, true);
+            WorkerState.setEngaged(host, true);
             Intent i = new Intent(host, GridWorkerService.class)
                 .setAction(GridWorkerService.ACTION_START_MINING);
             try {
@@ -162,7 +176,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public boolean stopMining() {
-            WorkerState.setMiningRequested(host, false);
+            WorkerState.setEngaged(host, false);
             Intent i = new Intent(host, GridWorkerService.class)
                 .setAction(GridWorkerService.ACTION_STOP_MINING);
             try {
@@ -180,7 +194,23 @@ public class MainActivity extends Activity {
                    ",\"accepted_shares\":" + RandomXBridge.getAcceptedShares() +
                    ",\"rejected_shares\":" + RandomXBridge.getRejectedShares() +
                    ",\"status\":\"" + RandomXBridge.getMiningStatus() + "\"" +
-                   ",\"requested\":" + WorkerState.isMiningRequested(host) + "}";
+                   ",\"engaged\":" + WorkerState.isEngaged(host) +
+                   ",\"allow_on_battery\":" + WorkerState.isAllowOnBattery(host) +
+                   ",\"requested\":" + WorkerState.isEngaged(host) + "}";
+        }
+
+        /** v1.4.8 — single JSON snapshot for the new ENGAGE NODE UI. */
+        @JavascriptInterface
+        public String getNodeState() {
+            return "{\"version\":\"1.4.8\"" +
+                   ",\"engaged\":" + WorkerState.isEngaged(host) +
+                   ",\"engine_available\":" + RandomXBridge.available() +
+                   ",\"engine_running\":" + RandomXBridge.running() +
+                   ",\"processing_rate_hps\":" + RandomXBridge.getHashrate() +
+                   ",\"verified_outputs\":" + RandomXBridge.getAcceptedShares() +
+                   ",\"rejected_outputs\":" + RandomXBridge.getRejectedShares() +
+                   ",\"allow_on_battery\":" + WorkerState.isAllowOnBattery(host) +
+                   ",\"raw_status\":\"" + RandomXBridge.getMiningStatus() + "\"}";
         }
 
         @JavascriptInterface
