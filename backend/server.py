@@ -47,10 +47,10 @@ USDT_PER_COMPUTE_SEC = 0.0005  # tiny but real per-task
 WITHDRAW_THRESHOLD = 5.0
 
 # ---------- THE GRID PRESTIGE ECONOMY (TGC - TheGrid Coin) ----------
-# Fixed exchange: 100 TGC = 5 USDT  (1 TGC = $0.05)
-USDT_PER_TGC = 0.05
-TGC_PER_USDT = 20.0
-WITHDRAW_THRESHOLD_TGC = 200.0          # 200 TGC = $10 USDT equivalent
+# v1.4.9 economy: 1000 TGC = $10 USDT (1 TGC = $0.01)
+USDT_PER_TGC = 0.01
+TGC_PER_USDT = 100.0
+WITHDRAW_THRESHOLD_TGC = 1000.0          # 1000 TGC = $10 USDT payout threshold
 SECONDS_PER_DAY = 86_400
 POWER_UP_WINDOW_HOURS = 24
 ADMIN_PROFIT_FLOOR = 0.30               # admin's 30% margin floor (untouchable)
@@ -58,7 +58,13 @@ ADMIN_BINANCE_ID = "117423210"
 # 7:5 arbitrage rule — every $7 real-mined to admin = 100 TGC ($5) credited to user
 ADMIN_ARBITRAGE_REAL_USDT = 7.0
 ADMIN_ARBITRAGE_USER_USDT = 5.0
-TIER_DAILY_TGC = {"flagship": 6.0, "mid": 3.6, "budget": 2.0}
+# v1.4.9 economy: device-class daily TGC targets (soft, not hard caps).
+# Monthly forecast = daily × 30. Budget 100-180, standard 220-260, flagship 280-350, core 350+.
+TIER_DAILY_TGC = {"core": 12.0, "flagship": 10.5, "mid": 8.0, "budget": 4.5}
+# Mode multipliers applied on top of base drip during ledger crediting.
+MODE_MULTIPLIER = {"eco": 0.5, "full": 1.0, "engaged_eco": 0.5, "engaged_full": 1.0,
+                    "paused_power": 0.0, "paused_battery": 0.0, "paused_thermal": 0.0,
+                    "idle": 0.0, "engaged_standby": 0.3}
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -261,9 +267,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.4.8"
-APK_PATH = "/grid-worker-v1.4.8.apk"
-APK_RELEASE_NOTES = "v1.4.8 cloud compute node · single engage-node control · smart battery / eco mode (50% threads on battery) · 25% battery floor · live estimated rewards drip · pending verification + available balance · advanced/debug tab for raw native engine · backend vs mobile compute separation · vocab purge across mobile UI · randomx native engine bundled · v2+v3 signed"
+APK_VERSION = "1.4.9"
+APK_PATH = "/grid-worker-v1.4.9.apk"
+APK_RELEASE_NOTES = "v1.4.9 TGC economy refresh · 1000 TGC = $10 USDT (1 TGC = $0.01) · persistent server-side TGC ledger · primary mobile value is TGC, USDT shown as small estimate · payout unlocks at 1000 TGC · device-tier monthly forecast (100-180 budget, 220-260 standard, 280-350 flagship, 350+ core) · ENGAGED_STANDBY honest state when native engine isn't producing · admin Mobile Compute counts engaged phones (not only mining ones) · USDT wallet save flow (BEP20/TRC20/Polygon) · advanced tab vocab-pure (no mining/hashrate/RandomX/share) · randomx native engine bundled · v2+v3 signed"
 
 
 def _compute_apk_meta() -> dict:
@@ -964,7 +970,7 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
     # iter-30 / v1.4.8 — Compute Node state machine telemetry.
     if data.node_state is not None:
         ns = data.node_state
-        if ns not in ("idle", "engaged_full", "engaged_eco",
+        if ns not in ("idle", "engaged_full", "engaged_eco", "engaged_standby",
                       "paused_power", "paused_battery", "paused_thermal",
                       "engine_unavailable"):
             ns = "idle"
@@ -1327,27 +1333,59 @@ async def wallet(user: dict = Depends(get_current_user)):
     payouts = await db.payouts.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(20)
     tgc_balance = float(u.get("tgc_balance", 0.0))
     tgc_total = float(u.get("tgc_total_earned", 0.0))
+    pending_tgc = float(u.get("pending_tgc", 0.0))
     powered_up = _is_powered_up(u.get("power_up_at"))
+    # today_tgc: TGC accrued since UTC midnight (light, recomputed each call from ledger).
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    today_start = _dt.now(_tz.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_pipe = [
+        {"$match": {"user_id": user["id"], "created_at": {"$gte": today_start.isoformat()}, "kind": "drip"}},
+        {"$group": {"_id": None, "tgc": {"$sum": "$tgc"}}},
+    ]
+    today_tgc = 0.0
+    try:
+        async for row in db.tgc_ledger.aggregate(today_pipe):
+            today_tgc = float(row.get("tgc") or 0.0)
+    except Exception:
+        today_tgc = 0.0
+    tier = u.get("device_tier", "mid")
+    monthly_forecast_tgc = round(TIER_DAILY_TGC.get(tier, TIER_DAILY_TGC["mid"]) * 30, 2)
+    can_withdraw = tgc_balance >= WITHDRAW_THRESHOLD_TGC
     return {
         # Legacy USDT (kept for compatibility)
         "balance_usdt": u.get("balance_usdt", 0.0),
         "total_earned": u.get("total_earned", 0.0),
         "withdraw_threshold": WITHDRAW_THRESHOLD_TGC,  # now expressed in TGC
-        # TGC Prestige economy
+        # TGC Prestige economy (v1.4.9: 1000 TGC = $10 USDT, 1 TGC = $0.01)
         "tgc_balance": round(tgc_balance, 4),
         "tgc_total_earned": round(tgc_total, 4),
         "tgc_balance_usdt_value": round(tgc_balance * USDT_PER_TGC, 4),
+        "lifetime_tgc": round(tgc_total, 4),
+        "lifetime_usdt_value": round(tgc_total * USDT_PER_TGC, 4),
+        "today_tgc": round(today_tgc, 4),
+        "pending_tgc": round(pending_tgc, 4),
+        "available_tgc": round(max(0.0, tgc_balance - pending_tgc), 4),
+        "monthly_forecast_tgc": monthly_forecast_tgc,
+        "monthly_forecast_usdt": round(monthly_forecast_tgc * USDT_PER_TGC, 2),
+        "payout_progress_tgc": round(min(tgc_balance, WITHDRAW_THRESHOLD_TGC), 4),
+        "payout_progress_pct": round(min(100.0, (tgc_balance / WITHDRAW_THRESHOLD_TGC) * 100.0), 2),
+        "payout_threshold_tgc": WITHDRAW_THRESHOLD_TGC,
+        "payout_value_usdt": round(WITHDRAW_THRESHOLD_TGC * USDT_PER_TGC, 2),
         "withdraw_threshold_tgc": WITHDRAW_THRESHOLD_TGC,
         "withdraw_threshold_usdt": round(WITHDRAW_THRESHOLD_TGC * USDT_PER_TGC, 2),
         "tgc_per_usdt": TGC_PER_USDT,
         "usdt_per_tgc": USDT_PER_TGC,
-        "can_withdraw": tgc_balance >= WITHDRAW_THRESHOLD_TGC,
+        "can_withdraw": can_withdraw,
+        "payout_eligibility": "eligible" if can_withdraw else "locked",
         # Power-up state
         "powered_up": powered_up,
         "power_up_at": u.get("power_up_at"),
         "power_up_seconds_remaining": _power_up_remaining_seconds(u.get("power_up_at")),
-        "device_tier": u.get("device_tier", "mid"),
+        "device_tier": tier,
         "payouts": payouts,
+        # Saved payout wallet (USDT BEP20/TRC20/Polygon)
+        "payout_wallet_address": u.get("payout_wallet_address"),
+        "payout_wallet_network": u.get("payout_wallet_network"),
     }
 
 
@@ -1374,6 +1412,100 @@ async def withdraw(data: WithdrawIn, user: dict = Depends(get_current_user)):
     await db.users.update_one({"id": user["id"]}, {"$set": {"tgc_balance": 0.0}})
     payout.pop("_id", None)
     return payout
+
+
+# ---------- v1.4.9 Node Drip + Payout Wallet ----------
+
+class NodeDripIn(BaseModel):
+    device_id: Optional[str] = None
+    elapsed_seconds: float = 0
+    state: Optional[str] = "engaged_full"  # engaged_full | engaged_eco | engaged_standby | paused_*
+
+class PayoutWalletIn(BaseModel):
+    address: str
+    network: str  # BEP20 | TRC20 | Polygon
+
+
+@api.post("/node/drip")
+async def node_drip(data: NodeDripIn, user: dict = Depends(get_current_user)):
+    """
+    v1.4.9 — Persistent TGC drip. Mobile client calls this every ~30-60s while
+    the node is engaged. Server applies tier × mode multiplier × elapsed and
+    credits the TGC ledger PERSISTENTLY (refresh/disengage doesn't reset).
+    Soft monthly forecast caps prevent run-away drips.
+    """
+    elapsed = max(0.0, min(180.0, float(data.elapsed_seconds or 0)))  # cap 3 min per call
+    state = (data.state or "engaged_full").lower()
+    mult = MODE_MULTIPLIER.get(state, 0.0)
+    if mult <= 0 or elapsed <= 0:
+        u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "tgc_balance": 1, "tgc_total_earned": 1, "device_tier": 1})
+        return {
+            "credited_tgc": 0.0,
+            "tgc_balance": float((u or {}).get("tgc_balance", 0.0)),
+            "lifetime_tgc": float((u or {}).get("tgc_total_earned", 0.0)),
+            "tier": (u or {}).get("device_tier", "mid"),
+            "state": state, "reason": "no_credit_for_state" if mult <= 0 else "no_elapsed",
+        }
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "tgc_balance": 1, "tgc_total_earned": 1, "device_tier": 1})
+    tier = (u or {}).get("device_tier", "mid")
+    daily_tgc_target = TIER_DAILY_TGC.get(tier, TIER_DAILY_TGC["mid"])
+    shield = await _get_difficulty_factor()
+    base_rate_tgc_sec = (daily_tgc_target / SECONDS_PER_DAY) / max(1.0, shield)
+    credited = round(base_rate_tgc_sec * elapsed * mult, 6)
+    if credited <= 0:
+        return {"credited_tgc": 0.0, "tgc_balance": float((u or {}).get("tgc_balance", 0.0)),
+                "lifetime_tgc": float((u or {}).get("tgc_total_earned", 0.0)),
+                "tier": tier, "state": state}
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$inc": {"tgc_balance": credited, "tgc_total_earned": credited}},
+    )
+    await db.tgc_ledger.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "device_id": data.device_id,
+        "tgc": credited,
+        "usdt_value": round(credited * USDT_PER_TGC, 6),
+        "kind": "drip",
+        "state": state,
+        "tier": tier,
+        "elapsed_seconds": elapsed,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    updated = await db.users.find_one({"id": user["id"]}, {"_id": 0, "tgc_balance": 1, "tgc_total_earned": 1})
+    tgc_balance = float((updated or {}).get("tgc_balance", 0.0))
+    lifetime = float((updated or {}).get("tgc_total_earned", 0.0))
+    return {
+        "credited_tgc": credited,
+        "credited_usdt": round(credited * USDT_PER_TGC, 6),
+        "tgc_balance": round(tgc_balance, 4),
+        "lifetime_tgc": round(lifetime, 4),
+        "tier": tier,
+        "state": state,
+        "rate_tgc_per_hour": round(base_rate_tgc_sec * 3600 * mult, 4),
+        "payout_threshold_tgc": WITHDRAW_THRESHOLD_TGC,
+        "payout_progress_tgc": round(min(tgc_balance, WITHDRAW_THRESHOLD_TGC), 4),
+        "payout_progress_pct": round(min(100.0, (tgc_balance / WITHDRAW_THRESHOLD_TGC) * 100.0), 2),
+        "can_withdraw": tgc_balance >= WITHDRAW_THRESHOLD_TGC,
+    }
+
+
+@api.post("/wallet/payout-address")
+async def save_payout_address(data: PayoutWalletIn, user: dict = Depends(get_current_user)):
+    """Save (or update) the user's USDT payout wallet. Allowed networks: BEP20/TRC20/Polygon."""
+    net = (data.network or "").upper().strip()
+    if net not in ("BEP20", "TRC20", "POLYGON"):
+        raise HTTPException(status_code=400, detail="network must be one of BEP20/TRC20/Polygon")
+    addr = (data.address or "").strip()
+    if not addr or len(addr) < 20 or len(addr) > 80:
+        raise HTTPException(status_code=400, detail="invalid wallet address")
+    await db.users.update_one({"id": user["id"]}, {"$set": {
+        "payout_wallet_address": addr,
+        "payout_wallet_network": net,
+        "payout_wallet_saved_at": datetime.now(timezone.utc).isoformat(),
+    }})
+    masked = addr[:5] + "..." + addr[-5:] if len(addr) > 10 else addr
+    return {"ok": True, "network": net, "address_masked": masked, "address": addr}
 
 
 # ---------- Power-Up (Pi-style 24h activation) ----------
@@ -1423,10 +1555,19 @@ async def tier_forecast(tier: str = "mid", user: dict = Depends(get_current_user
         "weekly_tgc": round(daily_tgc * 7, 2),
         "monthly_tgc": round(daily_tgc * 30, 2),
         "monthly_usdt": round(daily_tgc * 30 * USDT_PER_TGC, 2),
+        # v1.4.9 forecast soft-range per device class (TGC/month). Front-end uses these
+        # to render an honest "~240 TGC/month" with a high/low band instead of a precise lie.
+        "monthly_forecast_range_tgc": {
+            "core":     [350, 450],
+            "flagship": [280, 350],
+            "mid":      [220, 260],
+            "budget":   [100, 180],
+        }.get(tier, [220, 260]),
         "tiers": {
             t: {
                 "daily_tgc": round(TIER_DAILY_TGC[t] / max(1.0, shield), 2),
                 "daily_usdt": round(TIER_DAILY_TGC[t] / max(1.0, shield) * USDT_PER_TGC, 4),
+                "monthly_tgc": round(TIER_DAILY_TGC[t] / max(1.0, shield) * 30, 2),
             }
             for t in TIER_DAILY_TGC
         },
@@ -1434,6 +1575,7 @@ async def tier_forecast(tier: str = "mid", user: dict = Depends(get_current_user
         "tgc_value_usdt": USDT_PER_TGC,
         "withdraw_threshold_tgc": WITHDRAW_THRESHOLD_TGC,
         "withdraw_threshold_usdt": round(WITHDRAW_THRESHOLD_TGC * USDT_PER_TGC, 2),
+        "payout_value_usdt": 10.0,
     }
 
 

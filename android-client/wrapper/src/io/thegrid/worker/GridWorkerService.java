@@ -51,6 +51,7 @@ public class GridWorkerService extends Service {
         IDLE,                // operator hasn't engaged
         ENGAGED_FULL,        // charging → full threads
         ENGAGED_ECO,         // on battery, allow-on-battery=on, battery >= floor
+        ENGAGED_STANDBY,     // operator engaged but native engine not yet producing
         PAUSED_POWER,        // on battery, allow-on-battery=off
         PAUSED_BATTERY,      // on battery, battery < floor
         PAUSED_THERMAL,      // device too hot
@@ -218,7 +219,15 @@ public class GridWorkerService extends Service {
         if (!RandomXBridge.running() || activeThreads != desiredThreads) {
             if (RandomXBridge.running()) stopNativeMiningSafely();
             boolean ok = RandomXBridge.startMining("", "", "x", desiredThreads);
-            if (ok) activeThreads = desiredThreads;
+            if (ok) {
+                activeThreads = desiredThreads;
+            } else {
+                // Engine failed to spin up — operator is ENGAGED but the native
+                // engine is in standby. Backend admin still counts this as
+                // engaged_phones but engine_active_phones stays 0 (honest).
+                nodeState = NodeState.ENGAGED_STANDBY;
+                activeThreads = 0;
+            }
         }
     }
 
@@ -236,6 +245,7 @@ public class GridWorkerService extends Service {
         switch (nodeState) {
             case ENGAGED_FULL:        return "Compute Node · Active";
             case ENGAGED_ECO:         return "Compute Node · Eco Mode";
+            case ENGAGED_STANDBY:     return "Compute Node · Engaged · Standby";
             case PAUSED_POWER:        return "Compute Node · Paused · Power Rule";
             case PAUSED_BATTERY:      return "Compute Node · Paused · Low Battery";
             case PAUSED_THERMAL:      return "Compute Node · Paused · Thermal";
@@ -450,7 +460,7 @@ public class GridWorkerService extends Service {
             "{\"device_id\":\"%s\",\"charging\":%s,\"wifi\":%s,\"permission\":true," +
             "\"battery\":%d,\"battery_percent\":%d,\"temperature_c\":%.1f,\"thermal\":\"%s\"," +
             "\"network_type\":\"%s\"," +
-            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.4.8\"," +
+            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.4.9\"," +
             "\"stratum_linked\":%s," +
             "\"native_pow\":%s,\"mining_status\":\"%s\",\"node_state\":\"%s\"," +
             "\"eco_mode\":%s,\"allow_on_battery\":%s,\"active_threads\":%d," +

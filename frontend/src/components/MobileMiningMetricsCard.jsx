@@ -89,8 +89,9 @@ export default function MobileMiningMetricsCard() {
           active={mc.active}
           testId="lane-mobile-compute"
           rows={[
-            { label: "Connected Phones", value: mc.connected_phones ?? 0, accent: "cyan", testId: "lane-mobile-connected" },
+            { label: "Connected Phones", value: mc.connected_phones ?? 0, accent: (mc.connected_phones ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-mobile-connected" },
             { label: "Engaged Phones", value: mc.engaged_phones ?? 0, accent: (mc.engaged_phones ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-mobile-engaged" },
+            { label: "Engine Active", value: mc.engine_active_phones ?? 0, accent: (mc.engine_active_phones ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-mobile-engine-active" },
             { label: "Processing Rate", value: fmtH(mc.hashrate_hps), accent: mc.hashrate_hps > 0 ? "matrix" : "cyan", testId: "lane-mobile-hashrate" },
             { label: "Verified Outputs", value: mc.accepted_outputs ?? 0, accent: (mc.accepted_outputs ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-mobile-accepted" },
           ]}
@@ -158,11 +159,14 @@ export default function MobileMiningMetricsCard() {
                 <ChevronRight className="w-3 h-3 cyan-text flex-shrink-0" />
                 <span className="cyan-text w-32 truncate">{d.name || d.device_id}</span>
                 <span className="text-white/55 w-32 truncate">{d.model || "—"}</span>
+                <span className={`w-32 truncate text-[10px] uppercase tracking-widest ${d.engine_active ? "matrix-text" : "text-white/55"}`}>
+                  {(d.node_state || "engaged_standby").replace(/_/g, " ")}
+                </span>
                 <span className="matrix-text w-24">{fmtH(d.hashrate_hps)}</span>
-                <span className="text-white/65 w-20">sub:{d.submitted ?? 0}</span>
                 <span className="text-white/65 w-20">acc:{d.accepted}</span>
                 <span className="text-white/45 w-20">bat:{d.battery ?? "?"}%</span>
                 <span className="text-white/45">{d.network || ""}</span>
+                {d.engine_active && <span className="cyber-pill matrix-pill text-[8px]">● ENGINE</span>}
                 {d.verified && <span className="cyber-pill matrix-pill text-[8px]">✓ VERIFIED</span>}
               </div>
             ))}

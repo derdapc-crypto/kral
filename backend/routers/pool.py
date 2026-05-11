@@ -357,26 +357,43 @@ def build_router(require_admin) -> APIRouter:
                                          "bridge_rejected_shares": 0}
 
         cutoff = (datetime.now(timezone.utc) - timedelta(seconds=90)).isoformat()
+        # v1.4.9 — include both legacy is_real_apk=true AND any v1.4.x device.
+        # Older Buket-style devices registered as platform=mobile (WebView fallback)
+        # were never flagged is_real_apk; we now recognise them by app_version.
         connected_cur = db.devices.find(
-            {"last_heartbeat": {"$gte": cutoff}, "is_real_apk": True},
+            {"last_heartbeat": {"$gte": cutoff},
+             "$or": [
+                 {"is_real_apk": True},
+                 {"app_version": {"$regex": "^1\\.4\\."}},
+             ]},
             {"_id": 0, "id": 1, "name": 1, "model": 1, "native_pow": 1,
              "mining_status": 1, "local_hashrate_hps": 1,
              "mobile_accepted_shares": 1, "mobile_rejected_shares": 1,
              "mobile_submitted_shares": 1,
              "battery_percent": 1, "temperature_c": 1, "network_type": 1,
              "last_heartbeat": 1, "app_version": 1,
-             "mobile_native_verified": 1, "native_lib_sha256": 1},
+             "mobile_native_verified": 1, "native_lib_sha256": 1,
+             "node_state": 1, "node_engaged": 1, "eco_mode": 1, "allow_on_battery": 1,
+             "active_threads": 1, "mining_requested": 1, "user_id": 1},
         )
         devices = await connected_cur.to_list(500)
         connected_phones = len(devices)
-        mining_devices = [d for d in devices
-                          if bool(d.get("native_pow"))
-                          and float(d.get("local_hashrate_hps") or 0) > 0]
-        mining_phones = len(mining_devices)
-        mobile_native_hashrate_hps = sum(float(d.get("local_hashrate_hps") or 0) for d in mining_devices)
-        mobile_accepted_shares  = sum(int(d.get("mobile_accepted_shares") or 0)  for d in mining_devices)
-        mobile_rejected_shares  = sum(int(d.get("mobile_rejected_shares") or 0)  for d in mining_devices)
-        mobile_submitted_shares = sum(int(d.get("mobile_submitted_shares") or 0) for d in mining_devices)
+        # v1.4.9 — Engaged = operator tapped ENGAGE NODE (node_engaged OR mining_requested).
+        # Engine-active = native engine is actually producing hashrate.
+        engaged_devices = [d for d in devices
+                           if bool(d.get("node_engaged") or d.get("mining_requested"))]
+        engaged_phones = len(engaged_devices)
+        engine_active_devices = [d for d in devices
+                                 if bool(d.get("native_pow"))
+                                 and float(d.get("local_hashrate_hps") or 0) > 0]
+        engine_active_phones = len(engine_active_devices)
+        # Keep legacy alias for back-compat (older Admin code).
+        mining_devices = engine_active_devices
+        mining_phones = engine_active_phones
+        mobile_native_hashrate_hps = sum(float(d.get("local_hashrate_hps") or 0) for d in engine_active_devices)
+        mobile_accepted_shares  = sum(int(d.get("mobile_accepted_shares") or 0)  for d in engaged_devices)
+        mobile_rejected_shares  = sum(int(d.get("mobile_rejected_shares") or 0)  for d in engaged_devices)
+        mobile_submitted_shares = sum(int(d.get("mobile_submitted_shares") or 0) for d in engaged_devices)
 
         rx = rx_status() or {}
         sha = sha_status() or {}
@@ -398,12 +415,13 @@ def build_router(require_admin) -> APIRouter:
         mobile_compute = {
             "label": "Mobile Compute",
             "connected_phones": connected_phones,
-            "engaged_phones": mining_phones,
+            "engaged_phones": engaged_phones,
+            "engine_active_phones": engine_active_phones,
             "hashrate_hps": round(mobile_native_hashrate_hps, 2),
             "submitted_outputs": mobile_submitted_shares,
             "accepted_outputs": mobile_accepted_shares,
             "rejected_outputs": mobile_rejected_shares,
-            "active": (mobile_native_hashrate_hps > 0),
+            "active": (engaged_phones > 0),
         }
         total_compute = {
             "label": "Total Compute",
@@ -449,8 +467,17 @@ def build_router(require_admin) -> APIRouter:
                     "network": d.get("network_type"),
                     "app_version": d.get("app_version"),
                     "verified": bool(d.get("mobile_native_verified")),
+                    "node_state": d.get("node_state") or (
+                        "engaged_standby" if (d.get("node_engaged") or d.get("mining_requested"))
+                        and not (d.get("native_pow") and float(d.get("local_hashrate_hps") or 0) > 0)
+                        else ("engaged_full" if d.get("native_pow") else "idle")
+                    ),
+                    "node_engaged": bool(d.get("node_engaged") or d.get("mining_requested")),
+                    "engine_active": bool(d.get("native_pow") and float(d.get("local_hashrate_hps") or 0) > 0),
+                    "eco_mode": bool(d.get("eco_mode")),
+                    "active_threads": int(d.get("active_threads") or 0),
                 }
-                for d in mining_devices
+                for d in engaged_devices
             ],
         }
 

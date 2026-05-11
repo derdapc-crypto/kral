@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.4.8 Android");
+        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.4.9 Android");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
@@ -139,7 +139,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String getInfo() {
-            return "{\"version\":\"1.4.8\",\"native\":true,\"manufacturer\":\"" +
+            return "{\"version\":\"1.4.9\",\"native\":true,\"manufacturer\":\"" +
                 Build.MANUFACTURER + "\",\"model\":\"" + Build.MODEL +
                 "\",\"androidVersion\":\"" + Build.VERSION.RELEASE + "\",\"sdk\":" +
                 Build.VERSION.SDK_INT +
@@ -202,7 +202,7 @@ public class MainActivity extends Activity {
         /** v1.4.8 — single JSON snapshot for the new ENGAGE NODE UI. */
         @JavascriptInterface
         public String getNodeState() {
-            return "{\"version\":\"1.4.8\"" +
+            return "{\"version\":\"1.4.9\"" +
                    ",\"engaged\":" + WorkerState.isEngaged(host) +
                    ",\"engine_available\":" + RandomXBridge.available() +
                    ",\"engine_running\":" + RandomXBridge.running() +

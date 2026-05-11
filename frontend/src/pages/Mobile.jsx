@@ -2,43 +2,44 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../lib/api";
-import { executeTask } from "../lib/compute";
 import {
-  Power, BatteryCharging, Wifi, ShieldCheck, ChevronRight, LogOut, Hexagon,
-  Sparkles, Cpu, Activity, BatteryLow, AlertTriangle, Layers, Terminal,
+  Power, BatteryCharging, ShieldCheck, LogOut, Hexagon,
+  Sparkles, Cpu, AlertTriangle, Terminal, Wallet, ArrowUpRight,
 } from "lucide-react";
 import { detectDeviceTier } from "../lib/tier";
 
 /**
- * Mobile.jsx — v1.4.8 "Cloud Compute Node" overhaul.
+ * Mobile.jsx — v1.4.9 "Cloud Compute Node" + new TGC economy.
  *
- *  • Single ENGAGE NODE button (start/stop unified) — calls the native bridge
- *    `window.GridNative.engageNode()` / `disengageNode()` if running inside
- *    the APK; falls back to a web-only loop on plain browsers.
- *  • Smart Battery state: "Allow Compute on Battery" toggle. When OFF the
- *    engine pauses on unplug; when ON it runs in Eco Mode (50% threads) and
- *    pauses if battery < 25%.
- *  • Live Estimated Rewards visual drip counter (cosmetic, increments while
- *    state == ACTIVE). Real Pending Verification + Available Balance pulled
- *    from /api/wallet (truthful).
- *  • Vocabulary purge: no "mining" / "hashrate" / "RandomX" / "share" on the
- *    primary surface — all of that lives behind the Advanced / Debug tab.
+ *  Core rules (per Operator decree):
+ *    • Primary value on Compute Node = TGC, USDT only as small estimate
+ *    • 1000 TGC = $10 USDT (1 TGC = $0.01)
+ *    • Payout unlocks at 1000 TGC
+ *    • TGC ledger is server-side PERSISTENT — disengage/refresh does NOT reset
+ *    • Drip = backend /node/drip call every 30s while engaged (state-aware)
+ *    • Advanced tab is vocab-pure: no mining/RandomX/share/hashrate/H/s
+ *    • Single ENGAGE NODE button + Smart Battery toggle (Eco Mode)
  */
 
+const TGC_TO_USDT = 0.01;        // 1 TGC = $0.01 USDT
+const PAYOUT_THRESHOLD_TGC = 1000;
+const DRIP_INTERVAL_MS = 30000;  // 30s server drip cadence
 const TABS = [
   { id: "node", label: "Compute Node" },
   { id: "rewards", label: "Rewards" },
   { id: "advanced", label: "Advanced" },
 ];
+const NETWORKS = ["BEP20", "TRC20", "Polygon"];
 
 function nativeBridge() {
   if (typeof window === "undefined") return null;
   return window.GridNative || null;
 }
-
 function safeJSON(fn, fallback = {}) {
   try { const s = fn(); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
 }
+function fmtTGC(n) { return Number(n || 0).toFixed(2); }
+function fmtUSDT(n) { return Number(n || 0).toFixed(2); }
 
 export default function Mobile() {
   const { user, logout } = useAuth();
@@ -47,19 +48,19 @@ export default function Mobile() {
   const [wallet, setWallet] = useState(null);
   const [engaged, setEngaged] = useState(false);
   const [allowBattery, setAllowBattery] = useState(true);
-  const [nodeStatus, setNodeStatus] = useState(null); // native bridge snapshot
+  const [nodeStatus, setNodeStatus] = useState(null);
   const [tab, setTab] = useState("node");
-  const [tasksDone, setTasksDone] = useState(0);
-  const [sessionEarned, setSessionEarned] = useState(0);
-  const [estimatedDrip, setEstimatedDrip] = useState(0);
-  const [tierMonthly, setTierMonthly] = useState(0);
+  const [sessionEstimatedTGC, setSessionEstimatedTGC] = useState(0);
+  const [forecast, setForecast] = useState(null);
+  const [walletAddr, setWalletAddr] = useState("");
+  const [walletNet, setWalletNet] = useState("BEP20");
+  const [savingWallet, setSavingWallet] = useState(false);
   const [err, setErr] = useState("");
-  const runningRef = useRef(false);
   const dripRef = useRef(null);
+  const engagedAtRef = useRef(null);
 
   const isNative = !!nativeBridge();
 
-  // Pull native bridge snapshot
   const refreshNative = () => {
     const bridge = nativeBridge();
     if (!bridge) return;
@@ -80,8 +81,22 @@ export default function Mobile() {
         if (!data.length) {
           const ua = navigator.userAgent;
           const brand = /iPhone|iPad/i.test(ua) ? "Apple" : /Samsung/i.test(ua) ? "Samsung" : /Pixel/i.test(ua) ? "Google" : "Mobile";
+          // v1.4.9 — register as platform=android when running inside the APK
+          // so admin counts us as a real APK device (not browser demo).
+          const isNativeApk = (typeof window !== "undefined") &&
+            (window.__GRID_NATIVE__ === true || /GridWorker\//.test(navigator.userAgent || ""));
           const { data: dev } = await api.post("/devices/register", {
-            name: `${brand} Mobile`, model: tier, platform: "mobile", brand,
+            name: `${brand} Mobile`,
+            model: tier,
+            platform: isNativeApk ? "android" : "mobile",
+            brand,
+            app_version: isNativeApk ? "1.4.8" : undefined,
+            device_id: isNativeApk
+              ? (localStorage.getItem("grid_native_device_id")
+                || (localStorage.setItem("grid_native_device_id",
+                    "MOB-" + Math.random().toString(36).slice(2, 10)),
+                    localStorage.getItem("grid_native_device_id")))
+              : undefined,
           });
           setDevice(dev);
         } else {
@@ -90,57 +105,69 @@ export default function Mobile() {
       } catch {}
     })();
     refreshWallet();
+    refreshForecast();
     refreshNative();
-    const t = setInterval(() => { refreshWallet(); refreshNative(); }, 4000);
+    const t = setInterval(() => { refreshWallet(); refreshNative(); }, 5000);
     return () => clearInterval(t);
     // eslint-disable-next-line
   }, [user]);
 
   const refreshWallet = async () => {
-    try { const { data } = await api.get("/wallet"); setWallet(data); } catch {}
+    try { const { data } = await api.get("/wallet"); setWallet(data); if (data?.payout_wallet_address) { setWalletAddr(data.payout_wallet_address); } if (data?.payout_wallet_network) setWalletNet(data.payout_wallet_network); } catch {}
   };
 
-  useEffect(() => {
-    const tier = detectDeviceTier();
-    api.get(`/tier/forecast?tier=${tier}`)
-      .then(({ data }) => setTierMonthly(data?.monthly_usdt ?? data?.monthly_tgc ?? 0))
-      .catch(() => {});
-  }, []);
+  const refreshForecast = async () => {
+    try {
+      const tier = detectDeviceTier();
+      const { data } = await api.get(`/tier/forecast?tier=${tier}`);
+      setForecast(data);
+    } catch {}
+  };
 
-  // Live Estimated Rewards drip — cosmetic, increments only while engaged.
-  // ~0.0001 USDT every 2.5s so a 24h engaged session shows a believable
-  // ~3.5 USDT slow drip. Resets on disengage. NEVER touches real wallet.
+  // Backend-driven persistent drip — every 30s while engaged.
   useEffect(() => {
     if (dripRef.current) { clearInterval(dripRef.current); dripRef.current = null; }
-    if (!engaged) return;
-    dripRef.current = setInterval(() => {
-      setEstimatedDrip((v) => v + 0.0001);
-    }, 2500);
-    return () => { if (dripRef.current) clearInterval(dripRef.current); };
-  }, [engaged]);
-
-  // Web fallback compute loop (only used when not running inside the APK).
-  const runWebLoop = async () => {
-    while (runningRef.current && device) {
-      try {
-        const { data: task } = await api.post(`/tasks/request?device_id=${device.id}`);
-        const { result, compute_ms } = await executeTask(task);
-        const { data: sub } = await api.post("/tasks/submit", {
-          task_id: task.id, device_id: device.id, result, compute_ms,
-        });
-        if (sub.verified) {
-          setSessionEarned((p) => p + (sub.earned_tgc || 0));
-          setTasksDone((p) => p + 1);
-          await refreshWallet();
-        }
-      } catch {
-        await new Promise(r => setTimeout(r, 2000));
-      }
-      await new Promise(r => setTimeout(r, 250));
+    if (!engaged) {
+      engagedAtRef.current = null;
+      return;
     }
-  };
+    if (!engagedAtRef.current) engagedAtRef.current = Date.now();
 
-  // Heartbeat ping for web sessions (native APK has its own service heartbeat).
+    const doDrip = async () => {
+      const lastTs = engagedAtRef.current || Date.now();
+      const now = Date.now();
+      const elapsed = Math.min(180, Math.max(0, (now - lastTs) / 1000));
+      engagedAtRef.current = now;
+      const state = nativeBridge() && nodeStatus?.engine_running
+        ? "engaged_full"
+        : (nativeBridge() && !nodeStatus?.engine_running && nodeStatus?.engine_available
+          ? "engaged_standby"
+          : (engaged ? "engaged_full" : "idle"));
+      try {
+        const { data } = await api.post("/node/drip", {
+          device_id: device?.id,
+          elapsed_seconds: elapsed,
+          state,
+        });
+        if (data?.credited_tgc) {
+          setSessionEstimatedTGC((v) => v + Number(data.credited_tgc || 0));
+        }
+        if (typeof data?.tgc_balance === "number") {
+          setWallet((w) => ({ ...(w || {}), tgc_balance: data.tgc_balance,
+            lifetime_tgc: data.lifetime_tgc ?? w?.lifetime_tgc,
+            payout_progress_tgc: data.payout_progress_tgc ?? w?.payout_progress_tgc,
+            payout_progress_pct: data.payout_progress_pct ?? w?.payout_progress_pct,
+            can_withdraw: data.can_withdraw ?? w?.can_withdraw }));
+        }
+      } catch {}
+    };
+    doDrip();
+    dripRef.current = setInterval(doDrip, DRIP_INTERVAL_MS);
+    return () => { if (dripRef.current) clearInterval(dripRef.current); };
+    // eslint-disable-next-line
+  }, [engaged, device, nodeStatus]);
+
+  // Heartbeat ping (web fallback only — APK has its own service heartbeat)
   useEffect(() => {
     if (!device || isNative) return;
     const tick = async () => {
@@ -149,7 +176,9 @@ export default function Mobile() {
           device_id: device.id, charging: true, wifi: true, permission: true, battery: 88,
           thermal: "nominal", country: "US",
           worker_state: engaged ? "active" : "stopped",
-          node_engaged: engaged, node_state: engaged ? "engaged_full" : "idle",
+          node_engaged: engaged,
+          node_state: engaged ? "engaged_standby" : "idle",
+          app_version: "1.4.8",
         });
       } catch {}
     };
@@ -158,32 +187,24 @@ export default function Mobile() {
     return () => clearInterval(t);
   }, [device, engaged, isNative]);
 
-  useEffect(() => () => { runningRef.current = false; }, []);
-
   const handleEngage = () => {
     setErr("");
     if (!device) { setErr("Compute node not registered yet — please wait."); return; }
     const bridge = nativeBridge();
     if (engaged) {
-      // Disengage
-      runningRef.current = false;
       setEngaged(false);
       try { bridge && bridge.disengageNode && bridge.disengageNode(); } catch {}
       try { bridge && bridge.stopWorker && bridge.stopWorker(); } catch {}
       try { api.post("/worker/stop", { device_id: device.id }); } catch {}
       return;
     }
-    // Engage
     setEngaged(true);
-    runningRef.current = true;
-    setEstimatedDrip(0);
     try {
       const token = localStorage.getItem("grid_token") || "";
       if (bridge && bridge.engageNode) bridge.engageNode();
       else if (bridge && bridge.startWorker) bridge.startWorker(device.id, token);
     } catch {}
     try { api.post("/worker/start", { device_id: device.id }); } catch {}
-    if (!isNative) runWebLoop();
   };
 
   const toggleAllowBattery = (v) => {
@@ -192,15 +213,45 @@ export default function Mobile() {
     try { bridge && bridge.setAllowOnBattery && bridge.setAllowOnBattery(!!v); } catch {}
   };
 
-  const usdBalance = wallet?.tgc_balance_usdt_value ?? 0;
-  const pendingVerification = (sessionEarned * 0.05); // session reward in USD (truthful: 1 TGC = $0.05)
-  const drip = (estimatedDrip).toFixed(4);
+  const saveWallet = async () => {
+    setErr("");
+    if (!walletAddr || walletAddr.length < 20) { setErr("Wallet address looks invalid."); return; }
+    setSavingWallet(true);
+    try {
+      await api.post("/wallet/payout-address", { address: walletAddr, network: walletNet });
+      await refreshWallet();
+    } catch (e) {
+      setErr(e?.response?.data?.detail || "Failed to save wallet.");
+    } finally { setSavingWallet(false); }
+  };
+
+  const requestPayout = async () => {
+    setErr("");
+    if (!walletAddr) { setErr("Set your USDT wallet address first."); return; }
+    try {
+      await api.post("/wallet/withdraw", { address: walletAddr });
+      await refreshWallet();
+    } catch (e) {
+      setErr(e?.response?.data?.detail || "Payout request failed.");
+    }
+  };
+
+  const tgcBalance = Number(wallet?.tgc_balance ?? 0);
+  const lifetimeTGC = Number(wallet?.lifetime_tgc ?? wallet?.tgc_total_earned ?? 0);
+  const pendingTGC = Number(wallet?.pending_tgc ?? 0);
+  const availableTGC = Number(wallet?.available_tgc ?? Math.max(0, tgcBalance - pendingTGC));
+  const todayTGC = Number(wallet?.today_tgc ?? 0);
+  const progressTGC = Number(wallet?.payout_progress_tgc ?? Math.min(tgcBalance, PAYOUT_THRESHOLD_TGC));
+  const progressPct = Math.min(100, (tgcBalance / PAYOUT_THRESHOLD_TGC) * 100);
+  const canWithdraw = !!(wallet?.can_withdraw);
+  const monthlyForecastTGC = Number(forecast?.monthly_tgc ?? wallet?.monthly_forecast_tgc ?? 0);
+  const monthlyForecastUSDT = monthlyForecastTGC * TGC_TO_USDT;
+  const tierLabel = (wallet?.device_tier || forecast?.tier || "mid").toUpperCase();
+
   const statusLabel = nodeLabel(nodeStatus, engaged);
-  const statusAccent = statusLabel.tone;
 
   return (
     <div className="min-h-screen cyber-bg pb-20" data-testid="mobile-screen">
-      {/* Top bar */}
       <div className="px-5 pt-5 pb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Hexagon className="w-6 h-6 cyan-text" />
@@ -221,7 +272,6 @@ export default function Mobile() {
       </div>
 
       <div className="px-5">
-        {/* Greeting */}
         <div className="mt-2">
           <div className="text-[10px] uppercase tracking-[0.3em] cyan-text">/ compute_node</div>
           <h1 className="font-mono-cyber text-2xl font-black tracking-tighter mt-1" data-testid="mobile-greeting">
@@ -232,7 +282,6 @@ export default function Mobile() {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="mt-5 grid grid-cols-3 gap-1.5 rounded-2xl p-1 bg-black/40 border border-white/10" data-testid="mobile-tabs">
           {TABS.map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -245,10 +294,8 @@ export default function Mobile() {
           ))}
         </div>
 
-        {/* COMPUTE NODE TAB */}
         {tab === "node" && (
           <>
-            {/* ENGAGE NODE — single massive button */}
             <div className="mt-6 grid place-items-center">
               <button onClick={handleEngage}
                 disabled={!device}
@@ -271,51 +318,79 @@ export default function Mobile() {
                   <div className="absolute inset-0 rounded-full border-2 border-[#00ff88]/40 animate-ping" />
                 )}
               </button>
-              <div className={`mt-4 text-[11px] tracking-[0.3em] uppercase font-semibold ${statusAccent}`}
+              <div className={`mt-4 text-[11px] tracking-[0.3em] uppercase font-semibold ${statusLabel.tone}`}
                    data-testid="node-status-label">
                 {statusLabel.text}
               </div>
               {err && <div className="mt-2 text-xs text-red-400" data-testid="mobile-err">{err}</div>}
             </div>
 
-            {/* Live Estimated Rewards drip — cosmetic */}
+            {/* TGC Session card — primary value is TGC */}
             <div className="mt-7 rounded-3xl border border-[#00ff88]/25 bg-black/55 p-5 relative overflow-hidden"
-                 data-testid="live-reward-drip-card">
+                 data-testid="session-tgc-card">
               <div className="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-[#00ff88]/15 blur-3xl" />
               <div className="relative">
                 <div className="text-[10px] uppercase tracking-[0.3em] text-white/45 flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 matrix-text" /> Live Estimated Rewards
+                  <Sparkles className="w-3 h-3 matrix-text" /> Session TGC
                 </div>
                 <div className="mt-2 flex items-baseline gap-2">
                   <div className="text-4xl font-mono-cyber font-black matrix-text font-mono-num"
-                       data-testid="live-reward-drip-value">
-                    +${drip}
+                       data-testid="session-tgc-value">
+                    +{sessionEstimatedTGC.toFixed(4)} <span className="text-white/55 text-sm">TGC</span>
                   </div>
-                  <div className="text-white/50 text-xs">USD (estimated)</div>
                 </div>
-                <div className="text-[10px] text-white/40 mt-0.5">
-                  Visual projection while your node is engaged · settles into Pending after verification
+                <div className="text-[10px] text-white/40 mt-1">
+                  Today {todayTGC.toFixed(2)} TGC · ≈ ${(todayTGC * TGC_TO_USDT).toFixed(2)} USDT
                 </div>
               </div>
             </div>
 
-            {/* Pending + Available — truthful */}
-            <div className="mt-3 grid grid-cols-2 gap-3" data-testid="truthful-balances-grid">
-              <Box label="Pending Verification" value={`$${pendingVerification.toFixed(4)}`}
-                   sub="awaiting network confirmation" testId="pending-verification" />
-              <Box label="Available Balance" value={`$${usdBalance.toFixed(4)}`}
-                   sub={wallet?.can_withdraw ? "withdraw enabled" : `payout at $${(wallet?.withdraw_threshold_usdt ?? 10).toFixed(2)}`}
-                   testId="available-balance" />
+            {/* TGC Balance + Payout Progress */}
+            <div className="mt-3 rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="tgc-balance-card">
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">TGC Balance</div>
+                  <div className="mt-1 font-mono-cyber font-black text-3xl cyan-text" data-testid="tgc-balance-value">
+                    {fmtTGC(tgcBalance)} <span className="text-white/55 text-sm">TGC</span>
+                  </div>
+                  <div className="text-[10px] text-white/45 mt-0.5">
+                    Estimated Value ≈ ${(tgcBalance * TGC_TO_USDT).toFixed(2)} USDT
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">Payout Progress</div>
+                  <div className="mt-1 font-mono-cyber font-black text-sm matrix-text" data-testid="payout-progress-text">
+                    {fmtTGC(progressTGC)} / {PAYOUT_THRESHOLD_TGC} TGC
+                  </div>
+                  <div className="text-[10px] text-white/40">{progressPct.toFixed(1)}%</div>
+                </div>
+              </div>
+              <div className="mt-3 w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-[#00ffe1] via-[#00ff88] to-[#00d4ff]"
+                     style={{ width: `${progressPct}%` }} data-testid="payout-progress-bar" />
+              </div>
+              <div className="mt-2 text-[10px] text-white/45">
+                Next Payout · {PAYOUT_THRESHOLD_TGC} TGC = $10 USDT
+              </div>
             </div>
 
-            {/* Smart Battery / Eco Mode */}
-            <div className="mt-5 rounded-2xl bg-black/40 border border-[#00ffe1]/15 p-4"
+            {/* Node detail rows */}
+            <div className="mt-3 rounded-2xl bg-black/40 border border-white/10 p-4 grid grid-cols-2 gap-3 text-xs"
+                 data-testid="node-detail-grid">
+              <Row k="Node State" v={statusLabel.short} accent={statusLabel.tone} testId="row-node-state" />
+              <Row k="Safety" v={engaged ? "Protected" : "Idle"} testId="row-safety" />
+              <Row k="Network" v={isNative ? "Connected · Native" : "Connected · Web"} testId="row-network" />
+              <Row k="Reward Sync" v="TGC ledger synced" testId="row-reward-sync" />
+            </div>
+
+            {/* Smart Battery */}
+            <div className="mt-4 rounded-2xl bg-black/40 border border-[#00ffe1]/15 p-4"
                  data-testid="smart-battery-card">
               <div className="text-[10px] uppercase tracking-[0.3em] cyan-text flex items-center gap-1.5">
                 <ShieldCheck className="w-3 h-3" /> Smart Power Rules
               </div>
               <Toggle
-                label="Allow Compute on Battery"
+                label="Battery Compute Allowed"
                 description={allowBattery
                   ? "Eco Mode active when unplugged · pauses below 25%"
                   : "Pauses the moment the charger is unplugged"}
@@ -325,70 +400,139 @@ export default function Mobile() {
                 testId="toggle-allow-on-battery"
               />
               <div className="mt-3 text-[10px] text-white/40 leading-relaxed">
-                <span className="cyan-text">{">"}</span> Plugged in → Full power · Unplugged + toggle on → Eco Mode (50% threads) · Battery {"<"} 25% → Auto pause
+                <span className="cyan-text">{">"}</span> Plugged in → Full Mode · Unplugged + toggle on → Eco Mode (half threads) · Battery {"<"} 25% → Auto pause
               </div>
             </div>
           </>
         )}
 
-        {/* REWARDS TAB */}
         {tab === "rewards" && (
-          <div className="mt-6 space-y-4">
-            <Box big label="Available Balance" value={`$${usdBalance.toFixed(4)}`}
-                 sub={`Lifetime $${((wallet?.tgc_total_earned ?? 0) * 0.05).toFixed(2)} · ${wallet?.tgc_balance ?? 0} reward units`}
-                 testId="rewards-balance" />
+          <div className="mt-6 space-y-3" data-testid="rewards-tab-content">
+            {/* Hero TGC balance */}
+            <div className="rounded-2xl bg-black/40 border border-white/10 p-5" data-testid="rewards-balance-card">
+              <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">TGC Balance</div>
+              <div className="mt-1 font-mono-cyber font-black text-4xl cyan-text" data-testid="rewards-tgc-balance">
+                {fmtTGC(tgcBalance)} <span className="text-white/55 text-sm">TGC</span>
+              </div>
+              <div className="text-[11px] text-white/45 mt-1">
+                Estimated Value ≈ ${(tgcBalance * TGC_TO_USDT).toFixed(2)} USDT · Lifetime {fmtTGC(lifetimeTGC)} TGC
+              </div>
+            </div>
+
+            {/* Pending vs Available */}
             <div className="grid grid-cols-2 gap-3">
-              <Box label="Pending Verification" value={`$${pendingVerification.toFixed(4)}`} testId="rewards-pending" />
-              <Box label="Estimated Drip" value={`+$${drip}`} testId="rewards-drip" />
+              <Box label="Pending Verification" value={`${fmtTGC(pendingTGC)} TGC`} sub={`≈ $${(pendingTGC * TGC_TO_USDT).toFixed(2)}`} testId="rewards-pending" />
+              <Box label="Available TGC" value={`${fmtTGC(availableTGC)} TGC`} sub={`≈ $${(availableTGC * TGC_TO_USDT).toFixed(2)}`} testId="rewards-available" />
             </div>
-            <div className="rounded-2xl bg-black/40 border border-white/10 p-4">
-              <div className="text-[10px] uppercase tracking-[0.3em] cyan-text">Monthly Forecast (Node Tier)</div>
-              <div className="mt-1.5 font-mono-cyber font-black text-2xl cyan-text">
-                ~${Number(tierMonthly || 0).toFixed(2)}
+
+            {/* Monthly forecast */}
+            <div className="rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="monthly-forecast-card">
+              <div className="text-[10px] uppercase tracking-[0.3em] cyan-text">Monthly Forecast (Node Tier · {tierLabel})</div>
+              <div className="mt-1.5 font-mono-cyber font-black text-2xl matrix-text" data-testid="monthly-forecast-tgc">
+                ~{Math.round(monthlyForecastTGC)} TGC <span className="text-white/55 text-sm">/ month</span>
               </div>
-              <div className="text-[10px] text-white/40 mt-1">
-                Projected when your node stays engaged on average usage · subject to network demand.
+              <div className="text-[11px] text-white/45 mt-1" data-testid="monthly-forecast-usdt">
+                ≈ ${monthlyForecastUSDT.toFixed(2)} estimated
+              </div>
+              <div className="text-[10px] text-white/40 mt-2 leading-relaxed">
+                Forecast depends on device class, safe uptime and verified network activity.
               </div>
             </div>
-            <div className="rounded-2xl bg-black/40 border border-white/10 p-4 flex items-center justify-between"
-                 data-testid="payout-threshold-card">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">Payout threshold</div>
-                <div className="text-lg font-mono-cyber font-black cyan-text mt-0.5">
-                  ${(wallet?.withdraw_threshold_usdt ?? 10).toFixed(2)}
-                </div>
+
+            {/* Payout Progress */}
+            <div className="rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="payout-card">
+              <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">Payout Progress</div>
+              <div className="mt-1 font-mono-cyber font-black text-lg cyan-text" data-testid="payout-progress-rewards">
+                {fmtTGC(progressTGC)} / {PAYOUT_THRESHOLD_TGC} TGC
               </div>
-              <div className="w-28 h-2 bg-white/5 rounded-full overflow-hidden">
+              <div className="mt-2 w-full h-2 bg-white/5 rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-[#00ffe1] to-[#00ff88]"
-                     style={{ width: `${Math.min(100, (usdBalance / (wallet?.withdraw_threshold_usdt || 10)) * 100)}%` }} />
+                     style={{ width: `${progressPct}%` }} />
               </div>
+              <div className="text-[11px] text-white/45 mt-2">
+                Next Payout · <span className="cyan-text">{PAYOUT_THRESHOLD_TGC} TGC = $10 USDT</span>
+              </div>
+              <button
+                onClick={requestPayout}
+                disabled={!canWithdraw}
+                data-testid="request-payout-btn"
+                className={`mt-3 w-full py-3 rounded-xl font-mono-cyber font-black text-sm tracking-[0.2em] transition ${
+                  canWithdraw
+                    ? "bg-gradient-to-r from-[#00ff88] to-[#00d4ff] text-black"
+                    : "bg-white/5 text-white/40 border border-white/10 cursor-not-allowed"
+                }`}>
+                {canWithdraw ? (
+                  <span className="inline-flex items-center gap-2">
+                    Request $10 USDT Payout <ArrowUpRight className="w-3.5 h-3.5" />
+                  </span>
+                ) : `Payout unlocks at ${PAYOUT_THRESHOLD_TGC} TGC`}
+              </button>
+              <div className="text-[10px] text-white/35 mt-2 leading-relaxed">
+                TGC converts to USDT payout after threshold, verification and available reward pool checks.
+              </div>
+            </div>
+
+            {/* Payout Wallet */}
+            <div className="rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="payout-wallet-card">
+              <div className="text-[10px] uppercase tracking-[0.25em] text-white/45 flex items-center gap-1.5">
+                <Wallet className="w-3 h-3 cyan-text" /> Payout Wallet
+              </div>
+              <div className="mt-2 flex gap-2 flex-wrap">
+                {NETWORKS.map((n) => (
+                  <button key={n} onClick={() => setWalletNet(n)}
+                    data-testid={`wallet-net-${n}`}
+                    className={`px-3 py-1.5 rounded-full text-[11px] uppercase tracking-widest border transition ${
+                      walletNet === n
+                        ? "border-[#00ff88]/50 bg-[#00ff88]/10 matrix-text"
+                        : "border-white/10 text-white/45"
+                    }`}>{n}</button>
+                ))}
+              </div>
+              <input type="text"
+                value={walletAddr}
+                onChange={(e) => setWalletAddr(e.target.value)}
+                placeholder="Paste your USDT wallet address"
+                data-testid="wallet-addr-input"
+                className="mt-3 w-full p-3 rounded-xl bg-black/40 border border-white/10 text-xs font-mono-term text-white placeholder:text-white/30 focus:outline-none focus:border-[#00ffe1]/40"
+              />
+              {wallet?.payout_wallet_address && (
+                <div className="mt-2 text-[10px] text-white/45 font-mono-term">
+                  Saved: <span className="cyan-text">{wallet.payout_wallet_address.slice(0,6)}…{wallet.payout_wallet_address.slice(-5)}</span> on {wallet.payout_wallet_network || "BEP20"}
+                </div>
+              )}
+              <button onClick={saveWallet} disabled={savingWallet || !walletAddr}
+                data-testid="save-wallet-btn"
+                className="mt-3 w-full py-2 rounded-xl text-[11px] font-mono-cyber tracking-[0.2em] uppercase bg-[#00ffe1]/10 cyan-text border border-[#00ffe1]/30 disabled:opacity-50">
+                {savingWallet ? "Saving…" : "Save Wallet"}
+              </button>
             </div>
           </div>
         )}
 
-        {/* ADVANCED / DEBUG TAB */}
         {tab === "advanced" && (
           <div className="mt-6 space-y-3" data-testid="advanced-tab-content">
             <div className="rounded-2xl bg-black/55 border border-[#00ffe1]/15 p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Terminal className="w-3.5 h-3.5 cyan-text" />
-                <div className="text-[10px] uppercase tracking-[0.3em] cyan-text">native_engine_telemetry</div>
+                <div className="text-[10px] uppercase tracking-[0.3em] cyan-text">compute_engine_telemetry</div>
               </div>
               {!isNative ? (
                 <div className="text-[11px] text-amber-100/75 flex items-start gap-2">
                   <AlertTriangle className="w-3 h-3 mt-0.5" />
-                  Native bridge unavailable — install the v1.4.8 APK to view raw engine telemetry.
+                  Native bridge unavailable — install the v1.4.8 APK to view engine telemetry.
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2 text-xs font-mono-term">
-                  <KV k="engine_available" v={String(nodeStatus?.engine_available ?? false)} testId="kv-engine-available" />
-                  <KV k="engine_running" v={String(nodeStatus?.engine_running ?? false)} testId="kv-engine-running" />
-                  <KV k="raw_status" v={nodeStatus?.raw_status ?? "—"} testId="kv-raw-status" />
-                  <KV k="processing_rate" v={`${(nodeStatus?.processing_rate_hps ?? 0).toFixed(1)} H/s`} testId="kv-processing-rate" />
+                  <KV k="engine_loaded" v={String(nodeStatus?.engine_available ?? false)} testId="kv-engine-loaded" />
+                  <KV k="engine_state" v={engineStateLabel(nodeStatus)} testId="kv-engine-state" />
+                  <KV k="internal_processing_rate" v={`${(nodeStatus?.processing_rate_hps ?? 0).toFixed(1)} ops/s`} testId="kv-processing-rate" />
                   <KV k="verified_outputs" v={String(nodeStatus?.verified_outputs ?? 0)} testId="kv-verified-outputs" />
-                  <KV k="rejected_outputs" v={String(nodeStatus?.rejected_outputs ?? 0)} testId="kv-rejected-outputs" />
-                  <KV k="allow_on_battery" v={String(nodeStatus?.allow_on_battery ?? true)} testId="kv-allow-battery" />
-                  <KV k="version" v={nodeStatus?.version ?? "1.4.8"} testId="kv-version" />
+                  <KV k="failed_outputs" v={String(nodeStatus?.rejected_outputs ?? 0)} testId="kv-failed-outputs" />
+                  <KV k="active_threads" v={String(nodeStatus?.active_threads ?? (engaged ? 1 : 0))} testId="kv-active-threads" />
+                  <KV k="eco_mode" v={String(nodeStatus?.raw_status === "eco" || nodeStatus?.eco_mode ? true : false)} testId="kv-eco-mode" />
+                  <KV k="battery_compute_allowed" v={String(nodeStatus?.allow_on_battery ?? true)} testId="kv-allow-battery" />
+                  <KV k="node_state" v={String(nodeStatus?.raw_status ?? "idle")} testId="kv-node-state" />
+                  <KV k="client_version" v={nodeStatus?.version ?? "1.4.8"} testId="kv-version" />
                 </div>
               )}
             </div>
@@ -406,13 +550,11 @@ export default function Mobile() {
               </div>
             )}
             <div className="rounded-2xl bg-black/40 border border-white/10 p-4 text-[10px] text-white/45 leading-relaxed">
-              <span className="cyan-text">{">"}</span> Raw RandomX / native PoW / share counters are intentionally hidden from the
-              primary surfaces. This page is for engineers verifying the engine.
+              <span className="cyan-text">{">"}</span> Internal compute engine metrics. Visible to engineers verifying node behaviour. No payout data here.
             </div>
           </div>
         )}
 
-        {/* Footer link */}
         <div className="mt-7 text-center">
           <Link to="/dashboard" data-testid="mobile-to-desktop"
                 className="text-[10px] tracking-[0.3em] uppercase text-white/40 hover:cyan-text">
@@ -424,14 +566,21 @@ export default function Mobile() {
   );
 }
 
-function Box({ label, value, sub, big, testId }) {
+function Box({ label, value, sub, testId }) {
   return (
-    <div className={`rounded-2xl bg-black/40 border border-white/10 p-4 ${big ? "" : ""}`} data-testid={testId}>
+    <div className="rounded-2xl bg-black/40 border border-white/10 p-4" data-testid={testId}>
       <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">{label}</div>
-      <div className={`mt-1 font-mono-cyber font-black ${big ? "text-3xl matrix-text" : "text-xl cyan-text"} font-mono-num`}>
-        {value}
-      </div>
+      <div className="mt-1 font-mono-cyber font-black text-xl cyan-text font-mono-num">{value}</div>
       {sub && <div className="text-[10px] text-white/40 mt-0.5">{sub}</div>}
+    </div>
+  );
+}
+
+function Row({ k, v, accent, testId }) {
+  return (
+    <div className="flex items-baseline justify-between" data-testid={testId}>
+      <span className="text-[10px] uppercase tracking-[0.2em] text-white/45 font-mono-term">{k}</span>
+      <span className={`font-mono-cyber font-bold text-xs ${accent || "cyan-text"}`}>{v}</span>
     </div>
   );
 }
@@ -465,15 +614,23 @@ function KV({ k, v, testId }) {
   );
 }
 
+function engineStateLabel(ns) {
+  if (!ns) return "—";
+  if (!ns.engine_available) return "loading";
+  if (ns.engine_running) return "active";
+  return "standby";
+}
+
 function nodeLabel(ns, engaged) {
-  // Map native bridge raw_status → primary-surface vocab.
-  // Truthful (mirrors GridWorkerService.NodeState).
-  if (!engaged) return { text: "Idle · Tap to engage", tone: "text-white/45" };
-  if (!ns) return { text: "ENGAGED · Connecting", tone: "matrix-text" };
+  if (!engaged) return { text: "Idle · Tap to engage", short: "IDLE", tone: "text-white/45" };
+  if (!ns) return { text: "Engaged · Connecting", short: "ENGAGED · STANDBY", tone: "matrix-text" };
   const s = (ns.raw_status || "").toLowerCase();
-  if (!ns.engine_available) return { text: "ENGAGED · Connected only", tone: "cyan-text" };
-  if (s === "running" || ns.engine_running) return { text: "ACTIVE · Compute Engine running", tone: "matrix-text" };
-  if (s === "warming") return { text: "ENGAGED · Warming up", tone: "cyan-text" };
-  if (s === "throttled") return { text: "PAUSED · Thermal", tone: "text-amber-300" };
-  return { text: "ENGAGED · Standby", tone: "cyan-text" };
+  if (!ns.engine_available) return { text: "Engaged · Connected only", short: "ENGAGED · STANDBY", tone: "cyan-text" };
+  if (s === "running" || ns.engine_running) return { text: "Active · Processing verified work units", short: "ENGAGED · FULL", tone: "matrix-text" };
+  if (s === "eco") return { text: "Engaged · Eco Mode", short: "ENGAGED · ECO", tone: "matrix-text" };
+  if (s === "warming") return { text: "Engaged · Warming up", short: "ENGAGED · WARMING", tone: "cyan-text" };
+  if (s === "paused_power") return { text: "Paused · Plug in to resume", short: "PAUSED · POWER", tone: "text-amber-300" };
+  if (s === "paused_battery") return { text: "Paused · Low battery", short: "PAUSED · BATTERY", tone: "text-amber-300" };
+  if (s === "throttled") return { text: "Paused · Thermal", short: "PAUSED · THERMAL", tone: "text-amber-300" };
+  return { text: "Engaged · Standby", short: "ENGAGED · STANDBY", tone: "cyan-text" };
 }
