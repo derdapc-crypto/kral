@@ -435,3 +435,37 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **APK URL**: `https://grid-supercomputer.preview.emergentagent.com/grid-worker-v1.4.8.apk`
 - **Test sonuçları (iter-18 testing agent)**: 12/12 backend pytest PASS. Frontend full validation PASS (engage-node-btn, live-reward-drip-card, smart-battery-card, toggle-allow-on-battery, mobile-tabs, pending-verification, available-balance; tab switching Node↔Rewards↔Advanced çalışıyor; vocab purge clean). Admin Real-Android tab 3-lane split (lane-backend-compute / lane-mobile-compute / lane-total-compute) rendering correctly. Regression OK on `/auth/me`, `/auth/refresh`, `/pool/health`, `/admin/console/snapshot`.
 
+
+
+**Iter 31 (2026-05-11)** — **v1.4.9 TGC ECONOMY REFRESH + Honest Mobile Compute**
+- **Yeni para mantığı**: `1000 TGC = $10 USDT` (1 TGC = $0.01). Eski `200 TGC = $5` ve `100 TGC = $5` mantığı tamamen kaldırıldı.
+  * Backend constants: `USDT_PER_TGC=0.01`, `TGC_PER_USDT=100`, `WITHDRAW_THRESHOLD_TGC=1000`.
+  * `TIER_DAILY_TGC`: core=12.0, flagship=10.5, mid=8.0, budget=4.5 → monthly: core=360, flagship=315, mid=240, budget=135 (kullanıcı'nın hedef aralıklarına uyumlu).
+- **Persistent server-side TGC drip** — yeni endpoint `POST /api/node/drip`:
+  * Frontend her 30s'de çağırıyor, `elapsed_seconds` + `state` gönderiyor.
+  * Backend `MODE_MULTIPLIER` × tier daily rate × elapsed × shield ile credit hesaplıyor.
+  * State multipliers: `engaged_full=1.0, engaged_eco=0.5, engaged_standby=0.3, paused_*=0, idle=0`.
+  * `tgc_balance` ve `tgc_total_earned` `$inc`'leniyor → app kapatılıp açılsa da disengage edilse de **SIFIRLANMIYOR**.
+  * Yeni MongoDB collection `tgc_ledger` her drip'i kalıcı kayıt altına alıyor (today_tgc hesabı için).
+- **Wallet endpoint** baştan genişletildi: yeni alanlar `lifetime_tgc, today_tgc, pending_tgc, available_tgc, monthly_forecast_tgc, monthly_forecast_usdt, payout_progress_tgc, payout_progress_pct, payout_threshold_tgc=1000, payout_value_usdt=10, payout_eligibility (locked|eligible), payout_wallet_address, payout_wallet_network`.
+- **Tier forecast endpoint** genişletildi: `monthly_forecast_range_tgc` (her tier için min-max), tüm 4 tier daily/monthly/usdt, `payout_value_usdt=10`.
+- **Payout Wallet endpoint** `POST /api/wallet/payout-address`: BEP20/TRC20/Polygon network whitelist + 20-80 char address validation. Saved address masked döner (`0x...c6869`).
+- **Mobile.jsx baştan yazıldı** (~510 satır):
+  * **PRIMARY value = TGC**: Compute Node sekmesinde "Session TGC +0.0004 TGC", "TGC Balance 245.80 TGC" büyük, USDT küçük altyazı.
+  * **3 sekme**: Compute Node / Rewards / Advanced.
+  * **Payout button state machine**: <1000 TGC → "Payout unlocks at 1000 TGC" (disabled), ≥1000 TGC → "Request $10 USDT Payout" (active, neon-green gradient).
+  * **Payout Wallet UI**: 3 network pill (BEP20/TRC20/Polygon) + address input + "Save Wallet" → masked confirmation.
+  * **Persistent drip integration**: useEffect engaged değiştiğinde `setInterval(doDrip, 30000)` → `/api/node/drip` çağrısı → wallet state güncelleniyor (state-aware).
+  * **Native APK detection**: `window.__GRID_NATIVE__` veya UA contains "GridWorker/" → `platform=android` + `app_version=1.4.8` ile register oluyor (admin'de `is_real_apk=true` olarak görünüyor).
+  * **Advanced tab VOCAB-PURE**: testing agent doğruladı, 0 forbidden term. Yeni labels: `compute_engine_telemetry, engine_loaded, engine_state, internal_processing_rate (ops/s), verified_outputs, failed_outputs, active_threads, eco_mode, battery_compute_allowed, node_state, client_version`.
+- **Admin Mobile Compute split refined** (`/api/admin/mobile-mining/metrics`):
+  * `mobile_compute.connected_phones` artık tüm v1.4.x phone'ları sayıyor (filter `is_real_apk=True OR app_version startswith 1.4.`).
+  * `mobile_compute.engaged_phones` = `node_engaged=true OR mining_requested=true` olan tüm cihazlar.
+  * `mobile_compute.engine_active_phones` = `native_pow=true AND local_hashrate_hps>0` olan cihazlar (gerçek processing).
+  * Bu honest ayrım: phone ENGAGE'e bassa native engine başlamasa bile **artık admin'de görünüyor** (engaged=1, engine_active=0).
+  * `miners[]` array'ine `node_state, node_engaged, engine_active, eco_mode, active_threads` alanları eklendi.
+- **Android v1.4.9**: `ENGAGED_STANDBY` enum NodeState'e eklendi. RandomXBridge.startMining false dönerse → nodeState=ENGAGED_STANDBY (honest: operatör engaged ama engine ayağa kalkmadı). Notification metni: "Compute Node · Engaged · Standby".
+- **APK v1.4.9 built**: `/app/frontend/public/grid-worker-v1.4.9.apk` — **386,203 bytes**, SHA-256 `fe6a220ca383d180376c616c49443e56ceb9e6e97b811dead8fd6cab904fac35`, v2+v3 signed, librandomx.so embedded. versionCode=149, versionName=1.4.9.
+- **APK URL**: `https://grid-supercomputer.preview.emergentagent.com/grid-worker-v1.4.9.apk`
+- **Test sonuçları (iter-19 testing agent)**: **25/25 backend pytest PASS**. Frontend full validation: 9 Compute Node testids + 16 Rewards testids + Advanced vocab-pure (0 forbidden hits). 0 issues, retest_needed=False.
+
