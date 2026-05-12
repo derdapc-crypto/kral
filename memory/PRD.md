@@ -540,3 +540,29 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
   * Budget: $1.35/ay · 222 gün
 - **10K telefon ağında flagship kazancı**: $17.32/ay (×5.5 multiplier). 50K founding era'da $25.20/ay (×8.0).
 
+
+
+**Iter 35 (2026-05-12)** — **v1.5.0 MONTHLY CONTRIBUTOR DROP**
+- **Sistem felsefesi**: Kullanıcılar lifetime TGC milestone'ları (her 100 TGC = 1 Grid Ticket) ile aylık reward event'ine giriyor. TGC bakiyesi harcanmıyor (sadece milestone hakkı). Ticket satın alınamaz. UI dili strictly contribution-reward — gambling/lottery/kumar terimleri YOK.
+- **Yeni MongoDB collections**: `contributor_drops` (draw_id, month, reward_pool_usdt, status, prize_split, draw_date, totals), `grid_tickets` (ticket_id 'GT-XXXX', user_id, draw_id, lifetime_tgc_milestone, status active/winner/expired, risk_status), `drop_winners` (winner_id 'WIN-XXXX', draw_id, ticket_id, user_id, prize_tier, amount_usdt, payout_status: winner_selected/approved/sent/pending_wallet, wallet_address_masked, masked username 'GRD_XXXX').
+- **Ticket auto-mint** (`_generate_grid_tickets_if_due`): Idempotent — her 100 TGC milestone'unda 1 ticket. `/node/drip` her credit'ten sonra, `/wallet` her çağrıda backfill yapıyor. Wallet response'a `grid_tickets, next_ticket_in_tgc, next_ticket_milestone, tgc_per_ticket=100.0` eklendi.
+- **Default prize split** (`_default_prize_split`): 20% Grand + 40% Major ($25 each) + 40% Mini ($5 each). $500 pool → 1×$100 + 8×$25 + 40×$5 = 49 winner.
+- **User-facing endpoints**:
+  * `GET /api/rewards/drop/current` — active drop + your_tickets + tickets_in_current_drop + next_ticket_in_tgc + eligibility_status + compliance_text
+  * `GET /api/rewards/drop/history` — past drops + masked global winners + your_results
+  * `GET /api/rewards/drop/recent-winners` (**PUBLIC, no auth**) — landing page için maskeli kazanan listesi
+- **Admin endpoints**:
+  * `POST /admin/drops/create` — month duplicate guard, otomatik default split, orphan ticket attach
+  * `GET /admin/drops` + `GET /admin/drops/{id}` (with risk count + winners)
+  * `POST /admin/drops/{id}/freeze` (active → entries_closed)
+  * `POST /admin/drops/{id}/run` — **`secrets.randbelow`** ile kriptografik random selection. 1 ödül/kullanıcı limit. Risk-flagged ticket'lar hariç tutuluyor.
+  * `POST /admin/drops/{id}/approve-winners` — wallet'i kayıtlı winner'lar → approved; wallet yoksa → pending_wallet
+  * `POST /admin/drops/{id}/mark-paid` — approved → sent, drop → paid
+  * `POST /admin/drops/{id}/cancel` — tickets release back to orphan pool
+- **`app.include_router(api)` SONA TAŞINDI** — yeni v1.5.0 endpoint'lerinin de register olması için (önce router include ediliyor, sonra yeni endpoint declare edilince 404 alıyordu, fix).
+- **Frontend Mobile Rewards tab** baştan yazıldı (`RewardsTab` component): Monthly Contributor Drop kartı (`my-tickets-count`, `next-ticket-in-tgc` progress bar, `drop-pool-usdt`, `drop-draw-date`, `drop-prize-split` table, `drop-eligibility-status` ELIGIBLE/EARN TICKETS pill, `drop-compliance-text`). Drop history with `my-won-reward` highlight + winner rows.
+- **Frontend Admin**: yeni `admin-tab-drops` button + `ContributorDropsTab.jsx` component (`create-drop-card`, `drops-list-card`, `drop-details-card` with stats + prize_split tiers + action buttons freeze/run/approve/mark-paid/cancel + winners table).
+- **Frontend Landing**: yeni `RecentContributorRewards` section (EarningsExplorer ile TrustMetrics arası). Public maskeli winner kartları (9 max), 30s polling.
+- **Test sonuçları (iter-21)**: **21/21 backend pytest PASS** (`/app/backend/tests/test_iteration33_v150_contributor_drop.py`). Full frontend validation: 12 mobile testid + 6 admin testid + 1 landing testid PASS. Vocab purge clean (lottery/gambling/casino/wager/piyango/kumar/standalone-bet 0 hit). Full admin lifecycle tested: create → freeze → run (1 winner $100 grand drop) → approve → mark-paid → list. Backfill idempotent over 3 successive /wallet calls. Public recent-winners NO user_id leak. Regression PASS (/auth/me, /wallet, /node/drip, /tier/forecast, /wallet/payout-address, /admin/mobile-mining/metrics).
+- **Test data**: Worker user lifetime=1250 TGC = 12 backfilled tickets. DROP-DC7703A546 (May 2026, $500 pool) → worker won Grand Drop $100, status=paid. /rewards/drop/recent-winners response: `GRD_FC6E · $100 USDT · GT-****-19AE`.
+
