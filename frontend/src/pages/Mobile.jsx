@@ -728,13 +728,29 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
                 </div>
               </div>
               <div className="p-3 rounded-2xl bg-black/40 border border-[#00ffe1]/15">
-                <div className="text-[9px] uppercase tracking-widest text-white/45">Draw Date</div>
+                <div className="text-[9px] uppercase tracking-widest text-white/45">Auto Draw Date</div>
                 <div className="font-mono-cyber font-black text-sm cyan-text mt-1" data-testid="drop-draw-date">
                   {dropActive.draw_date ? new Date(dropActive.draw_date).toLocaleString("tr-TR", { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" }) : "TBA"}
                 </div>
+                <div className="text-[9px] text-white/40 mt-0.5">çekiliş otomatik · admin onayıyla payout</div>
+              </div>
+              <div className="p-3 rounded-2xl bg-[#00ff88]/8 border border-[#00ff88]/25" data-testid="drop-total-tickets-card">
+                <div className="text-[9px] uppercase tracking-widest text-white/55 flex items-center gap-1">
+                  <Sparkles className="w-2.5 h-2.5 matrix-text" /> Total Tickets in Drop
+                </div>
+                <div className="font-mono-cyber font-black text-2xl matrix-text mt-0.5" data-testid="drop-total-tickets-big">
+                  {dropActive.total_tickets ?? 0}
+                </div>
+              </div>
+              <div className="p-3 rounded-2xl bg-[#00ffe1]/8 border border-[#00ffe1]/25" data-testid="drop-eligible-card">
+                <div className="text-[9px] uppercase tracking-widest text-white/55">Eligible Contributors</div>
+                <div className="font-mono-cyber font-black text-2xl cyan-text mt-0.5" data-testid="drop-eligible-big">
+                  {dropActive.eligible_contributors ?? 0}
+                </div>
+                <div className="text-[9px] text-white/45 mt-0.5">çekilişe katılan kişi sayısı</div>
               </div>
               <div className="col-span-2 p-3 rounded-2xl bg-black/40 border border-[#00ffe1]/15" data-testid="drop-prize-split">
-                <div className="text-[9px] uppercase tracking-widest text-white/45 mb-2">Prize Split</div>
+                <div className="text-[9px] uppercase tracking-widest text-white/45 mb-2">Prize Split — {(dropActive.prize_split || []).reduce((s,t) => s + (t.winner_count||0), 0)} winners total</div>
                 <div className="space-y-1">
                   {(dropActive.prize_split || []).map((t) => (
                     <div key={t.tier_name} className="flex justify-between text-xs">
@@ -744,11 +760,12 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
                   ))}
                 </div>
               </div>
-              <div className="col-span-2 flex justify-between items-center text-[10px] text-white/40 font-mono-term">
-                <span data-testid="drop-total-tickets">Total Tickets: <span className="cyan-text">{dropActive.total_tickets}</span></span>
-                <span data-testid="drop-eligible">Eligible: <span className="cyan-text">{dropActive.eligible_contributors}</span></span>
+              <div className="col-span-2 flex justify-between items-center">
                 <span className={`cyber-pill text-[9px] ${drop?.eligibility_status === "eligible" ? "matrix-pill" : ""}`} data-testid="drop-eligibility-status">
-                  {drop?.eligibility_status === "eligible" ? "ELIGIBLE" : "EARN TICKETS"}
+                  {drop?.eligibility_status === "eligible" ? "ELIGIBLE — Çekilişe Katılıyorsun" : "EARN MORE TICKETS"}
+                </span>
+                <span className="text-[10px] text-white/55 font-mono-term">
+                  Sen: <span className="cyan-text font-bold">{ticketsInDrop} ticket</span>
                 </span>
               </div>
             </div>

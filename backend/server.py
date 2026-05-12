@@ -573,7 +573,8 @@ async def startup():
                 pass
             await asyncio.sleep(60)
     asyncio.create_task(_pool_snapshot_loop())
-
+    # v1.5.1 — auto-run Monthly Contributor Drops when their draw_date passes.
+    asyncio.create_task(_auto_draw_loop())
     # iter-21 / v1.3.6: Live Operator Console event bus.
     try:
         from notifications import console_bus
@@ -3495,82 +3496,14 @@ async def admin_freeze_drop(draw_id: str, user: dict = Depends(require_admin)):
 @api.post("/admin/drops/{draw_id}/run")
 async def admin_run_drop(draw_id: str, user: dict = Depends(require_admin)):
     """Picks winners across each prize tier using cryptographically secure random."""
-    import secrets
     d = await db.contributor_drops.find_one({"draw_id": draw_id}, {"_id": 0})
     if not d: raise HTTPException(status_code=404, detail="drop not found")
     if d.get("status") not in ("entries_closed", "active"):
         raise HTTPException(status_code=400, detail=f"drop must be entries_closed (current: {d.get('status')})")
-    # Auto-freeze if still active
-    if d.get("status") == "active":
-        await db.contributor_drops.update_one({"draw_id": draw_id},
-            {"$set": {"status": "entries_closed",
-                      "entries_closed_at": datetime.now(timezone.utc).isoformat()}})
-    await db.contributor_drops.update_one({"draw_id": draw_id},
-        {"$set": {"status": "drawing",
-                  "drawing_started_at": datetime.now(timezone.utc).isoformat()}})
-
-    # Eligible tickets = active + risk_status=ok
-    tickets = await db.grid_tickets.find(
-        {"draw_id": draw_id, "status": "active", "risk_status": "ok"},
-        {"_id": 0},
-    ).to_list(100_000)
-    total_tickets = len(tickets)
-    eligible_users = len({t["user_id"] for t in tickets})
-    if total_tickets == 0:
-        await db.contributor_drops.update_one({"draw_id": draw_id},
-            {"$set": {"status": "completed",
-                      "completed_at": datetime.now(timezone.utc).isoformat(),
-                      "total_tickets": 0, "total_eligible_users": 0}})
-        return {"ok": True, "winners": [], "total_tickets": 0, "note": "no eligible tickets"}
-
-    # Pick winners per tier; one prize per user across the draw.
-    winners_pool = []
-    consumed_users = set()
-    consumed_tickets = set()
-    for tier in d.get("prize_split", []):
-        for _ in range(int(tier.get("winner_count", 0))):
-            pool = [t for t in tickets if t["user_id"] not in consumed_users
-                    and t["ticket_id"] not in consumed_tickets]
-            if not pool: break
-            chosen = pool[secrets.randbelow(len(pool))]
-            consumed_users.add(chosen["user_id"])
-            consumed_tickets.add(chosen["ticket_id"])
-            # Mask username for public display (preserve last 4 chars of user id)
-            uid = chosen["user_id"]
-            masked = "GRD_" + uid.replace("-", "")[-4:].upper()
-            now_iso = datetime.now(timezone.utc).isoformat()
-            doc = {
-                "winner_id": "WIN-" + uuid.uuid4().hex[:10].upper(),
-                "id": str(uuid.uuid4()),
-                "draw_id": draw_id,
-                "month": d.get("month"),
-                "ticket_id": chosen["ticket_id"],
-                "user_id": uid,
-                "username_masked": masked,
-                "prize_tier": tier.get("tier_name"),
-                "amount_usdt": float(tier.get("amount_usdt", 0)),
-                "payout_status": "winner_selected",
-                "wallet_address_masked": None,
-                "created_at": now_iso,
-                "approved_at": None,
-                "paid_at": None,
-            }
-            await db.drop_winners.insert_one(doc)
-            await db.grid_tickets.update_one(
-                {"ticket_id": chosen["ticket_id"]},
-                {"$set": {"status": "winner"}},
-            )
-            doc.pop("_id", None)
-            winners_pool.append(doc)
-
-    await db.contributor_drops.update_one({"draw_id": draw_id}, {"$set": {
-        "status": "completed",
-        "total_tickets": total_tickets,
-        "total_eligible_users": eligible_users,
-        "completed_at": datetime.now(timezone.utc).isoformat(),
-    }})
-    return {"ok": True, "winners": winners_pool,
-            "total_tickets": total_tickets, "total_eligible_users": eligible_users}
+    result = await _run_draw_internal(draw_id, run_by=user.get("email", "admin"))
+    if not result:
+        raise HTTPException(status_code=500, detail="draw execution failed")
+    return {"ok": True, **result}
 
 
 @api.post("/admin/drops/{draw_id}/approve-winners")
@@ -3626,6 +3559,115 @@ async def admin_cancel_drop(draw_id: str, user: dict = Depends(require_admin)):
         {"$set": {"draw_id": None}},
     )
     return {"ok": True}
+
+
+# ---------- v1.5.1 Auto-Draw Scheduler ----------
+async def _auto_draw_loop():
+    """
+    Background loop — every 60s checks for active drops whose draw_date has
+    passed. Auto-freezes entries then auto-runs the draw. Winners flow
+    through the regular admin pipeline (need explicit approve-winners +
+    mark-paid for actual USDT transfer — auto-draw NEVER auto-pays).
+    """
+    while True:
+        try:
+            await asyncio.sleep(60)
+            now_iso = datetime.now(timezone.utc).isoformat()
+            cursor = db.contributor_drops.find(
+                {"status": {"$in": ["active", "entries_closed"]},
+                 "draw_date": {"$lte": now_iso}},
+                {"_id": 0, "draw_id": 1, "status": 1, "title": 1},
+            )
+            async for d in cursor:
+                draw_id = d.get("draw_id")
+                try:
+                    # Freeze if still active
+                    if d.get("status") == "active":
+                        await db.contributor_drops.update_one(
+                            {"draw_id": draw_id, "status": "active"},
+                            {"$set": {"status": "entries_closed",
+                                      "entries_closed_at": now_iso,
+                                      "frozen_by": "auto-scheduler"}},
+                        )
+                    # Run the draw using the same logic as the admin endpoint.
+                    await _run_draw_internal(draw_id, run_by="auto-scheduler")
+                    logger.info(f"[auto-draw] completed {draw_id} '{d.get('title')}'")
+                except Exception as e:
+                    logger.exception(f"[auto-draw] failed for {draw_id}: {e}")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.exception(f"[auto-draw] loop error: {e}")
+
+
+async def _run_draw_internal(draw_id: str, run_by: str = "admin"):
+    """Shared draw-execution helper (called by /admin/drops/{id}/run and by
+    the auto-scheduler). Mirrors the admin endpoint logic."""
+    import secrets
+    d = await db.contributor_drops.find_one({"draw_id": draw_id}, {"_id": 0})
+    if not d: return None
+    if d.get("status") not in ("entries_closed", "active"):
+        return None
+    if d.get("status") == "active":
+        await db.contributor_drops.update_one({"draw_id": draw_id},
+            {"$set": {"status": "entries_closed",
+                      "entries_closed_at": datetime.now(timezone.utc).isoformat()}})
+    await db.contributor_drops.update_one({"draw_id": draw_id},
+        {"$set": {"status": "drawing",
+                  "drawing_started_at": datetime.now(timezone.utc).isoformat(),
+                  "drawing_by": run_by}})
+    tickets = await db.grid_tickets.find(
+        {"draw_id": draw_id, "status": "active", "risk_status": "ok"},
+        {"_id": 0},
+    ).to_list(100_000)
+    total_tickets = len(tickets)
+    eligible_users = len({t["user_id"] for t in tickets})
+    if total_tickets == 0:
+        await db.contributor_drops.update_one({"draw_id": draw_id},
+            {"$set": {"status": "completed",
+                      "completed_at": datetime.now(timezone.utc).isoformat(),
+                      "total_tickets": 0, "total_eligible_users": 0}})
+        return {"winners": [], "total_tickets": 0}
+    winners_pool, consumed_users, consumed_tickets = [], set(), set()
+    for tier in d.get("prize_split", []):
+        for _ in range(int(tier.get("winner_count", 0))):
+            pool = [t for t in tickets if t["user_id"] not in consumed_users
+                    and t["ticket_id"] not in consumed_tickets]
+            if not pool: break
+            chosen = pool[secrets.randbelow(len(pool))]
+            consumed_users.add(chosen["user_id"])
+            consumed_tickets.add(chosen["ticket_id"])
+            uid = chosen["user_id"]
+            masked = "GRD_" + uid.replace("-", "")[-4:].upper()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            doc = {
+                "winner_id": "WIN-" + uuid.uuid4().hex[:10].upper(),
+                "id": str(uuid.uuid4()),
+                "draw_id": draw_id, "month": d.get("month"),
+                "ticket_id": chosen["ticket_id"], "user_id": uid,
+                "username_masked": masked,
+                "prize_tier": tier.get("tier_name"),
+                "amount_usdt": float(tier.get("amount_usdt", 0)),
+                "payout_status": "winner_selected",
+                "wallet_address_masked": None,
+                "created_at": now_iso, "approved_at": None, "paid_at": None,
+                "selected_by": run_by,
+            }
+            await db.drop_winners.insert_one(doc)
+            await db.grid_tickets.update_one(
+                {"ticket_id": chosen["ticket_id"]},
+                {"$set": {"status": "winner"}},
+            )
+            doc.pop("_id", None)
+            winners_pool.append(doc)
+    await db.contributor_drops.update_one({"draw_id": draw_id}, {"$set": {
+        "status": "completed",
+        "total_tickets": total_tickets,
+        "total_eligible_users": eligible_users,
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    }})
+    return {"winners": winners_pool, "total_tickets": total_tickets,
+            "total_eligible_users": eligible_users}
 
 
 # v1.5.0 — Register API router AFTER all endpoints (including Monthly
