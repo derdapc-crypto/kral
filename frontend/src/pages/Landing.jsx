@@ -1101,6 +1101,74 @@ function EarningsExplorer({ stats, apk }) {
 }
 
 
+/* ----------------------------- Recent Contributor Rewards (v1.5.0) ----------------------------- */
+function RecentContributorRewards() {
+  const { ref, shown } = useReveal();
+  const [winners, setWinners] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const { data } = await api.get("/rewards/drop/recent-winners");
+        if (!cancelled) setWinners(data?.winners || []);
+      } catch {}
+    };
+    load();
+    const t = setInterval(load, 30_000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+  if (winners.length === 0) return null;
+  return (
+    <section ref={ref} id="contributor-rewards"
+             className="px-6 sm:px-10 py-20 border-t border-white/[0.04]"
+             data-testid="recent-contributor-rewards">
+      <div className="max-w-7xl mx-auto">
+        <div className={`mb-10 transition-all duration-700 ${shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] cyan-text font-mono-term mb-3">
+            <Sparkles className="w-3 h-3" /> / recent_contributor_rewards
+          </div>
+          <h2 className="font-mono-cyber text-3xl sm:text-4xl font-black tracking-tighter">
+            Latest <span className="matrix-text">Contributor Drop</span> Winners
+          </h2>
+          <p className="text-white/55 text-sm mt-3 max-w-2xl">
+            Every 100 lifetime TGC earns a Grid Ticket. Each month a verified Contributor Drop distributes the reward pool across many winners.
+            Privacy-first: only masked usernames + ticket IDs shown.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {winners.slice(0, 9).map((w, i) => (
+            <div key={i}
+                 data-testid={`landing-winner-${i}`}
+                 className="cyber-card rounded-2xl p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl grid place-items-center bg-[#00ff88]/15 border border-[#00ff88]/30">
+                <Sparkles className="w-5 h-5 matrix-text" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] uppercase tracking-widest text-white/40 font-mono-term">
+                  {w.prize_tier || "Contributor Drop"}
+                </div>
+                <div className="font-mono-cyber font-black text-sm cyan-text truncate">
+                  {w.username_masked}
+                </div>
+                <div className="text-[10px] text-white/45 font-mono-term">
+                  {w.ticket_id_masked} · {w.month || ""}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="font-mono-cyber font-black text-xl matrix-text">
+                  ${w.amount_usdt}
+                </div>
+                <div className="text-[9px] uppercase tracking-widest text-white/35">USDT</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
 /* ----------------------------- Landing main ----------------------------- */
 export default function Landing() {
   const [stats, setStats] = useState(null);
@@ -1128,6 +1196,7 @@ export default function Landing() {
     <main className="landing-root font-sans-saas" data-testid="landing-page">
       <Hero stats={stats} apk={apk} />
       <EarningsExplorer stats={stats} apk={apk} />
+      <RecentContributorRewards />
       <TrustMetrics stats={stats} />
       <WhyRewards />
       <HowItWorks />

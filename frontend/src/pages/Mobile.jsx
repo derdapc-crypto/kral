@@ -441,6 +441,22 @@ export default function Mobile() {
         )}
 
         {tab === "rewards" && (
+          <RewardsTab
+            wallet={wallet}
+            walletAddr={walletAddr}
+            setWalletAddr={setWalletAddr}
+            walletNet={walletNet}
+            setWalletNet={setWalletNet}
+            savingWallet={savingWallet}
+            saveWallet={saveWallet}
+            requestPayout={requestPayout}
+            tierLabel={tierLabel}
+            forecast={forecast}
+          />
+        )}
+
+        {/* legacy rewards renderer kept for ref */}
+        {false && tab === "rewards" && (
           <div className="mt-6 space-y-3" data-testid="rewards-tab-content">
             {/* Hero TGC balance */}
             <div className="rounded-2xl bg-black/40 border border-white/10 p-5" data-testid="rewards-balance-card">
@@ -610,6 +626,228 @@ function Box({ label, value, sub, testId }) {
     </div>
   );
 }
+
+/* ----------------------------- v1.5.0 Rewards Tab ----------------------------- */
+function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet,
+                       savingWallet, saveWallet, requestPayout, tierLabel, forecast }) {
+  const [drop, setDrop] = React.useState(null);
+  const [history, setHistory] = React.useState([]);
+  const TGC_TO_USDT = 0.01;
+  const PAYOUT_THRESHOLD_TGC = 1000;
+  const NETWORKS = ["BEP20", "TRC20", "Polygon"];
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const { data } = await api.get("/rewards/drop/current");
+        if (!cancelled) setDrop(data);
+      } catch {}
+      try {
+        const { data } = await api.get("/rewards/drop/history");
+        if (!cancelled) setHistory(data?.drops || []);
+      } catch {}
+    };
+    load();
+    const t = setInterval(load, 15000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+
+  const tgcBalance = Number(wallet?.tgc_balance ?? 0);
+  const lifetimeTGC = Number(wallet?.lifetime_tgc ?? wallet?.tgc_total_earned ?? 0);
+  const pendingTGC = Number(wallet?.pending_tgc ?? 0);
+  const availableTGC = Number(wallet?.available_tgc ?? Math.max(0, tgcBalance - pendingTGC));
+  const progressTGC = Number(wallet?.payout_progress_tgc ?? Math.min(tgcBalance, PAYOUT_THRESHOLD_TGC));
+  const progressPct = Math.min(100, (tgcBalance / PAYOUT_THRESHOLD_TGC) * 100);
+  const canWithdraw = !!(wallet?.can_withdraw);
+  const monthlyForecastTGC = Number(forecast?.monthly_tgc ?? wallet?.monthly_forecast_tgc ?? 0);
+  const monthlyForecastUSDT = monthlyForecastTGC * TGC_TO_USDT;
+
+  const dropActive = drop?.active_drop;
+  const myTicketsTotal = drop?.your_tickets ?? wallet?.grid_tickets ?? 0;
+  const ticketsInDrop = drop?.tickets_in_current_drop ?? 0;
+  const nextTicketIn = drop?.next_ticket_in_tgc ?? wallet?.next_ticket_in_tgc ?? 100;
+  const nextTicketPct = Math.max(0, Math.min(100, ((100 - nextTicketIn) / 100) * 100));
+  const lastDrop = history[0];
+
+  return (
+    <div className="mt-6 space-y-3" data-testid="rewards-tab-content">
+      {/* TGC hero */}
+      <div className="rounded-2xl bg-black/40 border border-white/10 p-5" data-testid="rewards-balance-card">
+        <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">TGC Balance</div>
+        <div className="mt-1 font-mono-cyber font-black text-4xl cyan-text" data-testid="rewards-tgc-balance">
+          {tgcBalance.toFixed(2)} <span className="text-white/55 text-sm">TGC</span>
+        </div>
+        <div className="text-[11px] text-white/45 mt-1">
+          Estimated Value ≈ ${(tgcBalance * TGC_TO_USDT).toFixed(2)} USDT · Lifetime {lifetimeTGC.toFixed(2)} TGC
+        </div>
+      </div>
+
+      {/* Pending vs Available */}
+      <div className="grid grid-cols-2 gap-3">
+        <Box label="Pending Verification" value={`${pendingTGC.toFixed(2)} TGC`} sub={`≈ $${(pendingTGC * TGC_TO_USDT).toFixed(2)}`} testId="rewards-pending" />
+        <Box label="Available TGC" value={`${availableTGC.toFixed(2)} TGC`} sub={`≈ $${(availableTGC * TGC_TO_USDT).toFixed(2)}`} testId="rewards-available" />
+      </div>
+
+      {/* ===== Monthly Contributor Drop ===== */}
+      <div className="rounded-3xl bg-gradient-to-br from-[#00ff88]/8 to-[#00d4ff]/4 border border-[#00ff88]/30 p-5 relative overflow-hidden"
+           data-testid="contributor-drop-card">
+        <div className="absolute -right-12 -top-12 w-48 h-48 rounded-full bg-[#00ff88]/12 blur-3xl" />
+        <div className="relative">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] matrix-text font-mono-term">
+            <Sparkles className="w-3 h-3" /> Monthly Contributor Drop
+          </div>
+          <div className="mt-2 flex items-baseline gap-3 flex-wrap">
+            <div className="font-mono-cyber font-black text-5xl matrix-text" data-testid="my-tickets-count">
+              {myTicketsTotal}
+            </div>
+            <div>
+              <div className="text-sm text-white/90">Your Tickets</div>
+              <div className="text-[10px] text-white/45">{ticketsInDrop} in this month's drop</div>
+            </div>
+          </div>
+          {/* Next ticket progress */}
+          <div className="mt-4">
+            <div className="flex justify-between text-[10px] uppercase tracking-widest text-white/45 mb-1.5">
+              <span>Next Ticket</span>
+              <span className="cyan-text" data-testid="next-ticket-in-tgc">{nextTicketIn.toFixed(1)} TGC kaldı</span>
+            </div>
+            <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-[#00ffe1] to-[#00ff88]"
+                   style={{ width: `${nextTicketPct}%` }} />
+            </div>
+          </div>
+
+          {/* This month's pool */}
+          {dropActive ? (
+            <div className="mt-4 grid grid-cols-2 gap-3" data-testid="drop-active-grid">
+              <div className="p-3 rounded-2xl bg-black/40 border border-[#00ffe1]/15">
+                <div className="text-[9px] uppercase tracking-widest text-white/45">This Month's Pool</div>
+                <div className="font-mono-cyber font-black text-2xl cyan-text" data-testid="drop-pool-usdt">
+                  ${dropActive.reward_pool_usdt?.toFixed(0)} USDT
+                </div>
+              </div>
+              <div className="p-3 rounded-2xl bg-black/40 border border-[#00ffe1]/15">
+                <div className="text-[9px] uppercase tracking-widest text-white/45">Draw Date</div>
+                <div className="font-mono-cyber font-black text-sm cyan-text mt-1" data-testid="drop-draw-date">
+                  {dropActive.draw_date ? new Date(dropActive.draw_date).toLocaleString("tr-TR", { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" }) : "TBA"}
+                </div>
+              </div>
+              <div className="col-span-2 p-3 rounded-2xl bg-black/40 border border-[#00ffe1]/15" data-testid="drop-prize-split">
+                <div className="text-[9px] uppercase tracking-widest text-white/45 mb-2">Prize Split</div>
+                <div className="space-y-1">
+                  {(dropActive.prize_split || []).map((t) => (
+                    <div key={t.tier_name} className="flex justify-between text-xs">
+                      <span className="text-white/75">{t.winner_count} × ${t.amount_usdt} {t.tier_name}</span>
+                      <span className="matrix-text font-mono-cyber">${t.total_usdt}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="col-span-2 flex justify-between items-center text-[10px] text-white/40 font-mono-term">
+                <span data-testid="drop-total-tickets">Total Tickets: <span className="cyan-text">{dropActive.total_tickets}</span></span>
+                <span data-testid="drop-eligible">Eligible: <span className="cyan-text">{dropActive.eligible_contributors}</span></span>
+                <span className={`cyber-pill text-[9px] ${drop?.eligibility_status === "eligible" ? "matrix-pill" : ""}`} data-testid="drop-eligibility-status">
+                  {drop?.eligibility_status === "eligible" ? "ELIGIBLE" : "EARN TICKETS"}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 p-3 rounded-2xl bg-black/40 border border-white/10 text-[11px] text-white/55"
+                 data-testid="no-active-drop">
+              Bu ay için aktif Contributor Drop yok. Admin yeni bir drop açtığında burada görünecek.
+            </div>
+          )}
+          <div className="mt-4 text-[10px] text-white/40 leading-relaxed" data-testid="drop-compliance-text">
+            Grid Tickets earn from lifetime TGC milestones (every 100 TGC = 1 ticket). Your TGC balance is not spent. Tickets cannot be purchased.
+          </div>
+        </div>
+      </div>
+
+      {/* Last winners (history) */}
+      {history.length > 0 && (
+        <div className="rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="drop-history-card">
+          <div className="text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3" /> Latest Drop Results
+          </div>
+          {lastDrop?.your_results?.length > 0 && (
+            <div className="mt-3 p-3 rounded-xl bg-[#00ff88]/8 border border-[#00ff88]/30" data-testid="my-won-reward">
+              <div className="text-[9px] uppercase tracking-widest matrix-text">YOU WON</div>
+              <div className="text-xl font-mono-cyber font-black matrix-text mt-0.5">
+                ${lastDrop.your_results[0].amount_usdt} USDT
+              </div>
+              <div className="text-[10px] text-white/55 mt-0.5">
+                {lastDrop.your_results[0].prize_tier} · status: {lastDrop.your_results[0].payout_status}
+              </div>
+            </div>
+          )}
+          <div className="mt-3 space-y-1.5">
+            {(lastDrop?.winners || []).slice(0, 5).map((w, i) => (
+              <div key={i} className="flex items-center justify-between text-[11px] font-mono-term px-2 py-1.5 rounded bg-black/30"
+                   data-testid={`drop-winner-${i}`}>
+                <span className="cyan-text">{w.username_masked}</span>
+                <span className="text-white/55">{w.ticket_id_masked}</span>
+                <span className="matrix-text font-mono-cyber font-black">${w.amount_usdt}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Monthly Forecast */}
+      <div className="rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="monthly-forecast-card">
+        <div className="text-[10px] uppercase tracking-[0.3em] cyan-text">Monthly Forecast (Node Tier · {tierLabel})</div>
+        <div className="mt-1.5 font-mono-cyber font-black text-2xl matrix-text" data-testid="monthly-forecast-tgc">
+          ~{Math.round(monthlyForecastTGC)} TGC <span className="text-white/55 text-sm">/ month</span>
+        </div>
+        <div className="text-[11px] text-white/45 mt-1" data-testid="monthly-forecast-usdt">
+          ≈ ${monthlyForecastUSDT.toFixed(2)} estimated
+        </div>
+      </div>
+
+      {/* Payout Progress */}
+      <div className="rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="payout-card">
+        <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">Payout Progress</div>
+        <div className="mt-1 font-mono-cyber font-black text-lg cyan-text" data-testid="payout-progress-rewards">
+          {progressTGC.toFixed(2)} / {PAYOUT_THRESHOLD_TGC} TGC
+        </div>
+        <div className="mt-2 w-full h-2 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-[#00ffe1] to-[#00ff88]" style={{ width: `${progressPct}%` }} />
+        </div>
+        <button onClick={requestPayout} disabled={!canWithdraw} data-testid="request-payout-btn"
+                className={`mt-3 w-full py-3 rounded-xl font-mono-cyber font-black text-sm tracking-[0.2em] transition ${
+                  canWithdraw ? "bg-gradient-to-r from-[#00ff88] to-[#00d4ff] text-black"
+                              : "bg-white/5 text-white/40 border border-white/10 cursor-not-allowed"
+                }`}>
+          {canWithdraw ? "Request $10 USDT Payout" : `Payout unlocks at ${PAYOUT_THRESHOLD_TGC} TGC`}
+        </button>
+      </div>
+
+      {/* Payout Wallet */}
+      <div className="rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="payout-wallet-card">
+        <div className="text-[10px] uppercase tracking-[0.25em] text-white/45 flex items-center gap-1.5">
+          <Wallet className="w-3 h-3 cyan-text" /> Payout Wallet
+        </div>
+        <div className="mt-2 flex gap-2 flex-wrap">
+          {NETWORKS.map((n) => (
+            <button key={n} onClick={() => setWalletNet(n)} data-testid={`wallet-net-${n}`}
+              className={`px-3 py-1.5 rounded-full text-[11px] uppercase tracking-widest border transition ${
+                walletNet === n ? "border-[#00ff88]/50 bg-[#00ff88]/10 matrix-text" : "border-white/10 text-white/45"
+              }`}>{n}</button>
+          ))}
+        </div>
+        <input type="text" value={walletAddr} onChange={(e) => setWalletAddr(e.target.value)}
+               placeholder="Paste your USDT wallet address" data-testid="wallet-addr-input"
+               className="mt-3 w-full p-3 rounded-xl bg-black/40 border border-white/10 text-xs font-mono-term text-white placeholder:text-white/30 focus:outline-none focus:border-[#00ffe1]/40" />
+        <button onClick={saveWallet} disabled={savingWallet || !walletAddr} data-testid="save-wallet-btn"
+                className="mt-3 w-full py-2 rounded-xl text-[11px] font-mono-cyber tracking-[0.2em] uppercase bg-[#00ffe1]/10 cyan-text border border-[#00ffe1]/30 disabled:opacity-50">
+          {savingWallet ? "Saving…" : "Save Wallet"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 
 function Row({ k, v, accent, testId }) {
   return (

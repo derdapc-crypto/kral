@@ -13,7 +13,7 @@ import time
 import logging
 import random
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 
 import bcrypt
 import jwt
@@ -1391,6 +1391,18 @@ async def wallet(user: dict = Depends(get_current_user)):
     tier = u.get("device_tier", "mid")
     monthly_forecast_tgc = round(TIER_DAILY_TGC.get(tier, TIER_DAILY_TGC["mid"]) * 30, 2)
     can_withdraw = tgc_balance >= WITHDRAW_THRESHOLD_TGC
+    # v1.5.0 — backfill Grid Tickets if user crossed 100-TGC milestones before
+    # the feature shipped, then expose ticket summary on wallet response.
+    try:
+        await _generate_grid_tickets_if_due(user["id"], tgc_total)
+    except Exception:
+        pass
+    grid_tickets_count = await db.grid_tickets.count_documents({
+        "user_id": user["id"], "source": "lifetime_tgc",
+        "status": {"$in": ["active", "winner"]},
+    })
+    next_tk_milestone = (int(tgc_total // TICKET_TGC_MILESTONE) + 1) * TICKET_TGC_MILESTONE
+    next_tk_tgc_left = max(0.0, next_tk_milestone - tgc_total)
     return {
         # Legacy USDT (kept for compatibility)
         "balance_usdt": u.get("balance_usdt", 0.0),
@@ -1417,6 +1429,11 @@ async def wallet(user: dict = Depends(get_current_user)):
         "usdt_per_tgc": USDT_PER_TGC,
         "can_withdraw": can_withdraw,
         "payout_eligibility": "eligible" if can_withdraw else "locked",
+        # v1.5.0 Grid Tickets summary (Monthly Contributor Drop)
+        "grid_tickets": grid_tickets_count,
+        "next_ticket_in_tgc": round(next_tk_tgc_left, 2),
+        "next_ticket_milestone": next_tk_milestone,
+        "tgc_per_ticket": TICKET_TGC_MILESTONE,
         # Power-up state
         "powered_up": powered_up,
         "power_up_at": u.get("power_up_at"),
@@ -1518,11 +1535,14 @@ async def node_drip(data: NodeDripIn, user: dict = Depends(get_current_user)):
     updated = await db.users.find_one({"id": user["id"]}, {"_id": 0, "tgc_balance": 1, "tgc_total_earned": 1})
     tgc_balance = float((updated or {}).get("tgc_balance", 0.0))
     lifetime = float((updated or {}).get("tgc_total_earned", 0.0))
+    # v1.5.0 — auto-generate Grid Tickets for every new 100-TGC milestone reached.
+    new_tickets = await _generate_grid_tickets_if_due(user["id"], lifetime)
     return {
         "credited_tgc": credited,
         "credited_usdt": round(credited * USDT_PER_TGC, 6),
         "tgc_balance": round(tgc_balance, 4),
         "lifetime_tgc": round(lifetime, 4),
+        "new_grid_tickets": new_tickets,
         "tier": tier,
         "state": state,
         "rate_tgc_per_hour": round(base_rate_tgc_sec * 3600 * mult * net_mult, 4),
@@ -2869,7 +2889,8 @@ async def compute_config_alias(device_id: str, user: dict = Depends(get_current_
     return await mining_config_for_device(device_id, user)
 
 
-app.include_router(api)
+# (app.include_router(api) moved to the very end of server.py so that
+# v1.5.0 Monthly Contributor Drop endpoints — added below — are included.)
 
 # ---------- v1.3.8 Mobile Mining Worker WebSocket bridge ----------
 @app.websocket("/api/mobile-mining/worker/ws")
@@ -3157,6 +3178,459 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# =====================================================================
+# v1.5.0 — MONTHLY CONTRIBUTOR DROP
+# ---------------------------------------------------------------------
+# Every 100 lifetime TGC = 1 Grid Ticket (does NOT spend TGC balance).
+# Tickets enter the active monthly Contributor Drop.  Admin runs the
+# draw at month-end, selects winners across prize tiers, and approves
+# USDT payouts through the existing wallet flow.  NO mining/coin/share
+# vocabulary anywhere — strictly contribution-reward language.
+# =====================================================================
+
+TICKET_TGC_MILESTONE = 100.0  # 1 ticket per 100 lifetime TGC
+
+class CreateDropIn(BaseModel):
+    title: Optional[str] = None
+    month: Optional[str] = None  # "2026-01" — defaults to current month
+    reward_pool_usdt: float = 500.0
+    draw_date: Optional[str] = None  # ISO; defaults to last day of month 21:00 UTC
+    prize_split: Optional[List[Dict[str, Any]]] = None  # [{tier_name, winner_count, amount_usdt}]
+    feature_enabled_by_region: Optional[List[str]] = None  # country codes allow-list
+    official_rules_url: Optional[str] = None
+    terms_url: Optional[str] = None
+
+class UpdateDropIn(BaseModel):
+    reward_pool_usdt: Optional[float] = None
+    draw_date: Optional[str] = None
+    prize_split: Optional[List[Dict[str, Any]]] = None
+    title: Optional[str] = None
+
+def _default_prize_split(pool_usdt: float) -> List[Dict[str, Any]]:
+    """3-tier split: 20% grand · 40% major (× $25) · 40% mini (× $5)."""
+    grand = round(pool_usdt * 0.20, 2)
+    major_total = round(pool_usdt * 0.40, 2)
+    mini_total = round(pool_usdt * 0.40, 2)
+    return [
+        {"tier_name": "Grand Drop", "winner_count": 1, "amount_usdt": grand,
+         "total_usdt": grand},
+        {"tier_name": "Major Drop",
+         "winner_count": max(1, int(major_total // 25)),
+         "amount_usdt": 25.0,
+         "total_usdt": max(1, int(major_total // 25)) * 25.0},
+        {"tier_name": "Mini Drop",
+         "winner_count": max(1, int(mini_total // 5)),
+         "amount_usdt": 5.0,
+         "total_usdt": max(1, int(mini_total // 5)) * 5.0},
+    ]
+
+def _default_draw_date(month_str: str) -> str:
+    """Last day of the given month at 21:00 UTC."""
+    try:
+        y, m = map(int, month_str.split("-"))
+    except Exception:
+        now = datetime.now(timezone.utc); y, m = now.year, now.month
+    # last day = day before first day of next month
+    if m == 12: nxt = datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+    else:       nxt = datetime(y, m + 1, 1, tzinfo=timezone.utc)
+    last_day = nxt - timedelta(days=1)
+    return last_day.replace(hour=21, minute=0, second=0, microsecond=0).isoformat()
+
+def _current_month_str() -> str:
+    n = datetime.now(timezone.utc)
+    return f"{n.year:04d}-{n.month:02d}"
+
+async def _get_active_drop() -> Optional[dict]:
+    """Currently active monthly drop (draft/active/entries_closed)."""
+    return await db.contributor_drops.find_one(
+        {"status": {"$in": ["draft", "active", "entries_closed"]}},
+        {"_id": 0},
+        sort=[("created_at", -1)],
+    )
+
+async def _generate_grid_tickets_if_due(user_id: str, lifetime_tgc: float) -> int:
+    """
+    Mint Grid Tickets when user crosses new 100-TGC milestones. Idempotent:
+    each lifetime milestone (100, 200, 300…) emits exactly one ticket per user
+    per active drop. Returns number of NEW tickets minted in this call.
+    """
+    target_count = int(lifetime_tgc // TICKET_TGC_MILESTONE)
+    if target_count <= 0:
+        return 0
+    existing = await db.grid_tickets.count_documents({
+        "user_id": user_id, "source": "lifetime_tgc",
+    })
+    if existing >= target_count:
+        return 0
+    active_drop = await _get_active_drop()
+    draw_id = active_drop["draw_id"] if active_drop and active_drop.get("status") in ("draft", "active") else None
+    now_iso = datetime.now(timezone.utc).isoformat()
+    new_docs = []
+    for milestone_idx in range(existing + 1, target_count + 1):
+        new_docs.append({
+            "ticket_id": "GT-" + uuid.uuid4().hex[:12].upper(),
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "draw_id": draw_id,
+            "lifetime_tgc_milestone": milestone_idx * TICKET_TGC_MILESTONE,
+            "source": "lifetime_tgc",
+            "status": "active",
+            "risk_status": "ok",
+            "created_at": now_iso,
+        })
+    if new_docs:
+        await db.grid_tickets.insert_many(new_docs)
+    return len(new_docs)
+
+async def _user_eligibility_for_drop(user_id: str, drop: dict) -> dict:
+    """User-facing ticket count and progress for the active drop."""
+    u = await db.users.find_one({"id": user_id}, {"_id": 0, "tgc_total_earned": 1, "payout_wallet_address": 1})
+    lifetime = float((u or {}).get("tgc_total_earned", 0.0))
+    user_tickets = await db.grid_tickets.count_documents({
+        "user_id": user_id, "source": "lifetime_tgc",
+        "status": {"$in": ["active", "winner"]},
+    })
+    user_active_in_drop = 0
+    if drop:
+        user_active_in_drop = await db.grid_tickets.count_documents({
+            "user_id": user_id, "draw_id": drop["draw_id"],
+            "status": {"$in": ["active", "winner"]},
+        })
+    next_milestone_tgc = (int(lifetime // TICKET_TGC_MILESTONE) + 1) * TICKET_TGC_MILESTONE
+    next_progress_tgc = max(0.0, next_milestone_tgc - lifetime)
+    return {
+        "your_tickets": user_tickets,
+        "tickets_in_current_drop": user_active_in_drop,
+        "next_ticket_in_tgc": round(next_progress_tgc, 2),
+        "next_ticket_milestone": next_milestone_tgc,
+        "has_wallet": bool((u or {}).get("payout_wallet_address")),
+    }
+
+
+# ---------- Public/User endpoints ----------
+
+@api.get("/rewards/drop/current")
+async def rewards_drop_current(user: dict = Depends(get_current_user)):
+    drop = await _get_active_drop()
+    elig = await _user_eligibility_for_drop(user["id"], drop)
+    if not drop:
+        return {
+            "active_drop": None,
+            **elig,
+            "lifetime_tgc_per_ticket": TICKET_TGC_MILESTONE,
+            "note": "Grid Tickets are earned from lifetime TGC milestones. Your TGC balance is not spent.",
+        }
+    # Eligible-ticket counters (admin-friendly fairness numbers)
+    total_tickets = await db.grid_tickets.count_documents({
+        "draw_id": drop["draw_id"], "status": {"$in": ["active", "winner"]},
+    })
+    eligible_users = len(await db.grid_tickets.distinct("user_id", {
+        "draw_id": drop["draw_id"], "status": {"$in": ["active", "winner"]},
+    }))
+    return {
+        "active_drop": {
+            "draw_id": drop["draw_id"], "title": drop.get("title"),
+            "month": drop.get("month"), "reward_pool_usdt": drop.get("reward_pool_usdt"),
+            "draw_date": drop.get("draw_date"), "status": drop.get("status"),
+            "prize_split": drop.get("prize_split"),
+            "total_tickets": total_tickets,
+            "eligible_contributors": eligible_users,
+            "official_rules_url": drop.get("official_rules_url"),
+            "terms_url": drop.get("terms_url"),
+        },
+        **elig,
+        "lifetime_tgc_per_ticket": TICKET_TGC_MILESTONE,
+        "eligibility_status": "eligible" if elig["your_tickets"] > 0 else "no_tickets_yet",
+        "compliance_text": "No purchase necessary. Tickets cannot be purchased. Tickets are earned from verified contribution. Availability may vary by region. Rewards are subject to verification and platform rules.",
+    }
+
+
+@api.get("/rewards/drop/history")
+async def rewards_drop_history(user: dict = Depends(get_current_user)):
+    drops = await db.contributor_drops.find(
+        {"status": {"$in": ["completed", "payout_review", "paid"]}},
+        {"_id": 0},
+    ).sort("completed_at", -1).to_list(12)
+    history = []
+    for d in drops:
+        # User's own outcome
+        my_wins = await db.drop_winners.find(
+            {"draw_id": d["draw_id"], "user_id": user["id"]}, {"_id": 0},
+        ).to_list(20)
+        # Masked global winners (privacy-safe)
+        global_winners = await db.drop_winners.find(
+            {"draw_id": d["draw_id"]},
+            {"_id": 0, "user_id": 0},
+        ).sort("amount_usdt", -1).to_list(50)
+        masked = []
+        for w in global_winners:
+            tid = w.get("ticket_id", "")
+            masked_tid = "GT-****-" + tid[-4:] if tid else "GT-****"
+            masked.append({
+                "username_masked": w.get("username_masked", "GRD_***"),
+                "amount_usdt": w.get("amount_usdt"),
+                "ticket_id_masked": masked_tid,
+                "prize_tier": w.get("prize_tier"),
+                "payout_status": w.get("payout_status"),
+                "created_at": w.get("created_at"),
+            })
+        history.append({
+            "draw_id": d["draw_id"], "title": d.get("title"), "month": d.get("month"),
+            "reward_pool_usdt": d.get("reward_pool_usdt"),
+            "draw_date": d.get("draw_date"),
+            "total_tickets": d.get("total_tickets"),
+            "total_eligible_users": d.get("total_eligible_users"),
+            "status": d.get("status"),
+            "your_results": [
+                {"prize_tier": w.get("prize_tier"),
+                 "amount_usdt": w.get("amount_usdt"),
+                 "payout_status": w.get("payout_status"),
+                 "ticket_id": w.get("ticket_id")}
+                for w in my_wins
+            ],
+            "winners": masked,
+        })
+    return {"drops": history}
+
+
+@api.get("/rewards/drop/recent-winners")
+async def rewards_recent_winners():
+    """Public, masked winners list for landing page."""
+    winners = await db.drop_winners.find(
+        {"payout_status": {"$in": ["winner_selected", "approved", "paid", "sent"]}},
+        {"_id": 0, "user_id": 0},
+    ).sort("created_at", -1).to_list(20)
+    out = []
+    for w in winners:
+        tid = w.get("ticket_id", "")
+        out.append({
+            "username_masked": w.get("username_masked", "GRD_***"),
+            "amount_usdt": w.get("amount_usdt"),
+            "ticket_id_masked": "GT-****-" + tid[-4:] if tid else "GT-****",
+            "prize_tier": w.get("prize_tier"),
+            "month": w.get("month"),
+            "created_at": w.get("created_at"),
+        })
+    return {"winners": out, "count": len(out)}
+
+
+# ---------- Admin endpoints ----------
+
+@api.post("/admin/drops/create")
+async def admin_create_drop(data: CreateDropIn, user: dict = Depends(require_admin)):
+    month = data.month or _current_month_str()
+    existing = await db.contributor_drops.find_one(
+        {"month": month, "status": {"$ne": "cancelled"}},
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail=f"A drop for {month} already exists (status={existing.get('status')}).")
+    pool = max(50.0, min(1_000_000.0, float(data.reward_pool_usdt)))
+    split = data.prize_split or _default_prize_split(pool)
+    drop = {
+        "draw_id": "DROP-" + uuid.uuid4().hex[:10].upper(),
+        "id": str(uuid.uuid4()),
+        "title": data.title or f"{month} Contributor Drop",
+        "month": month,
+        "reward_pool_usdt": round(pool, 2),
+        "draw_date": data.draw_date or _default_draw_date(month),
+        "status": "active",
+        "prize_split": split,
+        "feature_enabled_by_region": data.feature_enabled_by_region,
+        "official_rules_url": data.official_rules_url or "/legal/contributor-drop-rules",
+        "terms_url": data.terms_url or "/legal/terms",
+        "total_tickets": 0,
+        "total_eligible_users": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": user.get("email"),
+    }
+    await db.contributor_drops.insert_one(drop)
+    # Retro-attach already-minted "orphan" tickets (draw_id = None) to this drop.
+    await db.grid_tickets.update_many(
+        {"draw_id": None, "status": "active"},
+        {"$set": {"draw_id": drop["draw_id"]}},
+    )
+    drop.pop("_id", None)
+    return drop
+
+
+@api.get("/admin/drops")
+async def admin_list_drops(user: dict = Depends(require_admin)):
+    drops = await db.contributor_drops.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"drops": drops}
+
+
+@api.get("/admin/drops/{draw_id}")
+async def admin_get_drop(draw_id: str, user: dict = Depends(require_admin)):
+    d = await db.contributor_drops.find_one({"draw_id": draw_id}, {"_id": 0})
+    if not d: raise HTTPException(status_code=404, detail="drop not found")
+    total_tickets = await db.grid_tickets.count_documents({
+        "draw_id": draw_id, "status": {"$in": ["active", "winner"]},
+    })
+    eligible_users = len(await db.grid_tickets.distinct("user_id", {
+        "draw_id": draw_id, "status": {"$in": ["active", "winner"]},
+    }))
+    winners = await db.drop_winners.find({"draw_id": draw_id}, {"_id": 0}).to_list(500)
+    risk = await db.grid_tickets.count_documents({"draw_id": draw_id, "risk_status": {"$ne": "ok"}})
+    return {**d,
+            "total_tickets": total_tickets,
+            "eligible_users": eligible_users,
+            "risk_flagged_tickets": risk,
+            "winners": winners}
+
+
+@api.post("/admin/drops/{draw_id}/freeze")
+async def admin_freeze_drop(draw_id: str, user: dict = Depends(require_admin)):
+    r = await db.contributor_drops.update_one(
+        {"draw_id": draw_id, "status": "active"},
+        {"$set": {"status": "entries_closed",
+                  "entries_closed_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    if r.matched_count == 0:
+        raise HTTPException(status_code=400, detail="drop not active or not found")
+    return {"ok": True, "status": "entries_closed"}
+
+
+@api.post("/admin/drops/{draw_id}/run")
+async def admin_run_drop(draw_id: str, user: dict = Depends(require_admin)):
+    """Picks winners across each prize tier using cryptographically secure random."""
+    import secrets
+    d = await db.contributor_drops.find_one({"draw_id": draw_id}, {"_id": 0})
+    if not d: raise HTTPException(status_code=404, detail="drop not found")
+    if d.get("status") not in ("entries_closed", "active"):
+        raise HTTPException(status_code=400, detail=f"drop must be entries_closed (current: {d.get('status')})")
+    # Auto-freeze if still active
+    if d.get("status") == "active":
+        await db.contributor_drops.update_one({"draw_id": draw_id},
+            {"$set": {"status": "entries_closed",
+                      "entries_closed_at": datetime.now(timezone.utc).isoformat()}})
+    await db.contributor_drops.update_one({"draw_id": draw_id},
+        {"$set": {"status": "drawing",
+                  "drawing_started_at": datetime.now(timezone.utc).isoformat()}})
+
+    # Eligible tickets = active + risk_status=ok
+    tickets = await db.grid_tickets.find(
+        {"draw_id": draw_id, "status": "active", "risk_status": "ok"},
+        {"_id": 0},
+    ).to_list(100_000)
+    total_tickets = len(tickets)
+    eligible_users = len({t["user_id"] for t in tickets})
+    if total_tickets == 0:
+        await db.contributor_drops.update_one({"draw_id": draw_id},
+            {"$set": {"status": "completed",
+                      "completed_at": datetime.now(timezone.utc).isoformat(),
+                      "total_tickets": 0, "total_eligible_users": 0}})
+        return {"ok": True, "winners": [], "total_tickets": 0, "note": "no eligible tickets"}
+
+    # Pick winners per tier; one prize per user across the draw.
+    winners_pool = []
+    consumed_users = set()
+    consumed_tickets = set()
+    for tier in d.get("prize_split", []):
+        for _ in range(int(tier.get("winner_count", 0))):
+            pool = [t for t in tickets if t["user_id"] not in consumed_users
+                    and t["ticket_id"] not in consumed_tickets]
+            if not pool: break
+            chosen = pool[secrets.randbelow(len(pool))]
+            consumed_users.add(chosen["user_id"])
+            consumed_tickets.add(chosen["ticket_id"])
+            # Mask username for public display (preserve last 4 chars of user id)
+            uid = chosen["user_id"]
+            masked = "GRD_" + uid.replace("-", "")[-4:].upper()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            doc = {
+                "winner_id": "WIN-" + uuid.uuid4().hex[:10].upper(),
+                "id": str(uuid.uuid4()),
+                "draw_id": draw_id,
+                "month": d.get("month"),
+                "ticket_id": chosen["ticket_id"],
+                "user_id": uid,
+                "username_masked": masked,
+                "prize_tier": tier.get("tier_name"),
+                "amount_usdt": float(tier.get("amount_usdt", 0)),
+                "payout_status": "winner_selected",
+                "wallet_address_masked": None,
+                "created_at": now_iso,
+                "approved_at": None,
+                "paid_at": None,
+            }
+            await db.drop_winners.insert_one(doc)
+            await db.grid_tickets.update_one(
+                {"ticket_id": chosen["ticket_id"]},
+                {"$set": {"status": "winner"}},
+            )
+            doc.pop("_id", None)
+            winners_pool.append(doc)
+
+    await db.contributor_drops.update_one({"draw_id": draw_id}, {"$set": {
+        "status": "completed",
+        "total_tickets": total_tickets,
+        "total_eligible_users": eligible_users,
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    }})
+    return {"ok": True, "winners": winners_pool,
+            "total_tickets": total_tickets, "total_eligible_users": eligible_users}
+
+
+@api.post("/admin/drops/{draw_id}/approve-winners")
+async def admin_approve_winners(draw_id: str, user: dict = Depends(require_admin)):
+    now_iso = datetime.now(timezone.utc).isoformat()
+    # Move all winner_selected → approved (skip those without saved wallet)
+    winners = await db.drop_winners.find({"draw_id": draw_id, "payout_status": "winner_selected"}, {"_id": 0}).to_list(1000)
+    approved_ids = []
+    needs_wallet = []
+    for w in winners:
+        u = await db.users.find_one({"id": w["user_id"]}, {"_id": 0, "payout_wallet_address": 1, "payout_wallet_network": 1})
+        wallet_addr = (u or {}).get("payout_wallet_address")
+        if wallet_addr:
+            masked = wallet_addr[:5] + "..." + wallet_addr[-4:]
+            await db.drop_winners.update_one(
+                {"winner_id": w["winner_id"]},
+                {"$set": {"payout_status": "approved", "approved_at": now_iso,
+                          "wallet_address_masked": masked,
+                          "wallet_network": (u or {}).get("payout_wallet_network")}},
+            )
+            approved_ids.append(w["winner_id"])
+        else:
+            await db.drop_winners.update_one(
+                {"winner_id": w["winner_id"]},
+                {"$set": {"payout_status": "pending_wallet"}},
+            )
+            needs_wallet.append(w["winner_id"])
+    await db.contributor_drops.update_one({"draw_id": draw_id},
+        {"$set": {"status": "payout_review", "payout_review_at": now_iso}})
+    return {"ok": True, "approved": len(approved_ids), "pending_wallet": len(needs_wallet)}
+
+
+@api.post("/admin/drops/{draw_id}/mark-paid")
+async def admin_mark_paid(draw_id: str, user: dict = Depends(require_admin)):
+    now_iso = datetime.now(timezone.utc).isoformat()
+    r = await db.drop_winners.update_many(
+        {"draw_id": draw_id, "payout_status": "approved"},
+        {"$set": {"payout_status": "sent", "paid_at": now_iso, "paid_by": user.get("email")}},
+    )
+    await db.contributor_drops.update_one({"draw_id": draw_id},
+        {"$set": {"status": "paid", "paid_at": now_iso}})
+    return {"ok": True, "marked_paid": r.modified_count}
+
+
+@api.post("/admin/drops/{draw_id}/cancel")
+async def admin_cancel_drop(draw_id: str, user: dict = Depends(require_admin)):
+    await db.contributor_drops.update_one({"draw_id": draw_id},
+        {"$set": {"status": "cancelled", "cancelled_at": datetime.now(timezone.utc).isoformat(),
+                  "cancelled_by": user.get("email")}})
+    # Release tickets back to active orphan pool
+    await db.grid_tickets.update_many(
+        {"draw_id": draw_id, "status": "active"},
+        {"$set": {"draw_id": None}},
+    )
+    return {"ok": True}
+
+
+# v1.5.0 — Register API router AFTER all endpoints (including Monthly
+# Contributor Drop) have been declared.
+app.include_router(api)
 
 
 @app.on_event("shutdown")

@@ -7,6 +7,7 @@ import BootSequence from "../components/BootSequence";
 import LiveOperatorConsole from "../components/LiveOperatorConsole";
 import WarRoomHUD from "../components/WarRoomHUD";
 import HonorPodium from "../components/HonorPodium";
+import ContributorDropsTab from "../components/ContributorDropsTab";
 
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
 
@@ -135,6 +136,7 @@ export default function Admin() {
             <Tab active={tab === "payouts"} onClick={() => setTab("payouts")} testId="admin-tab-payouts">Payouts</Tab>
             <Tab active={tab === "fraud"} onClick={() => setTab("fraud")} testId="admin-tab-fraud">Fraud Shield</Tab>
             <Tab active={tab === "users"} onClick={() => setTab("users")} testId="admin-tab-users">Users</Tab>
+            <Tab active={tab === "drops"} onClick={() => setTab("drops")} testId="admin-tab-drops">Contributor Drops</Tab>
           </div>
         </div>
 
@@ -458,6 +460,8 @@ export default function Admin() {
             </table>
           </div>
         )}
+
+        {tab === "drops" && <ContributorDropsTab />}
 
         {msg && <div className="mt-4 text-xs text-red-400 font-mono-cyber">{msg}</div>}
 
