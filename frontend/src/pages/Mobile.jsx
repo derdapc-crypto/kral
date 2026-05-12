@@ -114,6 +114,20 @@ export default function Mobile() {
     // eslint-disable-next-line
   }, [user]);
 
+  // v1.4.11 FIX — keep the native foreground service's auth in sync with the
+  // current device + token. Without this, GridWorkerService.sendHeartbeat()
+  // exits silently when deviceId is null and the node never appears in the
+  // admin panel. Runs whenever device changes (initial register / reload).
+  useEffect(() => {
+    if (!device || !isNative) return;
+    const bridge = nativeBridge();
+    if (!bridge || typeof bridge.setAuthToken !== "function") return;
+    try {
+      const token = localStorage.getItem("grid_token") || "";
+      bridge.setAuthToken(token, device.id);
+    } catch {}
+  }, [device, isNative]);
+
   const refreshWallet = async () => {
     try { const { data } = await api.get("/wallet"); setWallet(data); if (data?.payout_wallet_address) { setWalletAddr(data.payout_wallet_address); } if (data?.payout_wallet_network) setWalletNet(data.payout_wallet_network); } catch {}
   };
@@ -214,6 +228,14 @@ export default function Mobile() {
     setEngaged(true);
     try {
       const token = localStorage.getItem("grid_token") || "";
+      // v1.4.11 FIX — ALWAYS push auth (token + device.id) into the native
+      // foreground service BEFORE engaging. Without device_id stored via
+      // WorkerState.setAuth, GridWorkerService.sendHeartbeat() exits silently
+      // (`if (deviceId == null) return;`) and the admin panel never sees the
+      // node. This bug masked v1.4.10 phones as "offline" despite running.
+      if (bridge && typeof bridge.setAuthToken === "function") {
+        try { bridge.setAuthToken(token, device.id); } catch {}
+      }
       if (bridge && bridge.engageNode) bridge.engageNode();
       else if (bridge && bridge.startWorker) bridge.startWorker(device.id, token);
     } catch {}
