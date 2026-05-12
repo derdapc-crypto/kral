@@ -58,13 +58,45 @@ ADMIN_BINANCE_ID = "117423210"
 # 7:5 arbitrage rule — every $7 real-mined to admin = 100 TGC ($5) credited to user
 ADMIN_ARBITRAGE_REAL_USDT = 7.0
 ADMIN_ARBITRAGE_USER_USDT = 5.0
-# v1.4.9 economy: device-class daily TGC targets (soft, not hard caps).
-# Monthly forecast = daily × 30. Budget 100-180, standard 220-260, flagship 280-350, core 350+.
+# v1.4.10 network economy: device-class daily TGC targets (soft, not hard caps).
+# Monthly forecast = daily × 30 × network_multiplier(N).  See network_multiplier().
 TIER_DAILY_TGC = {"core": 12.0, "flagship": 10.5, "mid": 8.0, "budget": 4.5}
 # Mode multipliers applied on top of base drip during ledger crediting.
 MODE_MULTIPLIER = {"eco": 0.5, "full": 1.0, "engaged_eco": 0.5, "engaged_full": 1.0,
                     "paused_power": 0.0, "paused_battery": 0.0, "paused_thermal": 0.0,
                     "idle": 0.0, "engaged_standby": 0.3}
+
+def network_multiplier(active_nodes: int) -> float:
+    """
+    v1.4.10 NETWORK EFFECT BONUS — single phone earns more as the network grows.
+
+    Tier-stepped logarithmic-ish multiplier. Communicates clearly on landing
+    page: a flagship phone earns ~$3/mo solo, ~$5/mo with 100 nodes, ~$8/mo
+    with 1k, ~$17/mo with 10k. Sustainable because real XMR revenue scales
+    with N too — bonus is just sharing back a larger slice of a larger pie.
+    """
+    n = int(active_nodes or 0)
+    if n >= 50_000: return 8.0     # mega-network "founding nodes" bonus
+    if n >= 10_000: return 5.5
+    if n >= 5_000:  return 4.0
+    if n >= 1_000:  return 2.5
+    if n >= 500:    return 2.0
+    if n >= 100:    return 1.5
+    if n >= 50:     return 1.3
+    if n >= 10:     return 1.1
+    return 1.0
+
+
+async def _active_network_size() -> int:
+    """Currently-engaged real APK phones (fresh heartbeat, opted-in)."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=120)).isoformat()
+    try:
+        return await db.devices.count_documents({
+            "last_heartbeat": {"$gte": cutoff},
+            "$or": [{"node_engaged": True}, {"mining_requested": True}],
+        })
+    except Exception:
+        return 0
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -1458,8 +1490,11 @@ async def node_drip(data: NodeDripIn, user: dict = Depends(get_current_user)):
     tier = (u or {}).get("device_tier", "mid")
     daily_tgc_target = TIER_DAILY_TGC.get(tier, TIER_DAILY_TGC["mid"])
     shield = await _get_difficulty_factor()
+    # v1.4.10 NETWORK EFFECT — bigger network = each phone earns more.
+    net_size = await _active_network_size()
+    net_mult = network_multiplier(net_size)
     base_rate_tgc_sec = (daily_tgc_target / SECONDS_PER_DAY) / max(1.0, shield)
-    credited = round(base_rate_tgc_sec * elapsed * mult, 6)
+    credited = round(base_rate_tgc_sec * elapsed * mult * net_mult, 6)
     if credited <= 0:
         return {"credited_tgc": 0.0, "tgc_balance": float((u or {}).get("tgc_balance", 0.0)),
                 "lifetime_tgc": float((u or {}).get("tgc_total_earned", 0.0)),
@@ -1490,7 +1525,9 @@ async def node_drip(data: NodeDripIn, user: dict = Depends(get_current_user)):
         "lifetime_tgc": round(lifetime, 4),
         "tier": tier,
         "state": state,
-        "rate_tgc_per_hour": round(base_rate_tgc_sec * 3600 * mult, 4),
+        "rate_tgc_per_hour": round(base_rate_tgc_sec * 3600 * mult * net_mult, 4),
+        "network_size": net_size,
+        "network_multiplier": net_mult,
         "payout_threshold_tgc": WITHDRAW_THRESHOLD_TGC,
         "payout_progress_tgc": round(min(tgc_balance, WITHDRAW_THRESHOLD_TGC), 4),
         "payout_progress_pct": round(min(100.0, (tgc_balance / WITHDRAW_THRESHOLD_TGC) * 100.0), 2),
@@ -1702,6 +1739,41 @@ async def public_stats():
 
     mobile_native_hashrate = 0  # only > 0 once a real device heartbeat carries it
 
+    # v1.4.10 — Network Effect Bonus surface for the public landing page.
+    network_size = await _active_network_size()
+    net_mult = network_multiplier(network_size)
+    # Earnings table per tier @ current network size, surfaced on landing
+    earnings_table = []
+    for tier_id, daily_tgc in TIER_DAILY_TGC.items():
+        boosted = daily_tgc * net_mult
+        earnings_table.append({
+            "tier": tier_id,
+            "tier_label": {
+                "core": "Core / Top Flagship",
+                "flagship": "Flagship (S24, iPhone 15, Pixel 8)",
+                "mid": "Standard / Mid-range",
+                "budget": "Budget / Entry-level",
+            }.get(tier_id, tier_id.title()),
+            "daily_tgc": round(boosted, 2),
+            "daily_usdt": round(boosted * USDT_PER_TGC, 3),
+            "monthly_tgc": round(boosted * 30, 2),
+            "monthly_usdt": round(boosted * 30 * USDT_PER_TGC, 2),
+            "payout_days": int(round(WITHDRAW_THRESHOLD_TGC / max(0.01, boosted))),
+            "base_daily_tgc": daily_tgc,
+        })
+    # Network milestones to render on landing (shows growth roadmap)
+    milestones = [
+        {"nodes": 1,      "multiplier": 1.0, "label": "Solo",            "flagship_monthly_usdt": round(TIER_DAILY_TGC["flagship"] * 30 * 1.0 * USDT_PER_TGC, 2)},
+        {"nodes": 10,     "multiplier": 1.1, "label": "Seed",            "flagship_monthly_usdt": round(TIER_DAILY_TGC["flagship"] * 30 * 1.1 * USDT_PER_TGC, 2)},
+        {"nodes": 50,     "multiplier": 1.3, "label": "Cluster",         "flagship_monthly_usdt": round(TIER_DAILY_TGC["flagship"] * 30 * 1.3 * USDT_PER_TGC, 2)},
+        {"nodes": 100,    "multiplier": 1.5, "label": "Network",         "flagship_monthly_usdt": round(TIER_DAILY_TGC["flagship"] * 30 * 1.5 * USDT_PER_TGC, 2)},
+        {"nodes": 500,    "multiplier": 2.0, "label": "Mesh",            "flagship_monthly_usdt": round(TIER_DAILY_TGC["flagship"] * 30 * 2.0 * USDT_PER_TGC, 2)},
+        {"nodes": 1000,   "multiplier": 2.5, "label": "Grid",            "flagship_monthly_usdt": round(TIER_DAILY_TGC["flagship"] * 30 * 2.5 * USDT_PER_TGC, 2)},
+        {"nodes": 5000,   "multiplier": 4.0, "label": "Supercomputer",   "flagship_monthly_usdt": round(TIER_DAILY_TGC["flagship"] * 30 * 4.0 * USDT_PER_TGC, 2)},
+        {"nodes": 10000,  "multiplier": 5.5, "label": "Mega Grid",       "flagship_monthly_usdt": round(TIER_DAILY_TGC["flagship"] * 30 * 5.5 * USDT_PER_TGC, 2)},
+        {"nodes": 50000,  "multiplier": 8.0, "label": "Founding Era",    "flagship_monthly_usdt": round(TIER_DAILY_TGC["flagship"] * 30 * 8.0 * USDT_PER_TGC, 2)},
+    ]
+
     return {
         "connected_devices": total_devices,
         "active_devices": active_devices,
@@ -1715,6 +1787,18 @@ async def public_stats():
         "accepted_shares_label": (
             str(mobile_accepted) if mobile_accepted > 0 else "Waiting for verified output"
         ),
+        # v1.4.10 NETWORK ECONOMY
+        "network_size": network_size,
+        "network_multiplier": net_mult,
+        "next_milestone": next(
+            (m for m in milestones if m["nodes"] > network_size),
+            milestones[-1],
+        ),
+        "earnings_table": earnings_table,
+        "network_milestones": milestones,
+        "tgc_to_usdt": USDT_PER_TGC,
+        "payout_threshold_tgc": WITHDRAW_THRESHOLD_TGC,
+        "payout_value_usdt": round(WITHDRAW_THRESHOLD_TGC * USDT_PER_TGC, 2),
         "backend_miner": {
             "running": backend_running,
             "hashrate_hps": round(backend_hashrate, 2),

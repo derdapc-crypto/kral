@@ -517,3 +517,26 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
   - S3: bridge.isBatteryExempt()=true → warning gizli, kv-battery-exempt='true' ✓
 - **Backend regression OK**: /wallet (TGC ledger), /node/drip, /tier/forecast (mid/flagship/budget/core), /wallet/payout-address (BEP20/TRC20/Polygon validation), /admin/mobile-mining/metrics (3-lane split + recently_engaged), /auth/me, /auth/refresh, /admin/console/snapshot, /pool/health.
 
+
+
+**Iter 34 (2026-05-12)** — **NETWORK EFFECT BONUS + Landing Earnings Section + APK QR Download**
+- **Network Effect Bonus** (`server.py` `network_multiplier()`): Ağ büyüklüğüne göre tier-step multiplier:
+  * 1 → ×1.0 (Solo) · 10 → ×1.1 (Seed) · 50 → ×1.3 (Cluster) · 100 → ×1.5 (Network) · 500 → ×2.0 (Mesh) · 1.000 → ×2.5 (Grid) · 5.000 → ×4.0 (Supercomputer) · 10.000 → ×5.5 (Mega Grid) · 50.000 → ×8.0 (Founding Era).
+  * `_active_network_size()` son 2 dakikalık fresh heartbeat'ler arasında `node_engaged=True` veya `mining_requested=True` olan real APK telefonları sayıyor.
+  * `/node/drip` artık `base_rate × mode_mult × net_mult` formülünü uyguluyor — kullanıcı kazancı ağ büyüdükçe otomatik artıyor.
+  * Response'a `network_size` + `network_multiplier` alanları eklendi.
+- **`/api/stats/public` genişletildi**: yeni alanlar `network_size, network_multiplier, next_milestone, earnings_table[], network_milestones[], tgc_to_usdt, payout_threshold_tgc, payout_value_usdt`. Landing page bu tek endpoint ile tüm "earn with your phone" datasını alıyor.
+- **`Landing.jsx EarningsExplorer` componenti**: Hero'nun hemen altına eklendi (`/earn` anchor).
+  * **Sol kart**: "Cihazına göre kazanç" — 4 tier (Core / Flagship / Standard / Budget) günlük ve aylık $ kazancı, payout süresi.
+  * **Sağ kart**: "APK QR ile yükle" — Cyan-on-black QR kodu (320px, MED error correction, kameralı taranabilir), "Direkt İndir" butonu, APK metadata (boyut, min Android, native engine flag).
+  * **Network Effect Milestones**: 9 kartlık responsive grid. Mevcut ağ size'a göre ulaşılan milestone'lar matrix-green check'li, sıradaki NEXT etiketi ile pulse animation. Her milestone Flagship aylık kazancı gösteriyor.
+  * **3 ekonomi açıklama kartı**: "1 TGC = $0.01 USDT", "Network Effect", "$10 USDT Payout (BEP20/TRC20/Polygon)".
+- **`qrcode` paketi** yarn ile kuruldu (^1.5.4). Browser-side QR generation.
+- **Test**: Backend `/api/stats/public` doğru milestones + earnings_table döndürüyor. Frontend smoke screenshot 9 milestone kartı, QR kodu (apkUrl=https://grid-supercomputer.preview.emergentagent.com/grid-worker-v1.4.10.apk) ve Türkçe tüm metinleri (Cihazına göre kazanç, Ağ büyüdükçe herkes daha çok kazanır) doğru render ettiğini gösterdi.
+- **Tek telefon kazanç tablosu** (×1.0 baseline, 24/7 engaged):
+  * Core: $3.60/ay · 83 gün payout
+  * Flagship: $3.15/ay · 95 gün
+  * Standard: $2.40/ay · 125 gün
+  * Budget: $1.35/ay · 222 gün
+- **10K telefon ağında flagship kazancı**: $17.32/ay (×5.5 multiplier). 50K founding era'da $25.20/ay (×8.0).
+

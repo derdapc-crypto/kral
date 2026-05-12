@@ -5,8 +5,10 @@ import {
   Smartphone, Cpu, ShieldCheck, BatteryCharging, Wifi, Thermometer,
   Hand, PowerOff, Layers, Server, Wallet, Terminal, ArrowRight,
   Check, Activity, Globe2, Briefcase, Download, FileCheck2,
-  Lock, AlertTriangle, ArrowUpRight,
+  Lock, AlertTriangle, ArrowUpRight, Sparkles, TrendingUp, Users,
+  QrCode, Zap,
 } from "lucide-react";
+import QRCode from "qrcode";
 import { api } from "../lib/api";
 
 /* ----------------------------- helpers ----------------------------- */
@@ -857,6 +859,249 @@ function RevenueFlowDetail() {
 }
 
 /* ============================== ROOT ============================== */
+/* ----------------------------- EARN WITH YOUR PHONE (v1.4.10) ----------------------------- */
+function EarningsExplorer({ stats, apk }) {
+  const { ref, shown } = useReveal();
+  const [qrSrc, setQrSrc] = useState(null);
+  const apkUrl = apk?.absolute_url || (typeof window !== "undefined" ? `${window.location.origin}${apk?.download_url || "/grid-worker-v1.4.10.apk"}` : "");
+  const earningsTable = stats?.earnings_table || [
+    { tier: "core", tier_label: "Core / Top Flagship",     daily_tgc: 12.0, daily_usdt: 0.12,  monthly_tgc: 360, monthly_usdt: 3.60, payout_days: 83 },
+    { tier: "flagship", tier_label: "Flagship (S24, iPhone 15, Pixel 8)", daily_tgc: 10.5, daily_usdt: 0.105, monthly_tgc: 315, monthly_usdt: 3.15, payout_days: 95 },
+    { tier: "mid", tier_label: "Standard / Mid-range",     daily_tgc: 8.0,  daily_usdt: 0.08,  monthly_tgc: 240, monthly_usdt: 2.40, payout_days: 125 },
+    { tier: "budget", tier_label: "Budget / Entry-level",  daily_tgc: 4.5,  daily_usdt: 0.045, monthly_tgc: 135, monthly_usdt: 1.35, payout_days: 222 },
+  ];
+  const milestones = stats?.network_milestones || [];
+  const netSize = stats?.network_size ?? 0;
+  const netMult = stats?.network_multiplier ?? 1.0;
+  const nextMilestone = stats?.next_milestone;
+
+  useEffect(() => {
+    if (!apkUrl) return;
+    QRCode.toDataURL(apkUrl, {
+      width: 320, margin: 1, errorCorrectionLevel: "M",
+      color: { dark: "#00ffe1", light: "#000000" },
+    }).then(setQrSrc).catch(() => {});
+  }, [apkUrl]);
+
+  return (
+    <section ref={ref} id="earn" className="px-6 sm:px-10 py-24 md:py-32 border-t border-white/[0.04]"
+             data-testid="earn-section">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className={`mb-12 transition-all duration-700 ${shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] cyan-text font-mono-term mb-3">
+            <Sparkles className="w-3 h-3" /> / earn_with_your_phone
+          </div>
+          <h2 className="font-mono-cyber text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter leading-[0.95]"
+              data-testid="earn-headline">
+            Telefonun <span className="cyan-text">çalışıyor</span>,<br/>
+            <span className="matrix-text">sen kazanıyorsun.</span>
+          </h2>
+          <p className="mt-5 text-white/55 max-w-2xl text-base leading-relaxed">
+            Telefonun şarjdayken THE GRID şebekesine bağlanır ve doğrulanmış cloud compute
+            işleri tamamlar. Her iş bir <span className="cyan-text font-semibold">TGC</span> kredisi
+            kazandırır. <span className="matrix-text font-semibold">1.000 TGC</span> birikince
+            <span className="matrix-text font-semibold"> $10 USDT</span> çekim açılır.
+          </p>
+        </div>
+
+        {/* Earnings table — per device tier @ current network multiplier */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
+          <div className="cyber-card rounded-3xl p-7" data-testid="earnings-table-card">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
+                  device_class · daily_earnings
+                </div>
+                <h3 className="font-mono-cyber text-2xl font-black mt-1">
+                  Cihazına göre kazanç
+                </h3>
+              </div>
+              <span className="cyber-pill matrix-pill text-[10px]" data-testid="net-mult-pill">
+                ×{netMult.toFixed(1)} bonus
+              </span>
+            </div>
+            <div className="space-y-2.5">
+              {earningsTable.map((r) => (
+                <div key={r.tier}
+                     data-testid={`earn-row-${r.tier}`}
+                     className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-black/45 border border-[#00ffe1]/12 hover:border-[#00ffe1]/30 transition">
+                  <div className={`w-9 h-9 rounded-xl grid place-items-center text-[10px] uppercase tracking-widest font-mono-cyber font-black ${
+                    r.tier === "core" ? "bg-yellow-400/15 text-yellow-300 border border-yellow-400/30" :
+                    r.tier === "flagship" ? "bg-[#00ff88]/15 matrix-text border border-[#00ff88]/30" :
+                    r.tier === "mid" ? "bg-[#00ffe1]/15 cyan-text border border-[#00ffe1]/30" :
+                    "bg-white/5 text-white/55 border border-white/10"
+                  }`}>
+                    {r.tier.slice(0, 2)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-white truncate">{r.tier_label}</div>
+                    <div className="text-[10px] text-white/40 mt-0.5 font-mono-term">
+                      {r.daily_tgc.toFixed(1)} TGC/gün · ödüle {r.payout_days} gün
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono-cyber font-black text-lg matrix-text">
+                      ${r.monthly_usdt.toFixed(2)}
+                    </div>
+                    <div className="text-[9px] uppercase tracking-widest text-white/35">aylık</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 text-[10px] text-white/40 leading-relaxed">
+              <span className="cyan-text">{">"}</span> Hesaplama: telefonun 24/7 engaged + şu anki ağ büyüklüğü
+              (<span className="cyan-text">{netSize}</span> aktif düğüm · ×{netMult.toFixed(1)} bonus). Gerçekçi 12h kullanımda yarısı kadardır.
+            </div>
+          </div>
+
+          {/* QR code download card */}
+          <div className="cyber-card rounded-3xl p-7 relative overflow-hidden" data-testid="qr-download-card">
+            <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-[#00ffe1]/8 blur-3xl" />
+            <div className="relative">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term mb-2">
+                <QrCode className="w-3 h-3" /> / scan_to_install
+              </div>
+              <h3 className="font-mono-cyber text-2xl font-black">
+                APK <span className="cyan-text">QR ile yükle</span>
+              </h3>
+              <p className="text-white/55 text-sm mt-2">
+                Android telefonun kamerasıyla aşağıdaki kareyi tara, APK indir, kur ve <span className="matrix-text">ENGAGE NODE</span>'a bas.
+              </p>
+
+              <div className="mt-6 flex items-center gap-6 flex-wrap">
+                {qrSrc ? (
+                  <div className="relative p-3 rounded-2xl bg-black border border-[#00ffe1]/40 shadow-[0_0_60px_rgba(0,255,225,0.15)]">
+                    <img src={qrSrc} alt="APK QR Code"
+                         className="w-44 h-44 rounded-lg" data-testid="apk-qr-image" />
+                    <div className="absolute -top-2 -right-2 cyber-pill matrix-pill text-[9px]">
+                      v{apk?.version || "1.4.10"}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-44 h-44 rounded-2xl bg-black/60 border border-[#00ffe1]/20 grid place-items-center">
+                    <QrCode className="w-10 h-10 text-white/30" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-[180px] space-y-2">
+                  <a href={apkUrl} download
+                     data-testid="qr-direct-download"
+                     className="block px-5 py-3 rounded-2xl bg-gradient-to-r from-[#00ffe1] to-[#00d4ff] text-black font-mono-cyber font-black text-sm tracking-[0.2em] uppercase text-center">
+                    <Download className="inline w-3.5 h-3.5 mr-1.5 -mt-0.5" />
+                    Direkt İndir
+                  </a>
+                  <div className="text-[10px] text-white/40 leading-relaxed">
+                    Boyut: <span className="cyan-text">{((apk?.size_bytes || 386203)/1024).toFixed(0)} KB</span><br/>
+                    Min Android: <span className="cyan-text">{apk?.min_android || "7.0"}</span><br/>
+                    Native Engine: <span className="matrix-text">{apk?.native_lib_embedded ? "EMBEDDED ✓" : "—"}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 text-[10px] text-white/40 font-mono-term break-all" data-testid="qr-apk-url">
+                {apkUrl}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Network Effect milestones */}
+        <div className="cyber-card rounded-3xl p-7" data-testid="network-milestones-card">
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
+                / network_effect_economy
+              </div>
+              <h3 className="font-mono-cyber text-2xl font-black mt-1 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 matrix-text" />
+                Ağ büyüdükçe herkes <span className="matrix-text">daha çok kazanır</span>
+              </h3>
+              <p className="text-white/55 text-sm mt-2 max-w-2xl">
+                Daha fazla telefon = daha güçlü compute havuzu = pool'da daha çok verified output = herkes için yükselen oranlar.
+                Aşağıda, <span className="cyan-text">Flagship</span> tier (Samsung S24 / iPhone 15) bir telefonun aylık kazancı ağ büyüklüğüne göre.
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-[9px] uppercase tracking-widest text-white/40 font-mono-term">current network</div>
+              <div className="font-mono-cyber font-black text-3xl matrix-text" data-testid="current-network-size">
+                <Users className="inline w-5 h-5 -mt-1 mr-1.5" />{netSize}
+              </div>
+              <div className="text-[10px] text-white/45">aktif düğüm · ×{netMult.toFixed(1)} multiplier</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {milestones.map((m) => {
+              const reached = netSize >= m.nodes;
+              const isNext = nextMilestone && nextMilestone.nodes === m.nodes;
+              return (
+                <div key={m.nodes}
+                     data-testid={`milestone-${m.nodes}`}
+                     className={`p-4 rounded-2xl border transition relative ${
+                       reached ? "border-[#00ff88]/40 bg-[#00ff88]/8" :
+                       isNext ?  "border-[#00ffe1]/45 bg-[#00ffe1]/8 animate-pulse" :
+                                 "border-white/8 bg-black/35"
+                     }`}>
+                  {reached && (
+                    <Check className="absolute top-2 right-2 w-3.5 h-3.5 matrix-text" />
+                  )}
+                  {isNext && (
+                    <span className="absolute -top-2 left-3 px-2 py-0.5 rounded-full bg-[#00ffe1] text-black text-[9px] font-bold uppercase tracking-widest">
+                      next
+                    </span>
+                  )}
+                  <div className="text-[9px] uppercase tracking-[0.25em] text-white/45 font-mono-term">
+                    {m.label}
+                  </div>
+                  <div className={`font-mono-cyber font-black text-xl mt-1 ${reached ? "matrix-text" : "cyan-text"}`}>
+                    {m.nodes.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-white/55 mt-0.5">düğüm · ×{m.multiplier.toFixed(1)}</div>
+                  <div className={`mt-2 font-mono-cyber font-black text-lg ${reached ? "matrix-text" : "text-white/85"}`}>
+                    ${m.flagship_monthly_usdt}
+                  </div>
+                  <div className="text-[9px] uppercase tracking-widest text-white/35 font-mono-term">
+                    flagship/ay
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-2xl bg-black/45 border border-white/10" data-testid="economy-explain-1">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
+                <Zap className="w-3 h-3" /> 1 TGC = $0.01 USDT
+              </div>
+              <div className="text-xs text-white/65 mt-2 leading-relaxed">
+                Her TGC kredi sabit değerlidir. 1.000 TGC birikince payout açılır.
+              </div>
+            </div>
+            <div className="p-4 rounded-2xl bg-black/45 border border-white/10" data-testid="economy-explain-2">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
+                <TrendingUp className="w-3 h-3" /> Network Effect
+              </div>
+              <div className="text-xs text-white/65 mt-2 leading-relaxed">
+                Ağ büyüdükçe multiplier yükselir. Eski kullanıcılar yeni gelenlerden faydalanır.
+              </div>
+            </div>
+            <div className="p-4 rounded-2xl bg-black/45 border border-white/10" data-testid="economy-explain-3">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
+                <Wallet className="w-3 h-3" /> $10 USDT Payout
+              </div>
+              <div className="text-xs text-white/65 mt-2 leading-relaxed">
+                BEP20 / TRC20 / Polygon ağları desteklenir. Cüzdanın güvende, çekim doğrulanır.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+/* ----------------------------- Landing main ----------------------------- */
 export default function Landing() {
   const [stats, setStats] = useState(null);
   const [apk, setApk] = useState(null);
@@ -882,6 +1127,7 @@ export default function Landing() {
   return (
     <main className="landing-root font-sans-saas" data-testid="landing-page">
       <Hero stats={stats} apk={apk} />
+      <EarningsExplorer stats={stats} apk={apk} />
       <TrustMetrics stats={stats} />
       <WhyRewards />
       <HowItWorks />
