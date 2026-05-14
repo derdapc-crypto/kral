@@ -170,13 +170,18 @@ class _PoolConn:
         self.reader, self.writer = await asyncio.open_connection(
             SUBMIT_POOL_HOST, SUBMIT_POOL_PORT, ssl=ctx)
         self.connected = True
-        # XMR-style login (SupportXMR uses XMR JSON-RPC, not Bitcoin Stratum)
+        # XMR-style login (SupportXMR uses XMR JSON-RPC, not Bitcoin Stratum).
+        # Pass = "x+1000" requests a fixed difficulty of 1000 (a.k.a. vardiff
+        # floor) so the *low-hashrate phones* find a share roughly every
+        # ~13 minutes instead of the default 75000-diff which would take ~8h.
+        # Operator can override via MOBILE_BRIDGE_START_DIFF env.
+        start_diff = os.environ.get("MOBILE_BRIDGE_START_DIFF", "1000").strip() or "1000"
         self.msg_id += 1
         login = {
             "method": "login",
             "params": {
                 "login": SUBMIT_POOL_USER,
-                "pass": "x",
+                "pass":  f"x+{start_diff}",
                 "agent": "GridMobileBridge/1.3.8",
                 "rigid": self.worker_id,
             },
