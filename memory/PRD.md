@@ -574,3 +574,34 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **Doğrulama** (kullanıcının ekran görüntüleri): (a) Phone: TGC ticking, `ENGAGED` state, session +0.0163 TGC. (b) Admin Panel: `Mobile Compute LIVE · 1 connected · 1 engaged · 2.5 H/s · ENGAGED ECO`. (c) SupportXMR: `THEGRID_WEAPON · 140 H/s avg · 39 valid / 0 invalid shares · last share 8 min ago`. (d) RandomX miner: pool.supportxmr.com:443, PID 4370, rx/0 algorithm.
 - **Note**: APK'nın v1.4.10 battery exemption izni henüz verilmedi (Android Settings: "Hiçbir izin verilmedi"). Telefon kilitlendiğinde Doze yine servisi öldürebilir → kullanıcının ENGAGE NODE'a bir kez daha basıp "İzin Ver" diyaloğunu onaylaması yeterli.
 
+
+
+**Iter 37 (2026-05-14)** — **v1.5.0 APK SupportXMR Mobile Bridge** (PER-PHONE WORKER FORWARDING)
+- **Operator decree**: "Bridge'i kusursuz aç. 2 telefon SupportXMR'da ayrı worker olarak görünmeli." Şu ana kadar tüm telefon hash'leri TGC ledger'a sayılıyordu ama SupportXMR'a forward edilmiyordu — sadece backend xmrig `THEGRID_WEAPON` tek worker olarak görünüyordu. Bu iteration ile her telefon kendi worker_id'siyle pool'a bağlanır.
+- **Mimari**: Phone → backend WSS proxy → SupportXMR. Pool credentials cihazda DEĞİL (HMAC session_nonce + signature ile yetki). `librandomx.so` JNI v1.3.8 (Java_io_thegrid_worker_RandomXBridge_nativeSetMiningJob/nativePollShareCandidate exports MEVCUT — `nm -D` ile doğrulandı).
+- **Backend tarafı (ZATEN HAZIR + yeni endpoint)**:
+  * WS endpoint `@app.websocket('/api/mobile-mining/worker/ws')` server.py:2922 — token/device_id/nonce/signature query-param doğrulaması, _PoolConn ile login, asyncio.create_task(pool_to_phone) pump, submit forward, mobile_accepted_shares + telegram first-share notification.
+  * **YENİ** `POST /api/mobile-mining/config` (server.py:2898) — mm.issue_session() çağırır, 1 saat geçerli signed session döner (algorithm, pool_mode, worker_id GRID_M_xxxxx, session_nonce, signature, wallet_masked, difficulty_floor).
+  * **YENİ** `GET /api/admin/mobile-mining/bridge/metrics` (server.py:2911) — bridge_active_workers + submitted + accepted + rejected sayaçları.
+  * Mevcut `/api/admin/mobile-mining/metrics` (routers/pool.py:333) zaten `aggregate_metrics()` ile `bridge` field'ını döndürüyor.
+  * Yeni env: `MOBILE_MINING_SECRET` — backend restart sonrası session'lar invalid olmasın diye sabit secret (`secrets.token_hex(32)`). bridge.py:56 fallback artık dev-only.
+- **Android tarafı (BÜYÜK DEĞİŞİKLİK)**:
+  * **SİLİNDİ**: `StratumClient.java` (v1.2.6 Binance/RVN/KawPow için yazılmış legacy, artık geçersiz).
+  * **YENİ**: `MobileBridgeClient.java` (~370 satır) — RFC 6455 minimal WS client (masked client frames, ping/pong), `httpPostConfig()` ile session al, WS upgrade, `handleServerFrame()` job → `RandomXBridge.setMiningJob()`, `pollShareCandidate()` 2s cadence → `sendSubmit(job_id, nonce, result)`, exponential backoff 3s→60s. Fail-soft: librandomx.so yok ise sessizce devre dışı kalır.
+  * **GÜNCELLENDİ**: `GridWorkerService.java` — `StratumClient stratum` field'ı `MobileBridgeClient bridge` ile değiştirildi, onStartCommand/onDestroy/ACTION_STOP path'lerinde stop() çağrıları senkronlandı, heartbeat'teki `stratum_linked` artık `bridge.linked()` üzerinden.
+  * **Versiyon güncellemeleri**: `MainActivity.java` getInfo()/getNodeState() v1.5.0, GridWorkerService heartbeat payload app_version v1.5.0, MainActivity WebView user-agent `GridWorker/1.5.0 Android`.
+- **APK build**:
+  * `/app/frontend/public/grid-worker-v1.5.0.apk` — **390299 bytes**, SHA-256 `64513b0839bed374743169fd041df9d802365a0703e0c31dd3ce5cfdc6798644`, v2+v3 signed, native lib bundled (`lib/arm64-v8a/librandomx.so` 1195960 bytes / SHA-256 2c7c0be3…).
+  * Build pipeline: Android SDK platforms;android-34 + build-tools;34.0.0 yeniden kuruldu (önce silinmişti); apt: aapt + apksigner + zipalign + default-jdk-headless.
+- **Backend metadata (server.py:302-304)**: APK_VERSION = "1.5.0", APK_PATH = "/grid-worker-v1.5.0.apk", release_notes Türkçe + "her telefon kendi worker_id ile pool'a bağlanır".
+- **Frontend güncellemeleri**: Mobile.jsx (app_version="1.5.0" 2 yerde, KV client_version, "install v1.5.0 APK" mesajı, Native Node v1.5.0 label), MobileMiningMetricsCard v1.5.0, Landing.jsx fallback APK URL v1.5.0.
+- **Test sonuçları (iter-22, `/app/backend/tests/test_iteration34_v150_bridge_apk.py`)**: **19/19 PASS**. Doğrulandı:
+  * Config endpoint contract: worker_id ^GRID_M_[a-z0-9]{6}$, session_nonce 32 hex, signature 64 hex (sha256), wallet_masked ellipsisli (TAM XMR adresi yok), difficulty_floor>0.
+  * Auth: missing token → 401; foreign device_id → 404 device_not_found.
+  * Admin metrics: worker → 401/403, admin → 4 counter int >=0; `/admin/mobile-mining/metrics` bridge subobject mevcut.
+  * WS reject codes: no token → 4401, bogus token → 4401, valid token + bad nonce/signature → 4403.
+  * APK metadata: version 1.5.0, native_lib_embedded true, size_bytes 390299, sha256 doğrulandı.
+  * No XMR address / supportxmr.com:443 leak in /apk/version response.
+  * REGRESSION ALL PASS: /auth/login, /wallet, /devices/heartbeat, /node/drip, /rewards/drop/current.
+- **Live operator console doğrulaması**: Backend xmrig (Plan A) "share ACCEPTED #1 diff=75,000" mesajı admin Command Center'da live görünüyor — RX_BACKEND honor_podium'da accepted_shares=1 ile listeli.
+- **Kullanıcı next-step**: Eski v1.4.10 APK'yı kaldır, https://grid-supercomputer.preview.emergentagent.com/grid-worker-v1.5.0.apk indir + kur + ENGAGE NODE + battery exemption izin ver. 2-5 dakika içinde Admin panelinde `Bridge Workers: 2 · Bridge Submitted: >0 · Bridge Accepted: >0` görünmeli; SupportXMR dashboard'unda `GRID_M_xxxxxx` worker'lar listede yer almalı.
