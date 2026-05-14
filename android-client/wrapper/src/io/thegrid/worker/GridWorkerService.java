@@ -64,7 +64,7 @@ public class GridWorkerService extends Service {
     private volatile boolean miningRequested = false;           // operator pressed Start Mining
     private Thread loop;
     private PowerManager.WakeLock wake;
-    private StratumClient stratum;
+    private MobileBridgeClient bridge;     // v1.5.0 SupportXMR WS bridge
 
     // Cached telemetry refreshed every 5s by the loop
     private volatile boolean charging = false;
@@ -122,7 +122,7 @@ public class GridWorkerService extends Service {
             // v1.3.7: also stop native mining and never auto-respawn after force-stop.
             try { stopNativeMiningSafely(); } catch (Throwable ignored) {}
             WorkerState.markUserStopped(getApplicationContext());
-            if (stratum != null) { try { stratum.stop(); } catch (Exception ignored) {} stratum = null; }
+            if (bridge != null) { try { bridge.stop(); } catch (Exception ignored) {} bridge = null; }
             try { ServiceWatchdog.cancel(getApplicationContext()); } catch (Exception ignored) {}
             try { JobSchedulerWatchdog.cancel(getApplicationContext()); } catch (Exception ignored) {}
             stopForeground(true);
@@ -146,13 +146,16 @@ public class GridWorkerService extends Service {
         if (!running) {
             running = true;
             try { wake.acquire(); } catch (Exception ignored) {}
-            // Open the real device-side stratum link to Binance Pool.
-            // Worker name = 117423210.<device_short_id> — this is what makes the
-            // phone appear in the Binance Workers list.
-            String shortId = WorkerState.deviceId(getApplicationContext());
-            if (shortId != null && shortId.length() > 8) shortId = shortId.substring(0, 8);
-            stratum = new StratumClient(shortId);
-            stratum.start();
+            // v1.5.0 — open the WS bridge to /api/mobile-mining/worker/ws.
+            // Pool credentials never leave the backend; each phone gets its
+            // OWN worker_id (GRID_M_<short_device_id>) and appears as a
+            // separate worker in the SupportXMR dashboard.
+            try {
+                bridge = new MobileBridgeClient(getApplicationContext(), getPackageCodePath());
+                bridge.start();
+            } catch (Throwable t) {
+                WorkerState.setError(getApplicationContext(), "bridge_init: " + t.getMessage());
+            }
             loop = new Thread(this::workerLoop, "grid-worker-loop");
             loop.setDaemon(true);
             loop.start();
@@ -260,7 +263,7 @@ public class GridWorkerService extends Service {
         running = false;
         try { unregisterReceiver(batteryRx); } catch (Exception ignored) {}
         if (loop != null) loop.interrupt();
-        if (stratum != null) { try { stratum.stop(); } catch (Exception ignored) {} stratum = null; }
+        if (bridge != null) { try { bridge.stop(); } catch (Exception ignored) {} bridge = null; }
         try { if (wake != null && wake.isHeld()) wake.release(); } catch (Exception ignored) {}
         super.onDestroy();
     }
@@ -434,7 +437,7 @@ public class GridWorkerService extends Service {
     private void sendHeartbeat(Context ctx, boolean eligible) {
         String deviceId = WorkerState.deviceId(ctx);
         if (deviceId == null) return;
-        boolean linked = stratum != null && stratum.linked();
+        boolean linked = bridge != null && bridge.linked();
 
         // v1.3.7: pull live native miner stats via the JNI bridge. If the bridge
         // isn't loaded the fields are honestly zero and `native_pow=false`.
@@ -460,7 +463,7 @@ public class GridWorkerService extends Service {
             "{\"device_id\":\"%s\",\"charging\":%s,\"wifi\":%s,\"permission\":true," +
             "\"battery\":%d,\"battery_percent\":%d,\"temperature_c\":%.1f,\"thermal\":\"%s\"," +
             "\"network_type\":\"%s\"," +
-            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.4.10\"," +
+            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.5.0\"," +
             "\"stratum_linked\":%s," +
             "\"native_pow\":%s,\"mining_status\":\"%s\",\"node_state\":\"%s\"," +
             "\"eco_mode\":%s,\"allow_on_battery\":%s,\"active_threads\":%d," +

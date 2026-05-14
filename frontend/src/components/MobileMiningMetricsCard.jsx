@@ -50,7 +50,7 @@ export default function MobileMiningMetricsCard() {
             <div className="font-mono-cyber font-bold text-base flex items-center gap-2">
               <span className="cyan-text">compute_split_ledger</span>
               <span className="text-white/40">·</span>
-              <span className="text-white/80">v1.4.10</span>
+              <span className="text-white/80">v1.5.0</span>
             </div>
             <div className="text-[11px] text-white/55 font-mono-term mt-1 max-w-3xl">
               backend compute (server xmrig/sha256) and mobile compute (phone-native randomx)

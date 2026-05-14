@@ -92,7 +92,7 @@ export default function Mobile() {
             model: tier,
             platform: isNativeApk ? "android" : "mobile",
             brand,
-            app_version: isNativeApk ? "1.4.10" : undefined,
+            app_version: isNativeApk ? "1.5.0" : undefined,
             device_id: isNativeApk
               ? (localStorage.getItem("grid_native_device_id")
                 || (localStorage.setItem("grid_native_device_id",
@@ -194,7 +194,7 @@ export default function Mobile() {
           worker_state: engaged ? "active" : "stopped",
           node_engaged: engaged,
           node_state: engaged ? "engaged_standby" : "idle",
-          app_version: "1.4.10",
+          app_version: "1.5.0",
         });
       } catch {}
     };
@@ -296,7 +296,7 @@ export default function Mobile() {
           {isNative && (
             <span data-testid="native-apk-badge"
               className="ml-2 px-2 py-0.5 rounded-full text-[9px] tracking-widest uppercase border border-[#00ffe1]/40 cyan-text bg-[#00ffe1]/10">
-              Native Node · v1.4.10
+              Native Node · v1.5.0
             </span>
           )}
         </div>
@@ -591,7 +591,7 @@ export default function Mobile() {
               {!isNative ? (
                 <div className="text-[11px] text-amber-100/75 flex items-start gap-2">
                   <AlertTriangle className="w-3 h-3 mt-0.5" />
-                  Native bridge unavailable — install the v1.4.10 APK to view engine telemetry.
+                  Native bridge unavailable — install the v1.5.0 APK to view engine telemetry.
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2 text-xs font-mono-term">
@@ -605,7 +605,7 @@ export default function Mobile() {
                   <KV k="battery_compute_allowed" v={String(nodeStatus?.allow_on_battery ?? true)} testId="kv-allow-battery" />
                   <KV k="battery_exempt" v={String(nodeStatus?.battery_exempt ?? true)} testId="kv-battery-exempt" />
                   <KV k="node_state" v={String(nodeStatus?.raw_status ?? "idle")} testId="kv-node-state" />
-                  <KV k="client_version" v={nodeStatus?.version ?? "1.4.10"} testId="kv-version" />
+                  <KV k="client_version" v={nodeStatus?.version ?? "1.5.0"} testId="kv-version" />
                 </div>
               )}
             </div>

@@ -299,9 +299,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.4.10"
-APK_PATH = "/grid-worker-v1.4.10.apk"
-APK_RELEASE_NOTES = "v1.4.10 automatic battery exemption · auto-prompt REQUEST_IGNORE_BATTERY_OPTIMIZATIONS on first launch and first ENGAGE NODE tap · professional Turkish explainer dialog (Şebeke bağlantısı için pil tasarrufunu devre dışı bırak) · one-tap consent (system dialog, no manual settings dive) · low-performance mode warning when permission denied · persistent server-side TGC ledger (1000 TGC = $10 USDT) · ENGAGED_STANDBY honest state · admin Mobile Compute counts engaged phones · advanced tab vocab-pure · randomx native engine bundled · v2+v3 signed"
+APK_VERSION = "1.5.0"
+APK_PATH = "/grid-worker-v1.5.0.apk"
+APK_RELEASE_NOTES = "v1.5.0 SupportXMR Mobile Bridge · her telefon kendi worker_id ile pool.supportxmr.com'a bağlanır (GRID_M_xxxxx) · gerçek RandomX share submission backend WS proxy üzerinden · pool credentials cihazda tutulmaz (HMAC session_nonce + signature) · session/share telemetry admin Bridge metriklerinde canlı · v1.4.10 battery exemption + persistent TGC ledger korunuyor · v2+v3 signed · randomx native engine bundled"
 
 
 def _compute_apk_meta() -> dict:
@@ -2888,6 +2888,31 @@ async def compute_active_alias():
 @api.get("/compute/config")
 async def compute_config_alias(device_id: str, user: dict = Depends(get_current_user)):
     return await mining_config_for_device(device_id, user)
+
+
+# ---------- v1.3.8 Mobile Mining Bridge — session + admin metrics ----------
+@api.post("/mobile-mining/config")
+async def mobile_mining_config(device_id: str, user: dict = Depends(get_current_user)):
+    """
+    Phone calls this once per ENGAGE to receive a signed session_nonce.
+    The returned payload is then presented on the WS handshake to
+    /api/mobile-mining/worker/ws. Pool credentials are NEVER returned —
+    the backend is the only party with the operator's XMR address.
+    """
+    dev = await db.devices.find_one({"id": device_id, "user_id": user["id"]}, {"_id": 0})
+    if not dev:
+        raise HTTPException(status_code=404, detail="device_not_found")
+    from mobile_mining import bridge as mm
+    payload = await mm.issue_session(device_id)
+    return payload
+
+
+@api.get("/admin/mobile-mining/bridge/metrics")
+async def admin_mobile_mining_bridge_metrics(user: dict = Depends(require_admin)):
+    """Live aggregate counters for the Mobile Bridge — drives Bridge Workers /
+    Bridge Submitted / Bridge Accepted / Bridge Rejected cards in admin."""
+    from mobile_mining import bridge as mm
+    return mm.aggregate_metrics()
 
 
 # (app.include_router(api) moved to the very end of server.py so that
