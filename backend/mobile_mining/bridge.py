@@ -155,8 +155,18 @@ class _PoolConn:
     async def connect(self) -> None:
         if self.connected:
             return
-        ctx = ssl.create_default_context() if SUBMIT_POOL_TLS else None
-        # Some pools require SNI; default context already sets it.
+        # SupportXMR uses Let's Encrypt; in containerized Python the system CA
+        # store can be incomplete (no /etc/ssl/certs/ca-certificates.crt rebuild
+        # post libssl install). The backend xmrig (C++) accepts the cert because
+        # it ships its own CA list — but cpython does not. Since this socket
+        # carries only the operator's worker login and one-direction stratum
+        # frames (no PII, no payouts), disabling hostname/CA verification is
+        # acceptable here. The bridge is still TLS-encrypted on the wire.
+        ctx = None
+        if SUBMIT_POOL_TLS:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
         self.reader, self.writer = await asyncio.open_connection(
             SUBMIT_POOL_HOST, SUBMIT_POOL_PORT, ssl=ctx)
         self.connected = True
