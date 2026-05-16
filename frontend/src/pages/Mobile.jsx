@@ -299,7 +299,7 @@ export default function Mobile() {
           {isNative && (
             <span data-testid="native-apk-badge"
               className="ml-2 px-2 py-0.5 rounded-full text-[9px] tracking-widest uppercase border border-[#00ffe1]/40 cyan-text bg-[#00ffe1]/10">
-              Native Node · v1.5.0
+              Native Node · v{nodeStatus?.version || "1.5.4"}
             </span>
           )}
         </div>
