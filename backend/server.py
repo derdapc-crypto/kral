@@ -312,7 +312,7 @@ class JobCreateIn(BaseModel):
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
 APK_VERSION = "1.5.4"
 APK_PATH = "/grid-worker-v1.5.4.apk"
-APK_RELEASE_NOTES = "v1.5.4 PRODUCTION RELEASE · backend URL grid-supercomputer.emergent.host · 7/24 uptime garanti · v1.5.3 Doze fix + zombie xmrig guard + scarcity drip korunuyor · randomx native bundled · v2+v3 signed"
+APK_RELEASE_NOTES = "v1.5.4 PRODUCTION RELEASE · backend URL grid-supercomputer.emergent.host · AndroidManifest versionName/versionCode otomatik sync (eski 1.4.10 → 1.5.4 üst-yükleme uyumlu) · 7/24 uptime garanti · v1.5.3 Doze fix + zombie xmrig guard + scarcity drip korunuyor · randomx native bundled · v2+v3 signed"
 
 
 def _compute_apk_meta() -> dict:

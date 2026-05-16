@@ -21,6 +21,14 @@ NATIVE_LIB="${JNI_DIR}/arm64-v8a/librandomx.so"
 rm -rf build/classes build/gen build/grid-*.apk build/classes.dex
 mkdir -p build/classes build/gen
 
+# v1.5.4 — auto-sync AndroidManifest.xml versionName/versionCode with the
+# VERSION env var so Settings → Apps → Grid Worker shows the correct version
+# (Android installer reads versionName from manifest, not from filename).
+VERSION_CODE="$(echo "$VERSION" | awk -F. '{ printf "%d%02d%02d", $1, $2, $3 }')"
+sed -i -E "s|android:versionCode=\"[0-9]+\"|android:versionCode=\"${VERSION_CODE}\"|" AndroidManifest.xml
+sed -i -E "s|android:versionName=\"[^\"]+\"|android:versionName=\"${VERSION}\"|"     AndroidManifest.xml
+echo "[+] manifest versionName=${VERSION} versionCode=${VERSION_CODE}"
+
 # 1. compile resources
 $DEB_BT/aapt package -f -M AndroidManifest.xml -S res \
     -I "$PLATFORM" \
