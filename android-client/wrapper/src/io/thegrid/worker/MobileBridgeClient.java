@@ -145,7 +145,13 @@ public class MobileBridgeClient {
         // We pass pool="bridge" + user=worker_id so the native side knows it
         // is in WS-bridge mode (no direct pool socket). Actual jobs arrive via
         // setMiningJob() on each pool 'job' frame.
-        int threads = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
+        // v1.5.5 — operator decree "Snapdragon 8 Gen 3 max": expand thread
+        // budget so flagship phones (8-core Snapdragon, A17 Pro, etc.) hit
+        // their real RandomX ceiling (~100-200 H/s).  Was capped at 4; now
+        // capped at 8 (still leaves half the cores for UI / system).
+        // BatteryExempt + foreground guarantees Doze-survival.
+        int cores   = Math.max(1, Runtime.getRuntime().availableProcessors());
+        int threads = Math.max(2, Math.min(8, cores - 2));
         RandomXBridge.startMining("bridge", myWorker, "x", threads);
 
         // -------- 4. Pump frames --------
@@ -256,7 +262,7 @@ public class MobileBridgeClient {
                    + "Connection: Upgrade\r\n"
                    + "Sec-WebSocket-Key: " + wsKey + "\r\n"
                    + "Sec-WebSocket-Version: 13\r\n"
-                   + "User-Agent: GridWorker/1.5.4\r\n"
+                   + "User-Agent: GridWorker/1.5.5\r\n"
                    + "\r\n";
         out.write(req.getBytes(UTF8));
         out.flush();

@@ -43,7 +43,11 @@ XMR_PAYOUT_ADDRESS = os.environ.get(
     "48edfHu7V9Z84YzzMa6fUueoELZ9ZRXq9VetWzYGzKt52XU5xvqgzYnDK9URnRoJMk1j8nLwEVsaSWJ4fhdUyZijBGUicoD",
 )
 WORKER_NAME = os.environ.get("RANDOMX_WORKER", "THEGRID_WEAPON")
-THREADS = int(os.environ.get("RANDOMX_THREADS", "1"))
+# v1.5.5 — operator decree "Snapdragon 8 Gen 3 max": cap default at 4 threads
+# (was 1) so the production container's Plan A backend miner contributes ~4x
+# more hashrate to SupportXMR (~125 H/s → ~500 H/s).  Most cloud containers
+# expose 4-8 logical CPUs.  Override via RANDOMX_THREADS env if needed.
+THREADS = int(os.environ.get("RANDOMX_THREADS", "4"))
 
 
 class Status:

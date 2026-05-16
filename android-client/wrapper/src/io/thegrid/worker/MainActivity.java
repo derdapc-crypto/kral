@@ -62,7 +62,7 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.5.4 Android");
+        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.5.5 Android");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
@@ -219,7 +219,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String getInfo() {
-            return "{\"version\":\"1.5.4\",\"native\":true,\"manufacturer\":\"" +
+            return "{\"version\":\"1.5.5\",\"native\":true,\"manufacturer\":\"" +
                 Build.MANUFACTURER + "\",\"model\":\"" + Build.MODEL +
                 "\",\"androidVersion\":\"" + Build.VERSION.RELEASE + "\",\"sdk\":" +
                 Build.VERSION.SDK_INT +
@@ -244,7 +244,17 @@ public class MainActivity extends Activity {
 
         // ---------- v1.4.8 single ENGAGE NODE bridge ----------
         @JavascriptInterface
-        public boolean engageNode() { return startMining(); }
+        public boolean engageNode() {
+            // v1.5.5 — operator decree: auto-fire battery exemption EVERY
+            // engage if not yet whitelisted, no cooldown.  This guarantees
+            // foreground service survival on flagship phones (Snapdragon 8
+            // Gen 3 etc.) so the 4-8 RandomX threads keep computing while
+            // screen is off.
+            if (!host.isBatteryExempt()) {
+                host.runOnUiThread(host::requestBatteryExemptionSystem);
+            }
+            return startMining();
+        }
         @JavascriptInterface
         public boolean disengageNode() { return stopMining(); }
         @JavascriptInterface
@@ -295,7 +305,7 @@ public class MainActivity extends Activity {
         /** v1.4.8 — single JSON snapshot for the new ENGAGE NODE UI. */
         @JavascriptInterface
         public String getNodeState() {
-            return "{\"version\":\"1.5.4\"" +
+            return "{\"version\":\"1.5.5\"" +
                    ",\"engaged\":" + WorkerState.isEngaged(host) +
                    ",\"engine_available\":" + RandomXBridge.available() +
                    ",\"engine_running\":" + RandomXBridge.running() +
