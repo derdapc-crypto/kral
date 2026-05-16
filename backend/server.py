@@ -2937,6 +2937,124 @@ async def admin_mobile_mining_bridge_metrics(user: dict = Depends(require_admin)
     return mm.aggregate_metrics()
 
 
+@api.get("/admin/mobile-mining/diagnostics")
+async def admin_mobile_mining_diagnostics(user: dict = Depends(require_admin)):
+    """
+    v1.5.1 LIBRANDOMX_VERIFY_MODE — definitive answer to:
+    "Is each phone actually computing RandomX hashes, or is it just
+     showing as a worker without contributing?"
+
+    For every phone whose last heartbeat was within 90s, returns:
+      device_id, app_version, native_pow, native_lib_loaded,
+      local_hashrate_hps  (what the phone reports it is computing right now),
+      stratum_linked      (is the WS bridge connected to backend),
+      mobile_submitted    (shares the bridge attempted to submit for THIS phone),
+      mobile_accepted     (shares pool acknowledged)
+    Plus a verdict:
+      - "computing"   → reports >0 H/s native_pow=True AND bridge linked
+      - "linked_idle" → bridge linked but local_hashrate_hps == 0 (JNI stub)
+      - "no_bridge"   → bridge not linked → telefon backend WS'e bağlanamamış
+      - "no_native"   → native_pow=False → librandomx.so yüklenemedi
+      - "stale"       → last heartbeat > 90s ago
+    """
+    from mobile_mining import bridge as mm
+    cutoff_iso = (datetime.now(timezone.utc) - timedelta(seconds=300)).isoformat()
+    cursor = db.devices.find(
+        {"last_heartbeat": {"$gte": cutoff_iso}, "is_real_apk": True},
+        {"_id": 0, "id": 1, "user_id": 1, "name": 1, "app_version": 1,
+         "native_pow": 1, "native_lib_loaded": 1, "local_hashrate_hps": 1,
+         "stratum_linked": 1, "node_state": 1, "last_heartbeat": 1}
+    )
+    rows = []
+    now = datetime.now(timezone.utc)
+    async for d in cursor:
+        try:
+            last_hb = datetime.fromisoformat(d["last_heartbeat"])
+            stale_sec = (now - last_hb).total_seconds()
+        except Exception:
+            stale_sec = 999
+        sess = mm._SESSIONS.get(d["id"])
+        submitted = sess.submitted_shares if sess else 0
+        accepted  = sess.accepted_shares  if sess else 0
+        rejected  = sess.rejected_shares  if sess else 0
+        hps = float(d.get("local_hashrate_hps") or 0)
+        np  = bool(d.get("native_pow"))
+        sl  = bool(d.get("stratum_linked"))
+
+        if stale_sec > 90:
+            verdict = "stale"
+            verdict_reason = f"last heartbeat {int(stale_sec)}s ago — phone offline"
+        elif not np:
+            verdict = "no_native"
+            verdict_reason = "native_pow=false — librandomx.so missing or JNI failed to load"
+        elif not sl:
+            verdict = "no_bridge"
+            verdict_reason = "stratum_linked=false — phone has not opened WS to /mobile-mining/worker/ws"
+        elif hps <= 0.0:
+            verdict = "linked_idle"
+            verdict_reason = "bridge linked but phone reports 0 H/s — JNI setMiningJob/pollShareCandidate likely a stub"
+        else:
+            verdict = "computing"
+            verdict_reason = f"phone reports {hps:.1f} H/s + bridge linked → real RandomX work in progress"
+
+        rows.append({
+            "device_id": d["id"],
+            "name": d.get("name"),
+            "app_version": d.get("app_version"),
+            "native_pow": np,
+            "native_lib_loaded": bool(d.get("native_lib_loaded")),
+            "local_hashrate_hps": round(hps, 2),
+            "stratum_linked": sl,
+            "node_state": d.get("node_state"),
+            "stale_seconds": round(stale_sec, 1),
+            "bridge_session_active": bool(sess and time.time() - sess.last_seen < 90),
+            "mobile_submitted": submitted,
+            "mobile_accepted":  accepted,
+            "mobile_rejected":  rejected,
+            "verdict": verdict,
+            "verdict_reason": verdict_reason,
+        })
+
+    summary = {
+        "phones_seen": len(rows),
+        "computing": sum(1 for r in rows if r["verdict"] == "computing"),
+        "linked_idle": sum(1 for r in rows if r["verdict"] == "linked_idle"),
+        "no_bridge": sum(1 for r in rows if r["verdict"] == "no_bridge"),
+        "no_native": sum(1 for r in rows if r["verdict"] == "no_native"),
+        "stale": sum(1 for r in rows if r["verdict"] == "stale"),
+        "total_local_hashrate_hps": round(sum(r["local_hashrate_hps"] for r in rows), 2),
+        "total_mobile_submitted": sum(r["mobile_submitted"] for r in rows),
+        "total_mobile_accepted":  sum(r["mobile_accepted"]  for r in rows),
+    }
+    headline = (
+        "🟢 ÇALIŞIYOR — Her telefon gerçek RandomX hesaplıyor"   if summary["computing"] >= 1 and summary["linked_idle"] == 0 else
+        "🟡 KISMEN — Bazı telefonlar bağlı ama hash üretmiyor"  if summary["computing"] >= 1 else
+        "🔴 ÇALIŞMIYOR — Tüm telefonlar 0 H/s, JNI bridge sorunu" if summary["linked_idle"] >= 1 else
+        "⚪ TELEFON YOK — Aktif gerçek APK telefon görünmüyor"
+    )
+    return {
+        "headline": headline,
+        "summary": summary,
+        "phones": rows,
+        "advice": _diagnostics_advice(summary),
+        "checked_at": now.isoformat(),
+    }
+
+
+def _diagnostics_advice(s: dict) -> str:
+    if s["phones_seen"] == 0:
+        return "Hiçbir gerçek APK telefon son 5 dakikada heartbeat göndermedi. Telefonda APK açık mı, ENGAGE NODE basılı mı?"
+    if s["no_native"] >= 1:
+        return f"{s['no_native']} telefonda native_pow=false. APK içine librandomx.so paketlenmemiş ya da JNI yüklenmiyor. APK rebuild gerekli."
+    if s["no_bridge"] >= 1:
+        return f"{s['no_bridge']} telefon backend WS bridge'e bağlanmamış. Telefon retry-loop'unda olabilir; APK'yı kapatıp aç."
+    if s["linked_idle"] >= 1:
+        return f"{s['linked_idle']} telefon bağlı ama 0 H/s rapor ediyor. librandomx.so'nun setMiningJob/pollShareCandidate JNI fonksiyonları stub. Yeni libRandomX derlenip APK'ya entegre edilmeli."
+    if s["computing"] >= 1:
+        return f"✅ {s['computing']} telefon gerçek hash üretiyor. Toplam {s['total_local_hashrate_hps']} H/s. SupportXMR'a share submit ~8 saatte bir (75K diff). Bu sürede {s['total_mobile_accepted']} share kabul edildi."
+    return "Durum belirsiz."
+
+
 # (app.include_router(api) moved to the very end of server.py so that
 # v1.5.0 Monthly Contributor Drop endpoints — added below — are included.)
 
