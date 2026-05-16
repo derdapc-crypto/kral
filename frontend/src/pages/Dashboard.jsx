@@ -163,11 +163,13 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        {/* Stats — cloud-compute terminology only */}
+        {/* Stats — cloud-compute terminology only. v1.5.5: TGC balance with
+             5-decimal precision (crypto-style ticking) instead of $USDT
+             estimate, since redemption is locked until mainnet (Q3 2027). */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-          <StatCard label="Reward Balance"      value={`$${(wallet?.tgc_balance_usdt_value ?? 0).toFixed(2)}`}
+          <StatCard label="Reward Balance"      value={`${(wallet?.tgc_balance ?? 0).toFixed(5)} TGC`}
                     testId="stat-balance" tone="ok" />
-          <StatCard label="Lifetime Rewards"    value={`$${((wallet?.tgc_total_earned ?? 0) * 0.05).toFixed(2)}`}
+          <StatCard label="Lifetime TGC"        value={`${(wallet?.tgc_total_earned ?? 0).toFixed(5)} TGC`}
                     testId="stat-earned" />
           <StatCard label="Compute Nodes"       value={devices.length}
                     testId="stat-devices" tone="info" />

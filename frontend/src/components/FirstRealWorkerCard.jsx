@@ -181,7 +181,7 @@ export default function FirstRealWorkerCard() {
               {w.session_tasks ?? 0} tasks
             </span>
             <span className="font-display font-black gold-text font-mono-num" data-testid="first-worker-tgc">
-              +{(w.session_tgc ?? 0).toFixed(2)} TGC
+              +{(w.session_tgc ?? 0).toFixed(5)} TGC
             </span>
           </div>
         </div>

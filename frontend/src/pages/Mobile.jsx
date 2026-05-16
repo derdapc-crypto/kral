@@ -38,7 +38,10 @@ function nativeBridge() {
 function safeJSON(fn, fallback = {}) {
   try { const s = fn(); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
 }
-function fmtTGC(n) { return Number(n || 0).toFixed(2); }
+// v1.5.5 — crypto-style precision: show 5 decimals (0.00012 TGC) so users
+// see balance ticking up live like a real on-chain token rather than rounded
+// to "0.49 TGC" which feels static.
+function fmtTGC(n) { return Number(n || 0).toFixed(5); }
 function fmtUSDT(n) { return Number(n || 0).toFixed(2); }
 
 export default function Mobile() {
@@ -410,7 +413,7 @@ export default function Mobile() {
                     {fmtTGC(tgcBalance)} <span className="text-white/55 text-sm">TGC</span>
                   </div>
                   <div className="text-[10px] text-white/45 mt-0.5">
-                    Pre-mainnet · 1:1 airdrop on $TGC token launch (Q3 2027)
+                Pre-mainnet · 1:1 airdrop on $TGC token launch (Q3 2027) · Lifetime {fmtTGC(lifetimeTGC)} TGC
                   </div>
                 </div>
                 <div className="text-right">

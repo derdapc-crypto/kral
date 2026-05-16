@@ -287,7 +287,7 @@ export default function RealAndroidDevices() {
                     );
                   })()}
                   <div className="font-mono-num text-white text-[10px]">{d.session_tasks ?? 0} tasks</div>
-                  <div className="font-mono-num text-[#F2C94C] text-[10px]">+{(d.session_tgc || 0).toFixed(2)} TGC</div>
+                  <div className="font-mono-num text-[#F2C94C] text-[10px]">+{(d.session_tgc || 0).toFixed(5)} TGC</div>
                 </td>
                 <td className="text-xs text-white/70">
                   <span className="inline-flex items-center gap-1">
