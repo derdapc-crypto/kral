@@ -70,7 +70,7 @@ TIER_DAILY_TGC = {"core": 1.2, "flagship": 1.1, "mid": 1.0, "budget": 0.8}
 # for forecast cards as an "estimated future redemption" guidance only and is
 # replaced in UI by the "TGC Mainnet Launch · TBA" banner.
 TGC_REDEMPTION_LOCKED = True
-TGC_LAUNCH_LABEL = "TGC Mainnet · Token Launch Q3 2026"
+TGC_LAUNCH_LABEL = "TGC Mainnet · Token Launch Q3 2027"
 # Mode multipliers applied on top of base drip during ledger crediting.
 MODE_MULTIPLIER = {"eco": 0.5, "full": 1.0, "engaged_eco": 0.5, "engaged_full": 1.0,
                     "paused_power": 0.0, "paused_battery": 0.0, "paused_thermal": 0.0,
@@ -1442,7 +1442,7 @@ async def wallet(user: dict = Depends(get_current_user)):
         "payout_eligibility": "pre_mainnet",    # v1.5.1
         "redemption_locked": True,              # v1.5.1 — frontend gates UI on this
         "token_launch_label": TGC_LAUNCH_LABEL, # v1.5.1
-        "token_launch_quarter": "2026-Q3",      # v1.5.1
+        "token_launch_quarter": "2027-Q3",      # v1.5.1
         # v1.5.0 Grid Tickets summary (Monthly Contributor Drop)
         "grid_tickets": grid_tickets_count,
         "next_ticket_in_tgc": round(next_tk_tgc_left, 2),
@@ -1473,7 +1473,7 @@ async def withdraw(data: WithdrawIn, user: dict = Depends(get_current_user)):
             "error": "tgc_redemption_locked",
             "message": "USDT çekim, TGC Mainnet launch'a kadar kilitlidir. Bugün biriktirdiğin her TGC, token launch'da 1:1 airdrop edilecek. Cüzdan adresini şimdi kaydet, drop için hazır ol.",
             "launch_label": TGC_LAUNCH_LABEL,
-            "expected_launch_quarter": "2026-Q3",
+            "expected_launch_quarter": "2027-Q3",
         },
     )
 
@@ -1486,7 +1486,7 @@ async def token_launch_status():
         "status": "pre_mainnet_accumulation",
         "redemption_locked": True,
         "label": TGC_LAUNCH_LABEL,
-        "expected_quarter": "2026-Q3",
+        "expected_quarter": "2027-Q3",
         "snapshot_rule": "Every TGC accumulated by the operator's freeze snapshot is airdropped 1:1 onto the live $TGC token on launch day.",
         "operator_keep_pct": 15,
         "circulating_at_launch_pct": 70,

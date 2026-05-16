@@ -900,7 +900,7 @@ function EarningsExplorer({ stats, apk }) {
           <p className="mt-5 text-white/55 max-w-2xl text-base leading-relaxed">
             Telefonun şarjdayken THE GRID şebekesine bağlanır ve doğrulanmış cloud compute
             işleri tamamlar. Her iş bir <span className="cyan-text font-semibold">TGC</span> kredisi
-            kazandırır. Mainnet token launch'ında (<span className="matrix-text font-semibold">Q3 2026</span>)
+            kazandırır. Mainnet token launch'ında (<span className="matrix-text font-semibold">Q3 2027</span>)
             biriken her TGC, canlı <span className="matrix-text font-semibold">$TGC token</span>'a
             <span className="matrix-text font-semibold"> 1:1 airdrop</span> edilecek.
             Erken katılan kazanır — <span className="cyan-text font-semibold">snapshot tarihi yaklaşıyor</span>.
