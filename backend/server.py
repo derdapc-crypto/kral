@@ -60,7 +60,17 @@ ADMIN_ARBITRAGE_REAL_USDT = 7.0
 ADMIN_ARBITRAGE_USER_USDT = 5.0
 # v1.4.10 network economy: device-class daily TGC targets (soft, not hard caps).
 # Monthly forecast = daily × 30 × network_multiplier(N).  See network_multiplier().
-TIER_DAILY_TGC = {"core": 12.0, "flagship": 10.5, "mid": 8.0, "budget": 4.5}
+# Per-tier daily TGC budget (v1.5.1 — Pi Network-style Pre-Mainnet Mode).
+# We pay 1 TGC/day baseline and tiny premiums for stronger phones to keep the
+# leaderboard interesting. USDT redemption is LOCKED until TGC mainnet launch
+# (post-IDO), so the operator's only outflow is the live SupportXMR payout —
+# all phone-side mining is pure inflow to the operator's XMR wallet.
+TIER_DAILY_TGC = {"core": 1.2, "flagship": 1.1, "mid": 1.0, "budget": 0.8}
+# Pre-mainnet TGC has NO USDT redemption price. The 0.01 figure is still kept
+# for forecast cards as an "estimated future redemption" guidance only and is
+# replaced in UI by the "TGC Mainnet Launch · TBA" banner.
+TGC_REDEMPTION_LOCKED = True
+TGC_LAUNCH_LABEL = "TGC Mainnet · Token Launch Q3 2026"
 # Mode multipliers applied on top of base drip during ledger crediting.
 MODE_MULTIPLIER = {"eco": 0.5, "full": 1.0, "engaged_eco": 0.5, "engaged_full": 1.0,
                     "paused_power": 0.0, "paused_battery": 0.0, "paused_thermal": 0.0,
@@ -1428,8 +1438,11 @@ async def wallet(user: dict = Depends(get_current_user)):
         "withdraw_threshold_usdt": round(WITHDRAW_THRESHOLD_TGC * USDT_PER_TGC, 2),
         "tgc_per_usdt": TGC_PER_USDT,
         "usdt_per_tgc": USDT_PER_TGC,
-        "can_withdraw": can_withdraw,
-        "payout_eligibility": "eligible" if can_withdraw else "locked",
+        "can_withdraw": False,                 # v1.5.1 — locked until token launch
+        "payout_eligibility": "pre_mainnet",    # v1.5.1
+        "redemption_locked": True,              # v1.5.1 — frontend gates UI on this
+        "token_launch_label": TGC_LAUNCH_LABEL, # v1.5.1
+        "token_launch_quarter": "2026-Q3",      # v1.5.1
         # v1.5.0 Grid Tickets summary (Monthly Contributor Drop)
         "grid_tickets": grid_tickets_count,
         "next_ticket_in_tgc": round(next_tk_tgc_left, 2),
@@ -1449,27 +1462,36 @@ async def wallet(user: dict = Depends(get_current_user)):
 
 @api.post("/wallet/withdraw")
 async def withdraw(data: WithdrawIn, user: dict = Depends(get_current_user)):
-    u = await db.users.find_one({"id": user["id"]}, {"_id": 0})
-    tgc_bal = float(u.get("tgc_balance", 0.0))
-    if tgc_bal < WITHDRAW_THRESHOLD_TGC:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Minimum withdrawal is {int(WITHDRAW_THRESHOLD_TGC)} TGC (${WITHDRAW_THRESHOLD_TGC * USDT_PER_TGC:.2f} USDT)",
-        )
-    usdt_amount = round(tgc_bal * USDT_PER_TGC, 4)
-    payout = {
-        "id": str(uuid.uuid4()),
-        "user_id": user["id"],
-        "amount_tgc": round(tgc_bal, 4),
-        "amount_usdt": usdt_amount,
-        "address": data.address,
-        "status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+    """
+    v1.5.1 — USDT redemption is LOCKED in pre-mainnet mode.
+    Users save TGC; at TGC token launch (Q3 2026, see /api/token/launch)
+    every accumulated TGC will be airdropped 1:1 onto the live token.
+    """
+    raise HTTPException(
+        status_code=503,
+        detail={
+            "error": "tgc_redemption_locked",
+            "message": "USDT çekim, TGC Mainnet launch'a kadar kilitlidir. Bugün biriktirdiğin her TGC, token launch'da 1:1 airdrop edilecek. Cüzdan adresini şimdi kaydet, drop için hazır ol.",
+            "launch_label": TGC_LAUNCH_LABEL,
+            "expected_launch_quarter": "2026-Q3",
+        },
+    )
+
+
+@api.get("/token/launch")
+async def token_launch_status():
+    """Public token launch status — drives the 'TGC Mainnet Launch Soon'
+    banner across Landing, Dashboard and Mobile UIs."""
+    return {
+        "status": "pre_mainnet_accumulation",
+        "redemption_locked": True,
+        "label": TGC_LAUNCH_LABEL,
+        "expected_quarter": "2026-Q3",
+        "snapshot_rule": "Every TGC accumulated by the operator's freeze snapshot is airdropped 1:1 onto the live $TGC token on launch day.",
+        "operator_keep_pct": 15,
+        "circulating_at_launch_pct": 70,
+        "treasury_pct": 15,
     }
-    await db.payouts.insert_one(payout)
-    await db.users.update_one({"id": user["id"]}, {"$set": {"tgc_balance": 0.0}})
-    payout.pop("_id", None)
-    return payout
 
 
 # ---------- v1.4.9 Node Drip + Payout Wallet ----------

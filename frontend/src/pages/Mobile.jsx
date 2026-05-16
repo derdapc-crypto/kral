@@ -694,6 +694,24 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
 
   return (
     <div className="mt-6 space-y-3" data-testid="rewards-tab-content">
+      {/* v1.5.1 — Pre-mainnet token launch banner */}
+      {wallet?.redemption_locked && (
+        <div className="rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-500/10 to-orange-500/5 p-4"
+             data-testid="rewards-mainnet-banner">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] uppercase tracking-[0.3em] font-mono-term text-amber-300/90">
+              {wallet?.token_launch_label || "TGC Mainnet · Token Launch Q3 2026"}
+            </span>
+            <span className="ml-auto text-[9px] uppercase tracking-[0.25em] text-amber-200/60 font-mono-term">PRE-MAINNET · ACCUMULATING</span>
+          </div>
+          <div className="text-[12px] text-white/75 leading-relaxed">
+            Bugün biriktirdiğin her TGC, mainnet launch günü canlı <span className="text-amber-300 font-semibold">$TGC</span> token'a
+            <span className="text-amber-300 font-semibold"> 1:1 airdrop</span> edilecek. USDT çekim, snapshot tarihinde
+            biriken bakiyene göre token olarak açılacak. Ne kadar erken katılırsan o kadar büyük pay.
+          </div>
+        </div>
+      )}
+
       {/* TGC hero */}
       <div className="rounded-2xl bg-black/40 border border-white/10 p-5" data-testid="rewards-balance-card">
         <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">TGC Balance</div>
@@ -701,7 +719,9 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
           {tgcBalance.toFixed(2)} <span className="text-white/55 text-sm">TGC</span>
         </div>
         <div className="text-[11px] text-white/45 mt-1">
-          Estimated Value ≈ ${(tgcBalance * TGC_TO_USDT).toFixed(2)} USDT · Lifetime {lifetimeTGC.toFixed(2)} TGC
+          {wallet?.redemption_locked
+            ? `Pre-mainnet · 1:1 airdrop on launch · Lifetime ${lifetimeTGC.toFixed(2)} TGC`
+            : `Estimated Value ≈ $${(tgcBalance * TGC_TO_USDT).toFixed(2)} USDT · Lifetime ${lifetimeTGC.toFixed(2)} TGC`}
         </div>
       </div>
 

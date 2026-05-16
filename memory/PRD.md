@@ -605,3 +605,18 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
   * REGRESSION ALL PASS: /auth/login, /wallet, /devices/heartbeat, /node/drip, /rewards/drop/current.
 - **Live operator console doğrulaması**: Backend xmrig (Plan A) "share ACCEPTED #1 diff=75,000" mesajı admin Command Center'da live görünüyor — RX_BACKEND honor_podium'da accepted_shares=1 ile listeli.
 - **Kullanıcı next-step**: Eski v1.4.10 APK'yı kaldır, https://grid-supercomputer.preview.emergentagent.com/grid-worker-v1.5.0.apk indir + kur + ENGAGE NODE + battery exemption izin ver. 2-5 dakika içinde Admin panelinde `Bridge Workers: 2 · Bridge Submitted: >0 · Bridge Accepted: >0` görünmeli; SupportXMR dashboard'unda `GRID_M_xxxxxx` worker'lar listede yer almalı.
+
+
+**Iter 38 (2026-05-16)** — **v1.5.1 Pre-Mainnet Pi-Network Pivot** (TGC ACCUMULATION-ONLY, USDT REDEMPTION LOCKED)
+- **Operator decree** (kararı kullanıcı verdi): Tek bir telefonun XMR mining ekonomisi matematik olarak zarar getirir. Pi Network modeline geçiş: drip 1 TGC/gün, USDT redemption kilitli, "TGC Mainnet · Token Launch Q3 2026 · 1:1 airdrop" ile birikim teşviki.
+- **Backend** (`/app/backend/server.py`):
+  * `TIER_DAILY_TGC` 10x düşürüldü: `{core:12→1.2, flagship:10.5→1.1, mid:8→1.0, budget:4.5→0.8}` → mid-tier monthly forecast 33 TGC/ay (canlı doğrulandı).
+  * `POST /api/wallet/withdraw` HTTP 503 + Türkçe mesaj + launch_label + expected_quarter=2026-Q3. TGC bakiyesi korunuyor (mainnet airdrop için).
+  * `GET /api/token/launch` (public): status=pre_mainnet_accumulation, snapshot_rule=1:1 airdrop, tokenomics breakdown (operator 15%, circulating 70%, treasury 15%).
+  * `/api/wallet` yeni alanlar: `can_withdraw=false`, `redemption_locked=true`, `token_launch_label`, `token_launch_quarter`.
+- **Frontend**:
+  * Landing.jsx — "1.000 TGC = $10 USDT" mesajı kaldırıldı → "1:1 airdrop · snapshot yaklaşıyor".
+  * Dashboard.jsx — "Request Payout" → **🔒 Pre-Mainnet · Locked**, amber/orange banner.
+  * Mobile.jsx Rewards Tab — banner + redemption_locked durumunda "Pre-mainnet · 1:1 airdrop on launch".
+- **Doğrulama**: `/api/token/launch` 200, `/api/wallet` redemption_locked=true, withdraw POST → 503, Dashboard screenshot ✅.
+- **Ekonomik etki**: 1M user × 33 TGC/ay = 33M TGC birikir (operatör cebinden çıkış YOK). XMR mining $59K/ay pure inflow operatöre. Token launch'da operatör %15 retain.

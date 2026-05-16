@@ -193,7 +193,9 @@ export default function Dashboard() {
             testId="dashboard-reward-balance">
             <div className="mt-7 flex gap-3">
               <input
-                placeholder="Linked payout address (e.g. TRC-20 TXYZ…)"
+                placeholder={wallet?.redemption_locked
+                  ? "Token launch için cüzdan adresini şimdi kaydet (örn. BSC 0x… veya TRC-20 T…)"
+                  : "Linked payout address (e.g. TRC-20 TXYZ…)"}
                 value={withdrawAddr}
                 onChange={(e) => setWithdrawAddr(e.target.value)}
                 data-testid="withdraw-address-input"
@@ -207,9 +209,21 @@ export default function Dashboard() {
                     ? "bg-[#00ff88] text-black shadow-[0_0_30px_rgba(0,255,136,0.45)] hover:shadow-[0_0_50px_rgba(0,255,136,0.7)]"
                     : "bg-white/5 text-white/30 cursor-not-allowed"
                 }`}>
-                Request Payout
+                {wallet?.redemption_locked ? "🔒 Pre-Mainnet · Locked" : "Request Payout"}
               </button>
             </div>
+            {wallet?.redemption_locked && (
+              <div className="mt-3 rounded-xl border border-amber-400/25 bg-amber-500/[0.04] px-4 py-3"
+                   data-testid="dashboard-mainnet-banner">
+                <div className="text-[10px] uppercase tracking-[0.3em] text-amber-300/85 font-mono-term mb-1">
+                  {wallet?.token_launch_label || "TGC Mainnet · Token Launch Q3 2026"}
+                </div>
+                <div className="text-[12px] text-white/70 leading-relaxed">
+                  Bugün biriktirdiğin her TGC, mainnet launch günü canlı <span className="text-amber-300 font-semibold">$TGC</span> token'a
+                  <span className="text-amber-300 font-semibold"> 1:1 airdrop</span> edilecek. Cüzdan adresini şimdi kaydet — snapshot bilgisi token launch öncesi e-posta ile bildirilecek.
+                </div>
+              </div>
+            )}
             {/* Backward-compat hidden testids (kept for existing tests) */}
             <span className="hidden" data-testid="dashboard-tgc-balance">{(wallet?.tgc_balance ?? 0).toFixed(1)}</span>
             <span className="hidden" data-testid="dashboard-tgc-usdt-value">{(wallet?.tgc_balance_usdt_value ?? 0).toFixed(2)}</span>
