@@ -27,7 +27,12 @@ public final class ServiceWatchdog extends BroadcastReceiver {
 
     private static final String TAG = "GridWatchdog";
     private static final String ACTION = "io.thegrid.worker.ACTION_WATCHDOG_TICK";
-    private static final long INTERVAL_MS = 5 * 60 * 1000L;  // 5 minutes
+    // v1.5.3 — Android 12+ setExactAndAllowWhileIdle floors at 10 min in Doze
+    // anyway; we keep the user-space wish at 3 min so on most OEMs we still
+    // get 3-5 min cadence.  This significantly reduces visible drop-off
+    // windows ("phone disconnected" toasts on the admin panel) while
+    // remaining battery-friendly.
+    private static final long INTERVAL_MS = 3 * 60 * 1000L;
     private static final int  REQ_CODE = 0x6717;
 
     /**

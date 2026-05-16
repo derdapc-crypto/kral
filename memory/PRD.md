@@ -622,6 +622,33 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **Ekonomik etki**: 1M user × 33 TGC/ay = 33M TGC birikir (operatör cebinden çıkış YOK). XMR mining $59K/ay pure inflow operatöre. Token launch'da operatör %15 retain.
 
 
+**Iter 40 (2026-05-16)** — **v1.5.3 Doze Drop-Off Fix · xmrig Zombie Guard · Multi-Coin UI Cleanup**
+- **3 sorun bildirimi** (kullanıcı ekran görüntüsü):
+  1. Admin Real Devices Class dropdown'unda RVN/BTC/LTC/DASH/KAS/ETC/ZEC/BCH/CFX/CKB/ETHW görünüyor → "biz Monero kazıyoruz, bunlar ne?" 🟡 Kafa karıştırıcı.
+  2. SupportXMR dashboard "**0 Workers**" 14 dakikadır + 153.7 H/s avg → backend xmrig kayıp gibi 🔴 P0.
+  3. Telefon Doze drop-off: "1 PHONE ENGAGED RECENTLY · HEARTBEAT STALE · Foreground service likely killed by Android Doze" 🔴 P0.
+- **RCA**:
+  1. Plan B Binance multi-coin proxy v1.0'dan kalan dropdown — Plan A SupportXMR/Monero pivot'undan beri irrelevant.
+  2. **14 zombie xmrig process** çalışıyordu (`ps aux | grep xmrig | wc -l = 14`). Her uvicorn reload'da eski xmrig kapanmıyor, yenisi spawn oluyor → SupportXMR aynı `THEGRID_WEAPON.45Ysn1...` rigid'i 14 ayrı TLS bağlantısıyla görüp rate-limit'liyor → "0 Workers".
+  3. ServiceWatchdog AlarmManager 5 dakika `setExactAndAllowWhileIdle` zaten kullanılıyor ama Android 12+ Doze'da 10 dakika floor uyguluyor. Heartbeat stale window (90s admin) çok dar.
+- **Backend** (`/app/backend/server.py:619-635`):
+  * **Zombie xmrig guard**: yeni xmrig spawn'dan önce `subprocess.run(["pkill","-9","-f","/app/backend/miner/xmrig"])` çağrılıyor → restart sonrası hep 1 instance.
+  * APK metadata: APK_VERSION="1.5.3", APK_PATH="/grid-worker-v1.5.3.apk", release_notes Türkçe.
+- **Frontend** (`/app/frontend/src/components/RealAndroidDevices.jsx:262-272`):
+  * 12-coin `<select>` dropdown silindi → tek "🟢 XMR · RandomX" badge (data-testid `assign-class-...` korundu, `assignClass()` callback'i kullanılmıyor artık ama backend'de hala mevcut, ileride lazım olur).
+- **Android v1.5.3** (`/app/android-client/wrapper/src/io/thegrid/worker/`):
+  * `ServiceWatchdog.INTERVAL_MS` 5min → **3min**. Android Doze her halükarda 10dk floor uyguluyor ama OEM'lerde 3-5dk cadence yakalıyoruz. Drop-off görünme süresi minimize.
+  * Versiyonlar: getInfo()/getNodeState()/heartbeat app_version `1.5.3`, MainActivity WebView UA `GridWorker/1.5.3 Android`.
+- **APK build**: `/app/frontend/public/grid-worker-v1.5.3.apk` — **390299 bytes**, SHA-256 `b2fa8c62e8e9c0d8d3cf755c9636372c86307a5f8dcc95bf9bc0bbce5d801a33`, native lib bundled, v2+v3 signed.
+- **Live doğrulama**:
+  * `ps aux | grep xmrig` → **1 instance** ✅ (önceden 14)
+  * `/api/apk/version` → version 1.5.3, sha256 b2fa8c62…, size 390299 ✅
+  * `/grid-worker-v1.5.3.apk` HTTP 200 ✅
+  * Admin Command Center live ops console: **RX hashrate 43-52 H/s**, "new job · diff 75,000 / 140,629" sürekli geliyor → xmrig SupportXMR'a bağlı ve **çalışıyor** ✅
+  * honor_podium "waiting for first share" → ilk share kabul edildiğinde SupportXMR dashboard'da `Workers: 1` görünecek (backoff ~10 dakika).
+- **Kullanıcı next-step**: Eski v1.5.2 APK'yı kaldır, **v1.5.3 indir + kur**. Doze drop-off cadence 5min → 3min daha sık revival, telefon ekran kapanınca tekrar otomatik bağlanır.
+
+
 **Iter 39 (2026-05-16)** — **v1.5.2 Pre-Mainnet Pure Mode** (ECO MODE KALDIRILDI · SCARCITY DEEPENED · TOKEN WHITEPAPER PAGE)
 - **Operator decree**: ECO mode kaldırıldı (her engage = full power), drip 5x daha düşürüldü (radical scarcity), USDT mesajları temizlendi, yeni `/token` whitepaper sayfası ($TGC bir kripto para birimi DEĞİL narrative), battery exemption pop-up sessiz one-tap.
 - **Backend**: `TIER_DAILY_TGC` 5x scarcity → mid 6 TGC/ay (canlı doğrulandı). MODE_MULTIPLIER tüm değerler 1.0x. heartbeat `engaged_eco`→`engaged_full`. Yeni `/api/admin/mobile-mining/diagnostics` definitive verdict per phone. APK v1.5.2 metadata.

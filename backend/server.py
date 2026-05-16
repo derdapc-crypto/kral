@@ -310,9 +310,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.5.2"
-APK_PATH = "/grid-worker-v1.5.2.apk"
-APK_RELEASE_NOTES = "v1.5.2 Pre-Mainnet Pure Mode · ECO mode kaldırıldı (her engage = full power) · battery exemption pop-up'ı sessiz mod (one-tap) · drip ekonomi 0.05–0.30 TGC/gün scarcity (Q3 2027 mainnet'te 1:1 airdrop) · USDT redemption locked · SupportXMR Mobile Bridge canlı · librandomx.so (sha256 2c7c0be3…) bundled · v2+v3 signed"
+APK_VERSION = "1.5.3"
+APK_PATH = "/grid-worker-v1.5.3.apk"
+APK_RELEASE_NOTES = "v1.5.3 Doze Drop-Off Fix · ServiceWatchdog AlarmManager 5min→3min cadence (Doze sırasında daha sık revival) · backend xmrig zombie process guard (pkill before respawn — SupportXMR rate-limit fix) · Plan B multi-coin proxy admin UI'dan kaldırıldı (XMR-only network görünümü) · v1.5.2 ECO mode + battery one-tap + scarcity drip korunuyor · randomx native engine bundled · v2+v3 signed"
 
 
 def _compute_apk_meta() -> dict:
@@ -618,6 +618,17 @@ async def startup():
     # address pinned on Unmineable for the mobile worker fleet.
     if os.environ.get("ENABLE_RANDOMX_MINER", "true").lower() in ("1", "true", "yes"):
         try:
+            # v1.5.3 — kill any stray xmrig instances left over from a prior
+            # uvicorn reload before spawning the new one.  Reload created up to
+            # 14 zombie miners which all hit pool.supportxmr.com with the same
+            # worker name (THEGRID_WEAPON), leading SupportXMR to drop our
+            # connection and report "0 workers" on the dashboard.
+            try:
+                import subprocess as _sp
+                _sp.run(["pkill", "-9", "-f", "/app/backend/miner/xmrig"],
+                        timeout=5, check=False)
+            except Exception:
+                pass
             from miner.randomx_miner import start_in_background as _rx_start
             _rx_start()
             logger.info("Plan A RandomX miner started (xmrig -> SupportXMR rx/0)")

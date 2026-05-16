@@ -260,24 +260,14 @@ export default function RealAndroidDevices() {
                 <td><StateBadge state={d.worker_state} online={d.online} /></td>
                 <td><StratumBadge linked={d.stratum_linked} /></td>
                 <td>
-                  <select
-                    data-testid={`assign-class-${d.id_short}`}
-                    value={d.assigned_coin || "AUTO"}
-                    onChange={(e) => assignClass(d.id, e.target.value)}
-                    className="bg-black/40 border border-white/10 hover:border-[#F2C94C]/40 text-[10px] uppercase tracking-widest text-white/80 px-2 py-1 rounded-full font-mono cursor-pointer focus:outline-none focus:border-[#F2C94C]">
-                    <option value="AUTO">AUTO</option>
-                    <option value="RVN">RVN</option>
-                    <option value="BTC">BTC</option>
-                    <option value="LTC">LTC</option>
-                    <option value="DASH">DASH</option>
-                    <option value="KAS">KAS</option>
-                    <option value="ETC">ETC</option>
-                    <option value="ZEC">ZEC</option>
-                    <option value="BCH">BCH</option>
-                    <option value="CFX">CFX</option>
-                    <option value="CKB">CKB</option>
-                    <option value="ETHW">ETHW</option>
-                  </select>
+                  {/* v1.5.3 — Plan B multi-coin proxy retired. THE GRID is
+                      a Monero-only network now (RandomX via SupportXMR).
+                      Class column shows the routing destination. */}
+                  <span data-testid={`assign-class-${d.id_short}`}
+                        className="inline-flex items-center gap-1 bg-black/40 border border-[#00ff88]/30 text-[10px] uppercase tracking-widest text-[#00ff88]/85 px-2 py-1 rounded-full font-mono">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88]"></span>
+                    XMR · RandomX
+                  </span>
                 </td>
                 <td className="text-xs">
                   {/* iter-16 / v1.3.1: live neon-green H/s gauge */}
