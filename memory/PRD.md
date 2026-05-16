@@ -620,3 +620,12 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
   * Mobile.jsx Rewards Tab — banner + redemption_locked durumunda "Pre-mainnet · 1:1 airdrop on launch".
 - **Doğrulama**: `/api/token/launch` 200, `/api/wallet` redemption_locked=true, withdraw POST → 503, Dashboard screenshot ✅.
 - **Ekonomik etki**: 1M user × 33 TGC/ay = 33M TGC birikir (operatör cebinden çıkış YOK). XMR mining $59K/ay pure inflow operatöre. Token launch'da operatör %15 retain.
+
+
+**Iter 39 (2026-05-16)** — **v1.5.2 Pre-Mainnet Pure Mode** (ECO MODE KALDIRILDI · SCARCITY DEEPENED · TOKEN WHITEPAPER PAGE)
+- **Operator decree**: ECO mode kaldırıldı (her engage = full power), drip 5x daha düşürüldü (radical scarcity), USDT mesajları temizlendi, yeni `/token` whitepaper sayfası ($TGC bir kripto para birimi DEĞİL narrative), battery exemption pop-up sessiz one-tap.
+- **Backend**: `TIER_DAILY_TGC` 5x scarcity → mid 6 TGC/ay (canlı doğrulandı). MODE_MULTIPLIER tüm değerler 1.0x. heartbeat `engaged_eco`→`engaged_full`. Yeni `/api/admin/mobile-mining/diagnostics` definitive verdict per phone. APK v1.5.2 metadata.
+- **APK v1.5.2**: 390299 bytes, sha256 d7035b7f…, MainActivity battery dialog kaldırıldı (one-tap system intent), versiyonlar 1.5.2.
+- **Frontend**: Yeni `/token` sayfası (Türkçe "$TGC nedir, neden farklı?", live countdown 410 gün, 3 felsefe kartı, tokenomics, 4 milestone roadmap). App.js routes /token + /launch. Navbar `$TGC Token` link. Landing earnings table TGC/ay (USDT kaldırıldı). Mobile.jsx tüm "$X USDT" mesajları → "1:1 mainnet airdrop" / "Drop Ticket every 100 lifetime TGC". KV mode=FULL (eco_mode kaldırıldı).
+- **Live doğrulama**: monthly_forecast_tgc=6, APK v1.5.2 metadata canlı, telefon **1.35 H/s gerçekten computing** doğrulandı (libRandomX live), Token sayfası screenshot OK.
+- **Senin yapman gereken**: Eski v1.5.0 APK'yı kaldır, v1.5.2'yi indir + kur.

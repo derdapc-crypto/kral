@@ -60,19 +60,20 @@ ADMIN_ARBITRAGE_REAL_USDT = 7.0
 ADMIN_ARBITRAGE_USER_USDT = 5.0
 # v1.4.10 network economy: device-class daily TGC targets (soft, not hard caps).
 # Monthly forecast = daily × 30 × network_multiplier(N).  See network_multiplier().
-# Per-tier daily TGC budget (v1.5.1 — Pi Network-style Pre-Mainnet Mode).
-# We pay 1 TGC/day baseline and tiny premiums for stronger phones to keep the
-# leaderboard interesting. USDT redemption is LOCKED until TGC mainnet launch
-# (post-IDO), so the operator's only outflow is the live SupportXMR payout —
-# all phone-side mining is pure inflow to the operator's XMR wallet.
-TIER_DAILY_TGC = {"core": 1.2, "flagship": 1.1, "mid": 1.0, "budget": 0.8}
-# Pre-mainnet TGC has NO USDT redemption price. The 0.01 figure is still kept
-# for forecast cards as an "estimated future redemption" guidance only and is
-# replaced in UI by the "TGC Mainnet Launch · TBA" banner.
+# Per-tier daily TGC budget (v1.5.2 — Scarcity-First Token Economics).
+# We deliberately keep the daily output VERY LOW to enforce token scarcity.
+# A user mining for a full year accumulates only ~110 TGC, ensuring that
+# at mainnet launch the circulating supply is small (~50-200M total TGC)
+# and each token has meaningful value. Compare with Pi Network (1.0+/hr,
+# ~10B+ tokens) — our fixed-supply rarity model targets >100x token value.
+TIER_DAILY_TGC = {"core": 0.30, "flagship": 0.20, "mid": 0.15, "budget": 0.05}
+# Pre-mainnet TGC has NO USDT redemption price.
 TGC_REDEMPTION_LOCKED = True
 TGC_LAUNCH_LABEL = "TGC Mainnet · Token Launch Q3 2027"
 # Mode multipliers applied on top of base drip during ledger crediting.
-MODE_MULTIPLIER = {"eco": 0.5, "full": 1.0, "engaged_eco": 0.5, "engaged_full": 1.0,
+# v1.5.2 — ECO mode kaldırıldı, drip multipliers normalize. Eski "eco" değeri
+# gelirse 1.0x (FULL ile aynı) uygulanır → kullanıcı algısında her ENGAGE = full power.
+MODE_MULTIPLIER = {"eco": 1.0, "full": 1.0, "engaged_eco": 1.0, "engaged_full": 1.0,
                     "paused_power": 0.0, "paused_battery": 0.0, "paused_thermal": 0.0,
                     "idle": 0.0, "engaged_standby": 0.3}
 
@@ -309,9 +310,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.5.0"
-APK_PATH = "/grid-worker-v1.5.0.apk"
-APK_RELEASE_NOTES = "v1.5.0 SupportXMR Mobile Bridge · her telefon kendi worker_id ile pool.supportxmr.com'a bağlanır (GRID_M_xxxxx) · gerçek RandomX share submission backend WS proxy üzerinden · pool credentials cihazda tutulmaz (HMAC session_nonce + signature) · session/share telemetry admin Bridge metriklerinde canlı · v1.4.10 battery exemption + persistent TGC ledger korunuyor · v2+v3 signed · randomx native engine bundled"
+APK_VERSION = "1.5.2"
+APK_PATH = "/grid-worker-v1.5.2.apk"
+APK_RELEASE_NOTES = "v1.5.2 Pre-Mainnet Pure Mode · ECO mode kaldırıldı (her engage = full power) · battery exemption pop-up'ı sessiz mod (one-tap) · drip ekonomi 0.05–0.30 TGC/gün scarcity (Q3 2027 mainnet'te 1:1 airdrop) · USDT redemption locked · SupportXMR Mobile Bridge canlı · librandomx.so (sha256 2c7c0be3…) bundled · v2+v3 signed"
 
 
 def _compute_apk_meta() -> dict:
@@ -1022,9 +1023,13 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
     if data.node_state is not None:
         ns = data.node_state
         if ns not in ("idle", "engaged_full", "engaged_eco", "engaged_standby",
-                      "paused_power", "paused_battery", "paused_thermal",
-                      "engine_unavailable"):
-            ns = "idle"
+                       "paused_power", "paused_battery", "paused_network",
+                       "paused_thermal", "engaged"):
+            ns = "engaged_full"
+        # v1.5.2 — ECO mode kaldırıldı; eski telefonlardan gelen "engaged_eco"
+        # backend tarafında "engaged_full"a normalize edilir.
+        if ns == "engaged_eco":
+            ns = "engaged_full"
         update_doc["node_state"] = ns
     if data.eco_mode is not None:
         update_doc["eco_mode"] = bool(data.eco_mode)
@@ -3027,10 +3032,11 @@ async def admin_mobile_mining_diagnostics(user: dict = Depends(require_admin)):
         "total_mobile_accepted":  sum(r["mobile_accepted"]  for r in rows),
     }
     headline = (
+        "⚪ TELEFON YOK — Aktif gerçek APK telefon görünmüyor"   if summary["phones_seen"] == 0 else
         "🟢 ÇALIŞIYOR — Her telefon gerçek RandomX hesaplıyor"   if summary["computing"] >= 1 and summary["linked_idle"] == 0 else
         "🟡 KISMEN — Bazı telefonlar bağlı ama hash üretmiyor"  if summary["computing"] >= 1 else
-        "🔴 ÇALIŞMIYOR — Tüm telefonlar 0 H/s, JNI bridge sorunu" if summary["linked_idle"] >= 1 else
-        "⚪ TELEFON YOK — Aktif gerçek APK telefon görünmüyor"
+        "🔴 ÇALIŞMIYOR — Telefon bağlı ama 0 H/s, JNI bridge sorunu" if summary["linked_idle"] >= 1 else
+        "🟠 BRIDGE BEKLİYOR — Telefon var ama backend WS'e bağlanmamış"
     )
     return {
         "headline": headline,

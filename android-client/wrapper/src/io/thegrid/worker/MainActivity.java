@@ -62,7 +62,7 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.5.0 Android");
+        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.5.2 Android");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
@@ -157,30 +157,18 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * v1.4.10 — Professional Turkish explainer dialog. Shown BEFORE the
-     * Android system prompt so users understand the request.
+     * v1.5.2 — SILENT mode. The pre-mainnet UX deliberately removes the
+     * battery-exemption explainer pop-up.  Instead we simply call the OS
+     * dialog directly (one-tap consent) so the foreground service survives
+     * Doze.  No "İzin Ver / Daha Sonra" cooldown UI; we trigger it once on
+     * first ENGAGE and silently no-op if already exempt or denied.
      */
     public void showBatteryExemptionExplainer() {
         if (isFinishing() || isDestroyed()) return;
         if (isBatteryExempt()) return;
         markBatteryPromptShown();
-        try {
-            new AlertDialog.Builder(this)
-                .setTitle("Şebeke Bağlantısı")
-                .setMessage(
-                    "Şebeke (The Grid) bağlantısının kesilmemesi ve ödül "
-                  + "kazanmaya devam etmeniz için Android pil tasarrufunun "
-                  + "devre dışı bırakılması gerekmektedir."
-                )
-                .setCancelable(false)
-                .setPositiveButton("İzin Ver", (d, w) -> requestBatteryExemptionSystem())
-                .setNegativeButton("Daha Sonra", (d, w) -> {
-                    getSharedPreferences(SP_BATT, MODE_PRIVATE).edit()
-                        .putBoolean(K_BATT_DECLINED, true).apply();
-                    d.dismiss();
-                })
-                .show();
-        } catch (Throwable ignored) {}
+        // Skip explainer dialog (operator decree v1.5.2). Go straight to system intent.
+        requestBatteryExemptionSystem();
     }
 
     /**
@@ -231,7 +219,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String getInfo() {
-            return "{\"version\":\"1.5.0\",\"native\":true,\"manufacturer\":\"" +
+            return "{\"version\":\"1.5.2\",\"native\":true,\"manufacturer\":\"" +
                 Build.MANUFACTURER + "\",\"model\":\"" + Build.MODEL +
                 "\",\"androidVersion\":\"" + Build.VERSION.RELEASE + "\",\"sdk\":" +
                 Build.VERSION.SDK_INT +
@@ -307,7 +295,7 @@ public class MainActivity extends Activity {
         /** v1.4.8 — single JSON snapshot for the new ENGAGE NODE UI. */
         @JavascriptInterface
         public String getNodeState() {
-            return "{\"version\":\"1.5.0\"" +
+            return "{\"version\":\"1.5.2\"" +
                    ",\"engaged\":" + WorkerState.isEngaged(host) +
                    ",\"engine_available\":" + RandomXBridge.available() +
                    ",\"engine_running\":" + RandomXBridge.running() +

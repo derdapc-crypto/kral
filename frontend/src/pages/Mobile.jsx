@@ -396,7 +396,7 @@ export default function Mobile() {
                   </div>
                 </div>
                 <div className="text-[10px] text-white/40 mt-1">
-                  Today {todayTGC.toFixed(2)} TGC · ≈ ${(todayTGC * TGC_TO_USDT).toFixed(2)} USDT
+                  Today {todayTGC.toFixed(4)} TGC · accumulating for $TGC mainnet airdrop
                 </div>
               </div>
             </div>
@@ -410,7 +410,7 @@ export default function Mobile() {
                     {fmtTGC(tgcBalance)} <span className="text-white/55 text-sm">TGC</span>
                   </div>
                   <div className="text-[10px] text-white/45 mt-0.5">
-                    Estimated Value ≈ ${(tgcBalance * TGC_TO_USDT).toFixed(2)} USDT
+                    Pre-mainnet · 1:1 airdrop on $TGC token launch (Q3 2027)
                   </div>
                 </div>
                 <div className="text-right">
@@ -426,7 +426,7 @@ export default function Mobile() {
                      style={{ width: `${progressPct}%` }} data-testid="payout-progress-bar" />
               </div>
               <div className="mt-2 text-[10px] text-white/45">
-                Next Payout · {PAYOUT_THRESHOLD_TGC} TGC = $10 USDT
+                Next Milestone · Drop Ticket every 100 lifetime TGC
               </div>
             </div>
 
@@ -493,8 +493,8 @@ export default function Mobile() {
 
             {/* Pending vs Available */}
             <div className="grid grid-cols-2 gap-3">
-              <Box label="Pending Verification" value={`${fmtTGC(pendingTGC)} TGC`} sub={`≈ $${(pendingTGC * TGC_TO_USDT).toFixed(2)}`} testId="rewards-pending" />
-              <Box label="Available TGC" value={`${fmtTGC(availableTGC)} TGC`} sub={`≈ $${(availableTGC * TGC_TO_USDT).toFixed(2)}`} testId="rewards-available" />
+              <Box label="Pending Verification" value={`${fmtTGC(pendingTGC)} TGC`} sub="awaiting validation" testId="rewards-pending" />
+              <Box label="Available TGC" value={`${fmtTGC(availableTGC)} TGC`} sub="for $TGC airdrop" testId="rewards-available" />
             </div>
 
             {/* Monthly forecast */}
@@ -522,7 +522,7 @@ export default function Mobile() {
                      style={{ width: `${progressPct}%` }} />
               </div>
               <div className="text-[11px] text-white/45 mt-2">
-                Next Payout · <span className="cyan-text">{PAYOUT_THRESHOLD_TGC} TGC = $10 USDT</span>
+                Next Drop Ticket · <span className="cyan-text">every 100 lifetime TGC</span>
               </div>
               <button
                 onClick={requestPayout}
@@ -535,7 +535,7 @@ export default function Mobile() {
                 }`}>
                 {canWithdraw ? (
                   <span className="inline-flex items-center gap-2">
-                    Request $10 USDT Payout <ArrowUpRight className="w-3.5 h-3.5" />
+                    🔒 Pre-Mainnet · Q3 2027 <ArrowUpRight className="w-3.5 h-3.5" />
                   </span>
                 ) : `Payout unlocks at ${PAYOUT_THRESHOLD_TGC} TGC`}
               </button>
@@ -601,7 +601,8 @@ export default function Mobile() {
                   <KV k="verified_outputs" v={String(nodeStatus?.verified_outputs ?? 0)} testId="kv-verified-outputs" />
                   <KV k="failed_outputs" v={String(nodeStatus?.rejected_outputs ?? 0)} testId="kv-failed-outputs" />
                   <KV k="active_threads" v={String(nodeStatus?.active_threads ?? (engaged ? 1 : 0))} testId="kv-active-threads" />
-                  <KV k="eco_mode" v={String(nodeStatus?.raw_status === "eco" || nodeStatus?.eco_mode ? true : false)} testId="kv-eco-mode" />
+                  {/* v1.5.2 — eco_mode kaldırıldı, sistem her zaman FULL */}
+                  <KV k="mode" v="FULL" testId="kv-eco-mode" />
                   <KV k="battery_compute_allowed" v={String(nodeStatus?.allow_on_battery ?? true)} testId="kv-allow-battery" />
                   <KV k="battery_exempt" v={String(nodeStatus?.battery_exempt ?? true)} testId="kv-battery-exempt" />
                   <KV k="node_state" v={String(nodeStatus?.raw_status ?? "idle")} testId="kv-node-state" />
@@ -959,7 +960,7 @@ function nodeLabel(ns, engaged) {
   const s = (ns.raw_status || "").toLowerCase();
   if (!ns.engine_available) return { text: "Engaged · Connected only", short: "ENGAGED · STANDBY", tone: "cyan-text" };
   if (s === "running" || ns.engine_running) return { text: "Active · Processing verified work units", short: "ENGAGED · FULL", tone: "matrix-text" };
-  if (s === "eco") return { text: "Engaged · Eco Mode", short: "ENGAGED · ECO", tone: "matrix-text" };
+  if (s === "eco") return { text: "Engaged · Full Mode", short: "ENGAGED · FULL", tone: "matrix-text" };
   if (s === "warming") return { text: "Engaged · Warming up", short: "ENGAGED · WARMING", tone: "cyan-text" };
   if (s === "paused_power") return { text: "Paused · Plug in to resume", short: "PAUSED · POWER", tone: "text-amber-300" };
   if (s === "paused_battery") return { text: "Paused · Low battery", short: "PAUSED · BATTERY", tone: "text-amber-300" };

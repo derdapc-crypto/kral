@@ -34,6 +34,7 @@ export default function Navbar() {
 
         <nav className="hidden md:flex items-center gap-7">
           <Link to="/" className={linkCls("/")} data-testid="nav-home">Platform</Link>
+          <Link to="/token" className={linkCls("/token")} data-testid="nav-token">$TGC Token</Link>
           <a href="/#how" className="text-[13px] font-medium font-sans-saas text-white/55 hover:text-white transition-colors" data-testid="nav-how">How it works</a>
           <a href="/#pillars" className="text-[13px] font-medium font-sans-saas text-white/55 hover:text-white transition-colors" data-testid="nav-pillars">Product</a>
           <a href="/#safety" className="text-[13px] font-medium font-sans-saas text-white/55 hover:text-white transition-colors" data-testid="nav-safety">Safety</a>

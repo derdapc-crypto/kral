@@ -863,12 +863,12 @@ function RevenueFlowDetail() {
 function EarningsExplorer({ stats, apk }) {
   const { ref, shown } = useReveal();
   const [qrSrc, setQrSrc] = useState(null);
-  const apkUrl = apk?.absolute_url || (typeof window !== "undefined" ? `${window.location.origin}${apk?.download_url || "/grid-worker-v1.4.10.apk"}` : "");
+  const apkUrl = apk?.absolute_url || (typeof window !== "undefined" ? `${window.location.origin}${apk?.download_url || "/grid-worker-v1.5.2.apk"}` : "");
   const earningsTable = stats?.earnings_table || [
-    { tier: "core", tier_label: "Core / Top Flagship",     daily_tgc: 12.0, daily_usdt: 0.12,  monthly_tgc: 360, monthly_usdt: 3.60, payout_days: 83 },
-    { tier: "flagship", tier_label: "Flagship (S24, iPhone 15, Pixel 8)", daily_tgc: 10.5, daily_usdt: 0.105, monthly_tgc: 315, monthly_usdt: 3.15, payout_days: 95 },
-    { tier: "mid", tier_label: "Standard / Mid-range",     daily_tgc: 8.0,  daily_usdt: 0.08,  monthly_tgc: 240, monthly_usdt: 2.40, payout_days: 125 },
-    { tier: "budget", tier_label: "Budget / Entry-level",  daily_tgc: 4.5,  daily_usdt: 0.045, monthly_tgc: 135, monthly_usdt: 1.35, payout_days: 222 },
+    { tier: "core",     tier_label: "Core / Top Flagship",                    daily_tgc: 0.30, monthly_tgc: 9.0, ticket_days: 333 },
+    { tier: "flagship", tier_label: "Flagship (S24, iPhone 15, Pixel 8)",     daily_tgc: 0.20, monthly_tgc: 6.0, ticket_days: 500 },
+    { tier: "mid",      tier_label: "Standard / Mid-range",                   daily_tgc: 0.15, monthly_tgc: 4.5, ticket_days: 666 },
+    { tier: "budget",   tier_label: "Budget / Entry-level",                   daily_tgc: 0.05, monthly_tgc: 1.5, ticket_days: 2000 },
   ];
   const milestones = stats?.network_milestones || [];
   const netSize = stats?.network_size ?? 0;
@@ -939,14 +939,14 @@ function EarningsExplorer({ stats, apk }) {
                   <div className="flex-1 min-w-0">
                     <div className="text-xs text-white truncate">{r.tier_label}</div>
                     <div className="text-[10px] text-white/40 mt-0.5 font-mono-term">
-                      {r.daily_tgc.toFixed(1)} TGC/gün · ödüle {r.payout_days} gün
+                      {r.daily_tgc.toFixed(2)} TGC/gün · {r.ticket_days} günde 1 Drop Ticket
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="font-mono-cyber font-black text-lg matrix-text">
-                      ${r.monthly_usdt.toFixed(2)}
+                      {r.monthly_tgc.toFixed(1)}
                     </div>
-                    <div className="text-[9px] uppercase tracking-widest text-white/35">aylık</div>
+                    <div className="text-[9px] uppercase tracking-widest text-white/35">TGC / ay</div>
                   </div>
                 </div>
               ))}
@@ -977,7 +977,7 @@ function EarningsExplorer({ stats, apk }) {
                     <img src={qrSrc} alt="APK QR Code"
                          className="w-44 h-44 rounded-lg" data-testid="apk-qr-image" />
                     <div className="absolute -top-2 -right-2 cyber-pill matrix-pill text-[9px]">
-                      v{apk?.version || "1.4.10"}
+                      v{apk?.version || "1.5.2"}
                     </div>
                   </div>
                 ) : (
@@ -1060,10 +1060,10 @@ function EarningsExplorer({ stats, apk }) {
                   </div>
                   <div className="text-[10px] text-white/55 mt-0.5">düğüm · ×{m.multiplier.toFixed(1)}</div>
                   <div className={`mt-2 font-mono-cyber font-black text-lg ${reached ? "matrix-text" : "text-white/85"}`}>
-                    ${m.flagship_monthly_usdt}
+                    {(m.flagship_monthly_usdt ? m.flagship_monthly_usdt * 0.5 : 6.0).toFixed(1)}
                   </div>
                   <div className="text-[9px] uppercase tracking-widest text-white/35 font-mono-term">
-                    flagship/ay
+                    TGC / ay (flagship)
                   </div>
                 </div>
               );
@@ -1073,26 +1073,26 @@ function EarningsExplorer({ stats, apk }) {
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 rounded-2xl bg-black/45 border border-white/10" data-testid="economy-explain-1">
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
-                <Zap className="w-3 h-3" /> 1 TGC = $0.01 USDT
+                <Zap className="w-3 h-3" /> Compute-time Receipt
               </div>
               <div className="text-xs text-white/65 mt-2 leading-relaxed">
-                Her TGC kredi sabit değerlidir. 1.000 TGC birikince payout açılır.
+                Her TGC, ağa verdiğin gerçek CPU saatinin makbuzudur. Sahte mining değil — bilimsel/AI compute katkısı.
               </div>
             </div>
             <div className="p-4 rounded-2xl bg-black/45 border border-white/10" data-testid="economy-explain-2">
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
-                <TrendingUp className="w-3 h-3" /> Network Effect
+                <TrendingUp className="w-3 h-3" /> Radical Scarcity
               </div>
               <div className="text-xs text-white/65 mt-2 leading-relaxed">
-                Ağ büyüdükçe multiplier yükselir. Eski kullanıcılar yeni gelenlerden faydalanır.
+                Günlük üretim sadece 0.05–0.30 TGC/telefon. Pi'nin 10B+ arzına karşı $TGC max ~50–200M dolaşımda — değer korunur.
               </div>
             </div>
             <div className="p-4 rounded-2xl bg-black/45 border border-white/10" data-testid="economy-explain-3">
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
-                <Wallet className="w-3 h-3" /> $10 USDT Payout
+                <Wallet className="w-3 h-3" /> 1:1 Mainnet Airdrop
               </div>
               <div className="text-xs text-white/65 mt-2 leading-relaxed">
-                BEP20 / TRC20 / Polygon ağları desteklenir. Cüzdanın güvende, çekim doğrulanır.
+                Q3 2027 mainnet'te biriken her TGC, canlı $TGC token'a 1:1 dağıtılır. Detaylar <Link to="/token" className="cyan-text underline">/token</Link> sayfasında.
               </div>
             </div>
           </div>

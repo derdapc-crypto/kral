@@ -13,6 +13,7 @@ import Admin from "./pages/Admin";
 import CustomerPortal from "./pages/CustomerPortal";
 import Referrals from "./pages/Referrals";
 import Mobile from "./pages/Mobile";
+import Token from "./pages/Token";
 import { Toaster } from "./components/ui/sonner";
 
 function App() {
@@ -23,6 +24,8 @@ function App() {
           <Navbar />
           <Routes>
             <Route path="/" element={<Landing />} />
+            <Route path="/token" element={<Token />} />
+            <Route path="/launch" element={<Token />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
