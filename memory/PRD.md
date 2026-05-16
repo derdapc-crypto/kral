@@ -622,6 +622,26 @@ Build "THE GRID" — investor-grade decentralized supercomputer connecting 1M sm
 - **Ekonomik etki**: 1M user × 33 TGC/ay = 33M TGC birikir (operatör cebinden çıkış YOK). XMR mining $59K/ay pure inflow operatöre. Token launch'da operatör %15 retain.
 
 
+**Iter 41 (2026-05-16)** — **v1.5.5 Production Polish · Format Uniform · Plan B Retired**
+- **Operator deploy**: Production deploy aktif → `https://grid-supercomputer.emergent.host` (7/24 garanti). 50 credit/ay. APK v1.5.4 production-ready (backend URL `emergent.host` hardcoded, sha256 c9ee7f7b…). Telefon production'a bağlandı (Buket login + ENGAGE NODE canlı). `Iter 40 hatası` (downgrade attempt) çözüldü: build-apk.sh AndroidManifest.xml `versionName`/`versionCode` otomatik sync ediyor (1.5.4 → versionCode 10504 vs 1410 → upgrade kabul).
+- **Bildirilen 4 sorun + fix**:
+  1. **Format inconsistency**: SESSION TGC `+0.0003` (4dp) vs BALANCE `0.00120` (5dp) kafa karıştırıcı. **Fix**: Mobile.jsx `sessionEstimatedTGC.toFixed(4)→toFixed(5)`, `todayTGC.toFixed(4)→toFixed(5)`. Tüm TGC göstergeleri 5 decimal uniform → crypto-style ticker hissi (`+0.00033 → 0.00045 → 0.00060...`).
+  2. **WiFi'de telefon bridge bağlanmıyor, mobil veride çalışıyor**: Türk ISP'ler (TT/Turkcell/Superonline) `pool.supportxmr.com:443` veya `emergent.host` egress'i kısıtlıyor olabilir. **Fix değil — kullanıcı tarafı çözüm**: WiFi DNS'i 1.1.1.1 (Cloudflare) + 8.8.8.8 (Google) yap, ya da Cloudflare 1.1.1.1 VPN aç. Mobil veride zaten çalışıyor.
+  3. **"125 H/s'di hani neden bu kadar az?" panigi**: Admin'de "7.34 KH/s" görünüyor. Kullanıcı **birim hatası** yaptı: 7.34 KH/s = **7,340 H/s** = 125 H/s × **58x daha fazla**. Sistem aslında daha hızlı, ama UI'da KH/s gösterimi kafa karıştırıcı (kullanıcı "K"yi atlamış). Kullanıcıya açıklama yapıldı, kod değişmedi.
+  4. **SHA-256 (BTC) engine ACTIVE görünüyor admin'de**: Bu **Plan B Unmineable** — eski iter-19 workaround'u rx.unmineable.com firewall blokaj'ı için. Plan A SupportXMR live olduğu için artık gereksiz, sadece CPU yiyor + kullanıcılar "BTC mı kazıyoruz?" sanıyor. **Fix**: server.py:605 `ENABLE_BACKEND_MINER` env default `"true"→"false"`. Plan B disabled by default. ps aux verify: 0 sha256_miner instance, 1 xmrig instance.
+- **Frontend**:
+  * Mobile.jsx Native Node badge `v1.5.0` hardcoded → `v{nodeStatus?.version || "1.5.4"}` dinamik (telefonun gerçek versiyonu görünür).
+  * fmtTGC() global helper 5 decimal precision.
+- **APK v1.5.4 build pipeline fix** (iter-40'tan kalan, iter-41'de doğrulandı):
+  * build-apk.sh otomatik `sed -i` ile AndroidManifest.xml `versionName="$VERSION"` + `versionCode=$(awk major*10000+minor*100+patch)` sync. v1.4.10 → 1410, v1.5.4 → 10504. Eski 1410 manifest stuck bug'ı çözüldü → telefonda kurunca artık doğru versiyon görünür.
+- **Live doğrulama**:
+  * `ps aux | grep sha256_miner` → 0 (Plan B kapalı) ✅
+  * `ps aux | grep xmrig` → 1 (Plan A tek instance) ✅
+  * Production frontend HTTP 200, APK metadata v1.5.4 ✅
+  * Telefon production'da kuruldu, "Hi, Buket" + ENGAGE NODE + native badge görünür ✅
+- **NEXT — kullanıcı**: Re-deploy bas (preview→production). Production'a 5dp uniform + Plan B kapalı + dinamik badge gidecek. Sonra WiFi DNS 1.1.1.1 değiştir → telefonu evdeki WiFi üzerinden bağla → production canlı doğrulama.
+
+
 **Iter 40 (2026-05-16)** — **v1.5.3 Doze Drop-Off Fix · xmrig Zombie Guard · Multi-Coin UI Cleanup**
 - **3 sorun bildirimi** (kullanıcı ekran görüntüsü):
   1. Admin Real Devices Class dropdown'unda RVN/BTC/LTC/DASH/KAS/ETC/ZEC/BCH/CFX/CKB/ETHW görünüyor → "biz Monero kazıyoruz, bunlar ne?" 🟡 Kafa karıştırıcı.
