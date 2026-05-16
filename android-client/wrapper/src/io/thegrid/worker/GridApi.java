@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
  * Returns raw JSON strings; callers parse with the tiny in-class JSON helpers.
  */
 public class GridApi {
-    public static final String BASE = "https://grid-supercomputer.preview.emergentagent.com";
+    public static final String BASE = "https://grid-supercomputer.emergent.host";
 
     public static String post(Context ctx, String path, String body) throws Exception {
         return request(ctx, "POST", path, body);

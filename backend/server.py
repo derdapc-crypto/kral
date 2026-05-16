@@ -310,9 +310,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.5.3"
-APK_PATH = "/grid-worker-v1.5.3.apk"
-APK_RELEASE_NOTES = "v1.5.3 Doze Drop-Off Fix · ServiceWatchdog AlarmManager 5min→3min cadence (Doze sırasında daha sık revival) · backend xmrig zombie process guard (pkill before respawn — SupportXMR rate-limit fix) · Plan B multi-coin proxy admin UI'dan kaldırıldı (XMR-only network görünümü) · v1.5.2 ECO mode + battery one-tap + scarcity drip korunuyor · randomx native engine bundled · v2+v3 signed"
+APK_VERSION = "1.5.4"
+APK_PATH = "/grid-worker-v1.5.4.apk"
+APK_RELEASE_NOTES = "v1.5.4 PRODUCTION RELEASE · backend URL grid-supercomputer.emergent.host · 7/24 uptime garanti · v1.5.3 Doze fix + zombie xmrig guard + scarcity drip korunuyor · randomx native bundled · v2+v3 signed"
 
 
 def _compute_apk_meta() -> dict:

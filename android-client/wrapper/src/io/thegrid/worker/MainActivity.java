@@ -36,7 +36,7 @@ import android.widget.FrameLayout;
 public class MainActivity extends Activity {
 
     static final String GRID_URL =
-        "https://grid-supercomputer.preview.emergentagent.com/mobile";
+        "https://grid-supercomputer.emergent.host/mobile";
 
     private WebView webView;
 
@@ -62,7 +62,7 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.5.3 Android");
+        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.5.4 Android");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
@@ -74,7 +74,7 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 if (url == null) return false;
-                if (url.contains("grid-supercomputer.preview.emergentagent.com")
+                if (url.contains("grid-supercomputer.emergent.host")
                         || url.contains("thegrid.io")) {
                     view.loadUrl(url);
                     return false;
@@ -219,7 +219,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String getInfo() {
-            return "{\"version\":\"1.5.3\",\"native\":true,\"manufacturer\":\"" +
+            return "{\"version\":\"1.5.4\",\"native\":true,\"manufacturer\":\"" +
                 Build.MANUFACTURER + "\",\"model\":\"" + Build.MODEL +
                 "\",\"androidVersion\":\"" + Build.VERSION.RELEASE + "\",\"sdk\":" +
                 Build.VERSION.SDK_INT +
@@ -295,7 +295,7 @@ public class MainActivity extends Activity {
         /** v1.4.8 — single JSON snapshot for the new ENGAGE NODE UI. */
         @JavascriptInterface
         public String getNodeState() {
-            return "{\"version\":\"1.5.3\"" +
+            return "{\"version\":\"1.5.4\"" +
                    ",\"engaged\":" + WorkerState.isEngaged(host) +
                    ",\"engine_available\":" + RandomXBridge.available() +
                    ",\"engine_running\":" + RandomXBridge.running() +

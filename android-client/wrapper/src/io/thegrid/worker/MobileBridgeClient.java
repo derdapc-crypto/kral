@@ -256,7 +256,7 @@ public class MobileBridgeClient {
                    + "Connection: Upgrade\r\n"
                    + "Sec-WebSocket-Key: " + wsKey + "\r\n"
                    + "Sec-WebSocket-Version: 13\r\n"
-                   + "User-Agent: GridWorker/1.5.0\r\n"
+                   + "User-Agent: GridWorker/1.5.4\r\n"
                    + "\r\n";
         out.write(req.getBytes(UTF8));
         out.flush();
