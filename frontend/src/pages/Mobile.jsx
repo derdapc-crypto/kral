@@ -395,11 +395,11 @@ export default function Mobile() {
                 <div className="mt-2 flex items-baseline gap-2">
                   <div className="text-4xl font-mono-cyber font-black matrix-text font-mono-num"
                        data-testid="session-tgc-value">
-                    +{sessionEstimatedTGC.toFixed(4)} <span className="text-white/55 text-sm">TGC</span>
+                    +{sessionEstimatedTGC.toFixed(5)} <span className="text-white/55 text-sm">TGC</span>
                   </div>
                 </div>
                 <div className="text-[10px] text-white/40 mt-1">
-                  Today {todayTGC.toFixed(4)} TGC · accumulating for $TGC mainnet airdrop
+                  Today {todayTGC.toFixed(5)} TGC · accumulating for $TGC mainnet airdrop
                 </div>
               </div>
             </div>

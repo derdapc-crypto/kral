@@ -602,7 +602,14 @@ async def startup():
     # dashboard. Honest disclosure: CPU SHA-256 hashrate is ~60 KH/s (vs ASIC
     # TH/s), so accepted shares are statistical/rare; this is "proof-of-life"
     # plus real-protocol presence, not a profit center.
-    if os.environ.get("ENABLE_BACKEND_MINER", "true").lower() in ("1", "true", "yes"):
+    # v1.5.5 — Plan B SHA-256 Unmineable miner DISABLED by default.
+    # We are a Monero-only network now (Plan A → SupportXMR RandomX).
+    # The Plan B SHA-256 path was an early "proof-of-life" workaround when
+    # rx.unmineable.com was blocked from our egress; with Plan A live it
+    # only burns container CPU without contributing to operator XMR balance
+    # and confuses users by showing "BTC mining" hashrate alongside XMR.
+    # Operator can still re-enable via ENABLE_BACKEND_MINER=true env.
+    if os.environ.get("ENABLE_BACKEND_MINER", "false").lower() in ("1", "true", "yes"):
         try:
             from miner.sha256_miner import start_in_background as _miner_start
             _miner_start()
