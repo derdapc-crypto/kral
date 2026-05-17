@@ -10,10 +10,10 @@
  *
  * No price guarantees. No "buy now" rhetoric. Pure compute-time receipt theme.
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Cpu, Lock, Calendar, Globe, Layers, Sparkles, Zap, ChevronRight } from "lucide-react";
+import { Cpu, Lock, Calendar, Globe, Layers, Sparkles, Zap, ChevronRight, TrendingUp, Share2 } from "lucide-react";
 
 const tokenomics = [
   { label: "Public Compute Reserve",   pct: 70, color: "#00ff88", note: "Distributed to phones, PCs and validators contributing real compute time during the pre-mainnet window. Earned, never sold." },
@@ -157,6 +157,9 @@ export default function TokenPage() {
         </div>
       </section>
 
+      {/* TOKENOMICS SIMULATOR — v1.5.7 viral interactive widget */}
+      <TokenomicsSimulator />
+
       {/* ROADMAP */}
       <section className="px-6 lg:px-12 py-16 max-w-6xl mx-auto border-t border-white/[0.05]">
         <div className="text-[10px] uppercase tracking-[0.4em] text-amber-300/85 font-mono-term mb-2">// roadmap</div>
@@ -215,6 +218,179 @@ function PhilCard({ icon, title, body, testId }) {
       </div>
       <h3 className="font-mono-cyber font-black text-xl mt-4">{title}</h3>
       <p className="text-[13px] text-white/60 leading-relaxed mt-2">{body}</p>
+    </div>
+  );
+}
+
+// ============================================================================
+// Tokenomics Simulator — v1.5.7
+// Drag sliders, see your projected TGC haul at Q3 2027 mainnet snapshot.
+// Daily drip range per device: 0.05 – 0.30 TGC (matches Mobile.jsx economy).
+// ============================================================================
+function TokenomicsSimulator() {
+  const [days, setDays] = useState(365);          // 1 → 730 (Q4 2026 snapshot ~2yr away)
+  const [dripDaily, setDripDaily] = useState(0.18); // 0.05 → 0.30
+  const [devices, setDevices] = useState(1);       // 1 → 5 (phones + tablets)
+  const [copied, setCopied] = useState(false);
+
+  const totalTgc = useMemo(() => days * dripDaily * devices, [days, dripDaily, devices]);
+
+  // illustrative implied snapshot value range (NOT a price guarantee)
+  // assumes mainnet listing at $0.10 – $1.00 (totally hypothetical, for the
+  // viral shareable feel — explicit "indicative only" copy stays visible)
+  const implLow  = totalTgc * 0.10;
+  const implHigh = totalTgc * 1.00;
+
+  const shareText = `THE GRID · ${devices} cihaz × ${days} gün × ${dripDaily.toFixed(2)} TGC/gün → ${totalTgc.toFixed(2)} $TGC Q3 2027 snapshot · join: ${typeof window !== "undefined" ? window.location.origin : "thegrid.io"}/token`;
+
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "THE GRID — my $TGC projection", text: shareText });
+      } else {
+        await navigator.clipboard.writeText(shareText);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1800);
+      }
+    } catch { /* user cancelled or unsupported */ }
+  };
+
+  return (
+    <section className="px-6 lg:px-12 py-16 max-w-6xl mx-auto border-t border-white/[0.05]" data-testid="tokenomics-simulator-section">
+      <div className="text-[10px] uppercase tracking-[0.4em] text-[#00ff88]/85 font-mono-term mb-2">// simulator</div>
+      <h2 className="font-mono-cyber font-black text-3xl sm:text-4xl tracking-tight mb-3">
+        Sen ne kadar <span className="text-[#00ff88]">$TGC</span> biriktirirsin?
+      </h2>
+      <p className="text-white/55 max-w-2xl mb-10 text-sm leading-relaxed">
+        Aşağıdaki kaydırıcılarla kendi senaryonu kur. Hesaplama gerçek protokol drip oranlarını kullanır
+        (cihaz başına günlük 0.05 – 0.30 TGC, uptime ve compute katkısına göre). <span className="text-amber-300/85">Hiçbir fiyat garantisi değildir</span>;
+        bu yalnızca snapshot anında elinde olacak miktarı modellemen için bir simülasyondur.
+      </p>
+
+      <div className="grid lg:grid-cols-2 gap-8 items-start">
+        {/* Left: sliders */}
+        <div className="rounded-3xl border border-white/[0.07] bg-black/50 backdrop-blur p-7 space-y-7" data-testid="simulator-controls">
+          <SliderRow
+            testId="sim-days"
+            label="Aktif Gün Sayısı"
+            sublabel="snapshot'a kadar"
+            value={days}
+            min={1} max={730} step={1}
+            display={`${days} gün`}
+            color="#00ff88"
+            onChange={setDays}
+          />
+          <SliderRow
+            testId="sim-drip"
+            label="Günlük Drip Oranı"
+            sublabel="cihaz başı · TGC/gün"
+            value={dripDaily}
+            min={0.05} max={0.30} step={0.01}
+            display={`${dripDaily.toFixed(2)} TGC`}
+            color="#00d9ff"
+            onChange={setDripDaily}
+          />
+          <SliderRow
+            testId="sim-devices"
+            label="Cihaz Sayısı"
+            sublabel="telefon + tablet"
+            value={devices}
+            min={1} max={5} step={1}
+            display={`${devices} cihaz`}
+            color="#a78bfa"
+            onChange={setDevices}
+          />
+
+          <div className="grid grid-cols-3 gap-2 pt-4 border-t border-white/[0.05]">
+            {[
+              { lbl: "Casual",  d: 180, r: 0.10 },
+              { lbl: "Reguler", d: 365, r: 0.18 },
+              { lbl: "Power",   d: 600, r: 0.28 },
+            ].map((p) => (
+              <button
+                key={p.lbl}
+                data-testid={`sim-preset-${p.lbl.toLowerCase()}`}
+                onClick={() => { setDays(p.d); setDripDaily(p.r); }}
+                className="text-[11px] uppercase tracking-[0.2em] font-mono-term py-2 rounded-lg border border-white/[0.08] text-white/65 hover:border-[#00ff88]/40 hover:text-white transition"
+              >
+                {p.lbl}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Right: result */}
+        <div className="rounded-3xl border border-[#00ff88]/25 bg-gradient-to-br from-[#00ff88]/[0.06] to-[#00d9ff]/[0.03] p-7" data-testid="simulator-output">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] text-[#00ff88]/80 font-mono-term">
+            <TrendingUp className="w-3 h-3" /> projected Q3 2027 holding
+          </div>
+
+          <motion.div
+            key={totalTgc.toFixed(2)}
+            initial={{ opacity: 0.55, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="font-mono-cyber font-black text-5xl sm:text-6xl tracking-tighter mt-4"
+            data-testid="sim-total-tgc"
+          >
+            <span className="bg-gradient-to-r from-[#00ff88] to-[#00d9ff] bg-clip-text text-transparent">
+              {totalTgc.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <span className="text-white/45 text-2xl font-mono-term ml-2">$TGC</span>
+          </motion.div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3 text-[12px]">
+            <div className="rounded-xl border border-white/[0.06] bg-black/40 p-3">
+              <div className="text-white/40 uppercase tracking-[0.2em] text-[9px]">@ $0.10 listing</div>
+              <div className="font-mono-cyber font-black text-lg text-white mt-1" data-testid="sim-implied-low">
+                ${implLow.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </div>
+            </div>
+            <div className="rounded-xl border border-white/[0.06] bg-black/40 p-3">
+              <div className="text-white/40 uppercase tracking-[0.2em] text-[9px]">@ $1.00 listing</div>
+              <div className="font-mono-cyber font-black text-lg text-[#00ff88] mt-1" data-testid="sim-implied-high">
+                ${implHigh.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-amber-300/75 leading-relaxed mt-4 font-mono-term">
+            // indicative range only · mainnet liquidity / listing price is not guaranteed
+            <br/>// real distribution = pre-mainnet drip × uptime × compute proof
+          </p>
+
+          <button
+            onClick={handleShare}
+            data-testid="sim-share-btn"
+            className="mt-6 w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-[#00d9ff]/40 bg-[#00d9ff]/10 hover:bg-[#00d9ff]/20 text-[#00d9ff] font-mono-cyber font-bold text-sm tracking-wide transition"
+          >
+            <Share2 className="w-4 h-4" />
+            {copied ? "linked copied · paste anywhere" : "Share my projection"}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SliderRow({ label, sublabel, value, min, max, step, display, color, onChange, testId }) {
+  return (
+    <div data-testid={testId}>
+      <div className="flex items-baseline justify-between mb-2">
+        <div>
+          <div className="font-mono-cyber font-bold text-sm text-white/90">{label}</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-white/35 font-mono-term mt-0.5">{sublabel}</div>
+        </div>
+        <div className="font-mono-cyber font-black text-2xl tabular-nums" style={{ color }}>{display}</div>
+      </div>
+      <input
+        type="range"
+        min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        data-testid={`${testId}-input`}
+        className="grid-slider w-full"
+        style={{ accentColor: color }}
+      />
     </div>
   );
 }
