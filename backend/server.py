@@ -310,9 +310,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.5.5"
-APK_PATH = "/grid-worker-v1.5.5.apk"
-APK_RELEASE_NOTES = "v1.5.5 SNAPDRAGON 8 GEN 3 MAX · telefon RandomX 1→4-8 thread (cores-2, capped at 8) · backend xmrig 1→4 thread (~125 H/s → ~500 H/s) · ENGAGE her basışta battery exemption auto-trigger (cooldown yok) · 5dp uniform precision · Plan B SHA-256 retired · v2+v3 signed"
+APK_VERSION = "1.5.6"
+APK_PATH = "/grid-worker-v1.5.6.apk"
+APK_RELEASE_NOTES = "v1.5.6 ISP WI-FI FIX · agresif NetworkCallback Wi-Fi/Hücresel anlık geçiş · WebView offline fallback · bridge auto-reconnect ağ değişiminde · Snapdragon 8 Gen 3 cores-2 cap=8 · backend xmrig 4 thread · v2+v3 signed"
 
 
 def _compute_apk_meta() -> dict:
