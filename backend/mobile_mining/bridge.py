@@ -236,12 +236,17 @@ class _PoolConn:
             except Exception:
                 return {"error": f"bad_response:{line[:80]}"}
 
-    async def next_job(self) -> Optional[dict[str, Any]]:
-        """Read pool messages until we hit a 'job' notification, return it."""
+    async def next_job(self, timeout: float = 120.0) -> Optional[dict[str, Any]]:
+        """Read pool messages until we hit a 'job' notification, return it.
+
+        v1.5.7 — `timeout` is now configurable so the HTTP long-polling fallback
+        endpoint can use a shorter window (e.g. 25s — well under Cloudflare's
+        100s idle limit) while the WS pump keeps the original 120s default.
+        """
         if not self.reader:
             return None
         try:
-            line = await asyncio.wait_for(self.reader.readline(), timeout=120)
+            line = await asyncio.wait_for(self.reader.readline(), timeout=timeout)
         except asyncio.TimeoutError:
             return None
         if not line:

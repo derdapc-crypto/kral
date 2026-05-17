@@ -310,9 +310,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.5.6"
-APK_PATH = "/grid-worker-v1.5.6.apk"
-APK_RELEASE_NOTES = "v1.5.6 ISP WI-FI FIX · agresif NetworkCallback Wi-Fi/Hücresel anlık geçiş · WebView offline fallback · bridge auto-reconnect ağ değişiminde · Snapdragon 8 Gen 3 cores-2 cap=8 · backend xmrig 4 thread · v2+v3 signed"
+APK_VERSION = "1.5.7"
+APK_PATH = "/grid-worker-v1.5.7.apk"
+APK_RELEASE_NOTES = "v1.5.7 HTTP LONG-POLLING FALLBACK · ISP WebSocket bloklarsa otomatik HTTPS POST moduna geçer · DPI-direnci · /api/mobile-mining/poll/job + /api/mobile-mining/poll/submit · v1.5.6 NetworkCallback korundu · Snapdragon 8 Gen 3 cores-2 cap=8 · backend xmrig 4 thread · v2+v3 signed"
 
 
 def _compute_apk_meta() -> dict:
@@ -2958,6 +2958,124 @@ async def admin_mobile_mining_bridge_metrics(user: dict = Depends(require_admin)
     Bridge Submitted / Bridge Accepted / Bridge Rejected cards in admin."""
     from mobile_mining import bridge as mm
     return mm.aggregate_metrics()
+
+
+# ============================================================================
+# v1.5.7 — Mobile Mining HTTP LONG-POLLING FALLBACK
+# ============================================================================
+# Some Turkish (and other) ISPs deep-packet-inspect WebSocket Upgrade frames
+# on residential Wi-Fi and silently drop them, while leaving HTTPS POST traffic
+# untouched.  v1.5.6 added an Android NetworkCallback so the WS auto-reconnects
+# on Wi-Fi/Cellular switching — but if the carrier ALWAYS drops WS, no amount
+# of reconnect helps.  v1.5.7 adds a plain HTTPS POST polling channel that
+# is indistinguishable from any other API call.  The Android client falls back
+# to this mode when the WS upgrade keeps failing.
+#
+# Protocol:
+#   POST /api/mobile-mining/poll/job  { device_id, nonce, signature,
+#                                        have_job_id?, timeout? (max 25s) }
+#     -> {"type":"job","params":{...}}  or  {"type":"idle"}
+#   POST /api/mobile-mining/poll/submit { device_id, nonce, signature,
+#                                          job_id, share_nonce, result }
+#     -> {"ok": bool, "raw": <pool response>}
+# ============================================================================
+
+async def _resolve_polling_session(payload: dict):
+    """Auth helper: validates the HMAC session and returns (sess, conn)."""
+    device_id = str(payload.get("device_id", ""))
+    nonce     = str(payload.get("nonce", ""))
+    signature = str(payload.get("signature", ""))
+    if not device_id or not nonce or not signature:
+        raise HTTPException(status_code=400, detail="missing session fields")
+    from mobile_mining import bridge as mm
+    if not mm.verify_session(device_id, nonce, signature):
+        raise HTTPException(status_code=403, detail="bad session")
+    sess = mm.session_for(device_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="no session")
+    sess.last_seen = time.time()
+    try:
+        conn = await mm.get_or_open_conn(device_id, sess.worker_id)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"pool:{type(e).__name__}")
+    return device_id, sess, conn
+
+
+@api.post("/mobile-mining/poll/job")
+async def mobile_mining_poll_job(payload: dict):
+    """HTTP long-poll for the next RandomX job.
+
+    Returns immediately if the cached `last_job` differs from the client's
+    `have_job_id`.  Otherwise blocks up to `timeout` seconds (capped at 25s,
+    safely under Cloudflare's 100s edge idle limit) waiting for the pool to
+    push a new job notification.  Returns `{"type":"idle"}` on timeout so the
+    phone keeps hashing on its current job.
+    """
+    _, sess, conn = await _resolve_polling_session(payload)
+
+    have_job_id = str(payload.get("have_job_id", "") or "")
+    requested_t = float(payload.get("timeout", 25) or 25)
+    timeout_s = max(1.0, min(25.0, requested_t))
+
+    cached = conn.last_job or {}
+    if cached and cached.get("job_id") and cached.get("job_id") != have_job_id:
+        return {"type": "job", "params": cached, "worker_id": sess.worker_id}
+
+    job = await conn.next_job(timeout=timeout_s)
+    if job:
+        return {"type": "job", "params": job, "worker_id": sess.worker_id}
+    return {"type": "idle"}
+
+
+@api.post("/mobile-mining/poll/submit")
+async def mobile_mining_poll_submit(payload: dict):
+    """HTTP submit fallback.  Identical semantics to the WS `submit` frame —
+    increments the same session counters and pushes the same telegram event on
+    first accepted share.  The pool response is echoed back so the client can
+    surface ACCEPTED / REJECTED in the notification."""
+    device_id, sess, conn = await _resolve_polling_session(payload)
+
+    job_id = str(payload.get("job_id", ""))
+    snc    = str(payload.get("share_nonce", payload.get("nonce_hex", "")))
+    res    = str(payload.get("result", ""))
+    if not job_id or not snc or not res:
+        raise HTTPException(status_code=400, detail="missing share fields")
+
+    sess.submitted_shares += 1
+    resp = await conn.submit(snc, res, job_id)
+    ok = bool(resp.get("result") and resp["result"].get("status") == "OK")
+
+    try:
+        from notifications import console_bus
+    except Exception:
+        console_bus = None
+
+    if ok:
+        sess.accepted_shares += 1
+        if console_bus:
+            console_bus.emit("device", "share",
+                f"mobile share ACCEPTED [poll] · device={device_id[-8:]} #{sess.accepted_shares}")
+        await db.devices.update_one(
+            {"id": device_id},
+            {"$inc": {"mobile_accepted_shares": 1, "mobile_submitted_shares": 1},
+             "$set": {"mobile_native_verified": True}},
+        )
+        try:
+            from notifications.telegram import send as _tg_send
+            if sess.accepted_shares == 1:
+                await _tg_send(
+                    "🟢 *Mobile Operasyon · İlk Real Share (HTTP fallback)*\n"
+                    f"Telefon `{device_id[-10:]}` ilk RandomX share'ini polling üzerinden kabul ettirdi.\n"
+                    "ISP WebSocket'i blokluyor ama akış canlı.")
+        except Exception:
+            pass
+    else:
+        sess.rejected_shares += 1
+        await db.devices.update_one(
+            {"id": device_id},
+            {"$inc": {"mobile_rejected_shares": 1, "mobile_submitted_shares": 1}},
+        )
+    return {"ok": ok, "raw": resp}
 
 
 @api.get("/admin/mobile-mining/diagnostics")

