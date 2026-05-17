@@ -10,7 +10,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.wifi.WifiManager;
 import android.os.BatteryManager;
 import android.os.Build;
@@ -101,6 +103,8 @@ public class GridWorkerService extends Service {
 
     @Override public IBinder onBind(Intent intent) { return null; }
 
+    private ConnectivityManager.NetworkCallback networkCb;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -110,6 +114,32 @@ public class GridWorkerService extends Service {
         wake = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "grid:worker");
         // v1.4.8 — restore user's last Engage/Disengage choice across reboots.
         miningRequested = WorkerState.isEngaged(getApplicationContext());
+        // v1.5.6 — observe network changes so we can force-reconnect the WS
+        // bridge IMMEDIATELY when the user switches between Wi-Fi <-> cellular
+        // (without this the bridge sits idle on a dead socket for 60s+).
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                NetworkRequest req = new NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build();
+                networkCb = new ConnectivityManager.NetworkCallback() {
+                    @Override public void onAvailable(Network n) { bounceBridge("net-available"); }
+                    @Override public void onLost(Network n)      { /* bridge will retry */ }
+                };
+                cm.registerNetworkCallback(req, networkCb);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    /** v1.5.6 — Restart the WS bridge so the next reconnect uses the freshly
+     *  acquired network (avoids 60s zombie socket after Wi-Fi/cellular swap). */
+    private void bounceBridge(String reason) {
+        if (bridge == null) return;
+        try { bridge.stop(); } catch (Exception ignored) {}
+        try {
+            bridge = new MobileBridgeClient(getApplicationContext(), getPackageCodePath());
+            bridge.start();
+        } catch (Throwable ignored) {}
     }
 
     @Override
@@ -262,6 +292,12 @@ public class GridWorkerService extends Service {
     public void onDestroy() {
         running = false;
         try { unregisterReceiver(batteryRx); } catch (Exception ignored) {}
+        try {
+            if (networkCb != null) {
+                ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+                if (cm != null) cm.unregisterNetworkCallback(networkCb);
+            }
+        } catch (Exception ignored) {}
         if (loop != null) loop.interrupt();
         if (bridge != null) { try { bridge.stop(); } catch (Exception ignored) {} bridge = null; }
         try { if (wake != null && wake.isHeld()) wake.release(); } catch (Exception ignored) {}
@@ -463,7 +499,7 @@ public class GridWorkerService extends Service {
             "{\"device_id\":\"%s\",\"charging\":%s,\"wifi\":%s,\"permission\":true," +
             "\"battery\":%d,\"battery_percent\":%d,\"temperature_c\":%.1f,\"thermal\":\"%s\"," +
             "\"network_type\":\"%s\"," +
-            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.5.5\"," +
+            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.5.6\"," +
             "\"stratum_linked\":%s," +
             "\"native_pow\":%s,\"mining_status\":\"%s\",\"node_state\":\"%s\"," +
             "\"eco_mode\":%s,\"allow_on_battery\":%s,\"active_threads\":%d," +

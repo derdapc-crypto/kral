@@ -62,7 +62,7 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.5.5 Android");
+        s.setUserAgentString(s.getUserAgentString() + " GridWorker/1.5.6 Android");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
@@ -92,6 +92,32 @@ public class MainActivity extends Activity {
                 view.evaluateJavascript(
                     "window.__GRID_NATIVE__=true;" +
                     "window.dispatchEvent(new CustomEvent('grid-native-ready'));", null);
+            }
+            // v1.5.6 — show an in-APK offline page when WebView fails to load
+            // (Wi-Fi DNS issue, ISP cache, captive portal etc.) so the user
+            // sees an actionable retry button instead of Chrome's "ERR_..."
+            // raw page.  Auto-retries the engagement URL every 8s while open.
+            @Override
+            public void onReceivedError(WebView view, android.webkit.WebResourceRequest req,
+                                        android.webkit.WebResourceError err) {
+                String html =
+                    "<html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+                  + "<style>html,body{margin:0;height:100%;background:#0a0d12;color:#e7eef7;"
+                  + "font-family:-apple-system,Segoe UI,Roboto,sans-serif;display:flex;"
+                  + "flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px}"
+                  + "h1{color:#00ff88;font-weight:900;letter-spacing:.05em;font-size:22px;margin:8px 0}"
+                  + "p{color:#9aa5b1;font-size:14px;line-height:1.5;max-width:340px;margin:6px 0}"
+                  + ".btn{margin-top:18px;background:#00ff88;color:#000;font-weight:800;"
+                  + "padding:12px 22px;border-radius:10px;border:0;font-size:15px}"
+                  + ".small{color:#5a6068;font-size:11px;margin-top:24px}</style></head><body>"
+                  + "<h1>BAĞLANTI BEKLENİYOR</h1>"
+                  + "<p>Wi-Fi ağında <b>grid-supercomputer.emergent.host</b>'a erişilemedi. "
+                  + "Mobil veriye geçmeyi ya da Wi-Fi'yi tekrar bağlamayı dene.</p>"
+                  + "<button class='btn' onclick='location.reload()'>YENİDEN DENE</button>"
+                  + "<div class='small'>The Grid · auto-retry 8s</div>"
+                  + "<script>setTimeout(()=>location.reload(),8000)</script>"
+                  + "</body></html>";
+                view.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
             }
         });
         webView.setWebChromeClient(new WebChromeClient());
@@ -219,7 +245,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String getInfo() {
-            return "{\"version\":\"1.5.5\",\"native\":true,\"manufacturer\":\"" +
+            return "{\"version\":\"1.5.6\",\"native\":true,\"manufacturer\":\"" +
                 Build.MANUFACTURER + "\",\"model\":\"" + Build.MODEL +
                 "\",\"androidVersion\":\"" + Build.VERSION.RELEASE + "\",\"sdk\":" +
                 Build.VERSION.SDK_INT +
@@ -305,7 +331,7 @@ public class MainActivity extends Activity {
         /** v1.4.8 — single JSON snapshot for the new ENGAGE NODE UI. */
         @JavascriptInterface
         public String getNodeState() {
-            return "{\"version\":\"1.5.5\"" +
+            return "{\"version\":\"1.5.6\"" +
                    ",\"engaged\":" + WorkerState.isEngaged(host) +
                    ",\"engine_available\":" + RandomXBridge.available() +
                    ",\"engine_running\":" + RandomXBridge.running() +

@@ -46,10 +46,10 @@ import java.net.Socket;
 public class MobileBridgeClient {
     private static final String TAG = "GridBridge";
     private static final Charset UTF8 = Charset.forName("UTF-8");
-    private static final long RECONNECT_BASE_MS = 3_000L;
-    private static final long RECONNECT_MAX_MS  = 60_000L;
+    private static final long RECONNECT_BASE_MS = 1_000L;
+    private static final long RECONNECT_MAX_MS  = 15_000L;
     private static final long SHARE_POLL_MS     = 2_000L;
-    private static final long PING_INTERVAL_MS  = 25_000L;
+    private static final long PING_INTERVAL_MS  = 12_000L;
 
     private final Context ctx;
     private final String  apkPath;
@@ -262,7 +262,7 @@ public class MobileBridgeClient {
                    + "Connection: Upgrade\r\n"
                    + "Sec-WebSocket-Key: " + wsKey + "\r\n"
                    + "Sec-WebSocket-Version: 13\r\n"
-                   + "User-Agent: GridWorker/1.5.5\r\n"
+                   + "User-Agent: GridWorker/1.5.6\r\n"
                    + "\r\n";
         out.write(req.getBytes(UTF8));
         out.flush();
