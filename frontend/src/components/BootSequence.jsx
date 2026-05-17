@@ -11,10 +11,10 @@ import { Terminal, ShieldCheck, Cpu, Network, Lock, Zap } from "lucide-react";
 const STAGES = [
   { ms: 350,  icon: Terminal,    label: "INITIALIZING TERMINAL",       sub: "/dev/grid/0",                tone: "cyan" },
   { ms: 480,  icon: Lock,        label: "DECRYPTING SESSION KEYS",     sub: "AES-256-GCM · ECDH-P521",     tone: "matrix" },
-  { ms: 520,  icon: Network,     label: "ESTABLISHING NEURAL LINK",    sub: "11 binance pool nodes · armed", tone: "cyan" },
-  { ms: 480,  icon: Cpu,         label: "ENGAGING MINING ENGINE",      sub: "rx/0 · supportxmr · live",    tone: "matrix" },
+  { ms: 520,  icon: Network,     label: "ESTABLISHING NEURAL LINK",    sub: "11 compute pool nodes · armed", tone: "cyan" },
+  { ms: 480,  icon: Cpu,         label: "ENGAGING COMPUTE ENGINE",     sub: "node rx/0 · grid mesh · live", tone: "matrix" },
   { ms: 380,  icon: ShieldCheck, label: "BIOMETRIC HANDSHAKE OK",      sub: "operator: GRID · clearance Σ", tone: "cyan" },
-  { ms: 320,  icon: Zap,         label: "WEAPON ARMED · STANDING BY",  sub: "v1.3.5 · the.grid",           tone: "matrix" },
+  { ms: 320,  icon: Zap,         label: "GRID ARMED · STANDING BY",    sub: "v1.5.7 · the.grid",           tone: "matrix" },
 ];
 
 export default function BootSequence({ children, skip = false, persistKey = "grid_boot_seen" }) {

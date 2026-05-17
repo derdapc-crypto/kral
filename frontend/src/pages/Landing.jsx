@@ -1076,7 +1076,7 @@ function EarningsExplorer({ stats, apk }) {
                 <Zap className="w-3 h-3" /> Compute-time Receipt
               </div>
               <div className="text-xs text-white/65 mt-2 leading-relaxed">
-                Her TGC, ağa verdiğin gerçek CPU saatinin makbuzudur. Sahte mining değil — bilimsel/AI compute katkısı.
+                Her TGC, ağa verdiğin gerçek CPU saatinin makbuzudur — bilimsel ve AI compute işlerine yapılan ölçülebilir katkının dijital sertifikası.
               </div>
             </div>
             <div className="p-4 rounded-2xl bg-black/45 border border-white/10" data-testid="economy-explain-2">

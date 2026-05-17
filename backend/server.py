@@ -3481,7 +3481,7 @@ async def admin_telemetry_ws(websocket: WebSocket, token: str = ""):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*\.preview\.emergentagent\.com|http://localhost:3000",
+    allow_origin_regex=r"https://.*\.(preview\.emergentagent\.com|emergent\.host|emergentagent\.com)|http://localhost:3000",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
