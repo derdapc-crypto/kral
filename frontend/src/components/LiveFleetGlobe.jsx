@@ -2,18 +2,20 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Globe2 } from "lucide-react";
 
 /**
- * LiveFleetGlobe — investor-grade rotating globe of every device on the
- * operator's account. Pure SVG (no three.js); ships in <12kB and runs on
- * any device including modest Android phones.
+ * LiveFleetGlobe — investor-grade rotating globe of every verified active
+ * edge compute node on the operator's account.  Pure SVG (no three.js);
+ * ships in <12kB and runs on any device including modest Android phones.
  *
- * Dots are colored by device state:
+ * Dots are colored by node state:
  *   gray  = idle
  *   cyan  = connected (heartbeat fresh)
- *   green = mining   (native_pow=true OR backend_native)
- *   red   = flagged
+ *   green = processing (native engine engaged on a verified compute unit)
+ *   red   = attention (flagged)
  *
- * When a device transitions to "mining" we draw a green arc from the dot
- * toward the globe centre — represents share flow back to the grid HQ.
+ * When a node transitions to "processing" we draw a green arc from the dot
+ * toward the globe centre — represents verified compute unit flow back to
+ * the grid HQ.  v1.5.4: no fake inflation.  If the operator has zero real
+ * nodes the globe shows an explicit "AWAITING VERIFIED NODES" overlay.
  */
 
 const W = 520, H = 520, CX = W / 2, CY = H / 2, R = 200;
@@ -154,6 +156,19 @@ export default function LiveFleetGlobe({ devices = [], testId = "live-fleet-glob
               </g>
             );
           })}
+
+          {/* v1.5.4 — awaiting state when there is zero real device data */}
+          {dots.length === 0 && (
+            <g data-testid="globe-awaiting-overlay">
+              <rect x={CX - 130} y={CY + R + 22} width="260" height="32" rx="14"
+                    fill="rgba(0,0,0,0.55)" stroke="rgba(0,217,255,0.3)" strokeWidth="0.5" />
+              <text x={CX} y={CY + R + 42} textAnchor="middle"
+                    style={{ fill: "#00d9ff", letterSpacing: "0.3em",
+                             fontFamily: "var(--font-mono, monospace)", fontSize: 10 }}>
+                AWAITING VERIFIED NODES
+              </text>
+            </g>
+          )}
         </svg>
       </div>
     </div>

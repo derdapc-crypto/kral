@@ -7,7 +7,7 @@ import { Upload, Plus, Briefcase, FileText, Cpu, X, CheckCircle2, Clock, XCircle
 const WORKLOADS = [
   { id: "federated_learning", label: "Federated Learning" },
   { id: "matrix_compute", label: "Matrix Compute" },
-  { id: "hash_compute", label: "Hash / PoW" },
+  { id: "verified_compute", label: "Verified Compute Throughput" },
   { id: "mixed", label: "Mixed Workload" },
 ];
 
@@ -117,7 +117,8 @@ export default function CustomerPortal() {
               Customer <span className="gold-text">Portal</span>
             </h1>
             <p className="text-white/60 mt-3 max-w-xl text-sm">
-              Upload AI workloads. Set a budget. Watch the global grid solve them in real time at 80% the cost of AWS.
+              Upload AI workloads. Allocate a Compute Credit Budget. Watch the
+              distributed Edge Compute Node fleet resolve them in real time at 80% the cost of AWS.
             </p>
           </div>
           <button onClick={() => setOpen(true)} data-testid="customer-new-job-btn"
@@ -150,14 +151,14 @@ export default function CustomerPortal() {
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stats — v1.5.4 strict B2B SaaS vocabulary */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
           {[
-            { label: "Total Jobs", value: jobs.length },
-            { label: "Running", value: jobs.filter(j => j.status === "running").length },
-            { label: "Completed", value: jobs.filter(j => j.status === "completed").length },
+            { label: "Workload Queue", value: jobs.length },
+            { label: "Active Workloads", value: jobs.filter(j => j.status === "running").length },
+            { label: "Completed Dataset Batches", value: jobs.filter(j => j.status === "completed").length },
             {
-              label: "Spend USDT",
+              label: "Compute Credits Used",
               value: jobs.reduce((s, j) => s + (j.spent_usdt || 0), 0).toFixed(4),
             },
           ].map((s) => (
@@ -198,15 +199,15 @@ export default function CustomerPortal() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Budget</div>
-                      <div className="font-mono-num text-[#F2C94C] text-xl">{j.budget_usdt.toFixed(2)} USDT</div>
-                      <div className="text-[10px] text-white/40 mt-0.5">spent {j.spent_usdt?.toFixed(4) || "0.0000"}</div>
+                      <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Compute Credit Budget</div>
+                      <div className="font-mono-num text-[#F2C94C] text-xl">{j.budget_usdt.toFixed(2)} CC</div>
+                      <div className="text-[10px] text-white/40 mt-0.5">used {j.spent_usdt?.toFixed(4) || "0.0000"} CC</div>
                     </div>
                   </div>
 
                   <div className="mt-5">
                     <div className="flex justify-between text-[10px] uppercase tracking-[0.25em] text-white/40 mb-2">
-                      <span>Progress</span>
+                      <span>Verified Output Progress</span>
                       <span className="text-[#F2C94C] font-mono-num">{j.processed_units}/{j.total_units} ({pct}%)</span>
                     </div>
                     <div className="h-2 bg-white/5 rounded-full overflow-hidden">
@@ -214,9 +215,9 @@ export default function CustomerPortal() {
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-3 text-xs">
-                    <div className="text-white/50">Max Nodes <span className="text-white">{j.max_nodes}</span></div>
-                    <div className="text-white/50">Rate / unit <span className="text-white font-mono-num">{j.rate_per_unit?.toFixed(6)}</span></div>
-                    <div className="text-white/50">Created <span className="text-white">{new Date(j.created_at).toLocaleString()}</span></div>
+                    <div className="text-white/50">Max Edge Nodes <span className="text-white">{j.max_nodes}</span></div>
+                    <div className="text-white/50">Rate / Verified Unit <span className="text-white font-mono-num">{j.rate_per_unit?.toFixed(6)}</span></div>
+                    <div className="text-white/50">Dispatched <span className="text-white">{new Date(j.created_at).toLocaleString()}</span></div>
                   </div>
                   {/* Priority + Export buttons */}
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -292,17 +293,17 @@ export default function CustomerPortal() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-[0.25em] text-white/40">Max Nodes</label>
+                  <label className="text-[10px] uppercase tracking-[0.25em] text-white/40">Max Edge Compute Nodes</label>
                   <input type="number" min={1} max={10000} required value={maxNodes} onChange={(e) => setMaxNodes(e.target.value)} data-testid="new-job-max-nodes"
                     className="mt-2 w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-[#D4AF37] focus:outline-none" />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-[0.25em] text-white/40">Total Units</label>
+                  <label className="text-[10px] uppercase tracking-[0.25em] text-white/40">Total Verified Compute Units</label>
                   <input type="number" min={1} max={10000} required value={units} onChange={(e) => setUnits(e.target.value)} data-testid="new-job-units"
                     className="mt-2 w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-[#D4AF37] focus:outline-none" />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-[0.25em] text-white/40">Budget USDT</label>
+                  <label className="text-[10px] uppercase tracking-[0.25em] text-white/40">Compute Credit Budget (1 CC = 1 USDT)</label>
                   <input type="number" step="0.01" min={1} required value={budget} onChange={(e) => setBudget(e.target.value)} data-testid="new-job-budget"
                     className="mt-2 w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-[#D4AF37] focus:outline-none" />
                 </div>
@@ -323,13 +324,13 @@ export default function CustomerPortal() {
                     </button>
                   ))}
                 </div>
-                <div className="text-[10px] text-white/40 mt-1.5">Higher tiers = higher worker payouts = your job gets priority routing.</div>
+                <div className="text-[10px] text-white/40 mt-1.5">Higher tiers = priority routing on the Compute Routing Layer.</div>
               </div>
 
               <div>
                 <label className="text-[10px] uppercase tracking-[0.25em] text-white/40">Description (optional)</label>
                 <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} data-testid="new-job-desc"
-                  placeholder="Tell our network what this workload does…"
+                  placeholder="Describe the dataset or compute objective for the edge node fleet…"
                   className="mt-2 w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#D4AF37] focus:outline-none" />
               </div>
 
@@ -337,9 +338,9 @@ export default function CustomerPortal() {
 
               <button type="submit" disabled={submitting} data-testid="new-job-submit"
                 className="w-full px-6 py-3 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black font-semibold text-sm hover:shadow-[0_0_30px_rgba(242,201,76,0.6)] transition-shadow disabled:opacity-50">
-                {submitting ? "Uploading…" : "Submit for Review"}
+                {submitting ? "Dispatching…" : "Submit for Review"}
               </button>
-              <div className="text-[10px] text-white/40 text-center">All workloads require admin approval before dispatching to nodes.</div>
+              <div className="text-[10px] text-white/40 text-center">All workloads require operator approval before dispatch to the edge node fleet.</div>
             </form>
           </div>
         </div>

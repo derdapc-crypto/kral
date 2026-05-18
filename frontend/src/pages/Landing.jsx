@@ -965,15 +965,15 @@ function EarningsExplorer({ stats, apk }) {
           <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
             <div>
               <div className="text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
-                / network_effect_economy
+                / network_milestones
               </div>
               <h3 className="font-mono-cyber text-2xl font-black mt-1 flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 matrix-text" />
-                Ağ büyüdükçe herkes <span className="matrix-text">daha çok kazanır</span>
+                Ağ büyüdükçe ekosistem <span className="matrix-text">daha sağlam</span>
               </h3>
               <p className="text-white/55 text-sm mt-2 max-w-2xl">
-                Daha fazla telefon = daha güçlü compute havuzu = pool'da daha çok verified output = herkes için yükselen oranlar.
-                Aşağıda, <span className="cyan-text">Flagship</span> tier (Samsung S24 / iPhone 15) bir telefonun aylık kazancı ağ büyüklüğüne göre.
+                Daha fazla verified edge compute node = daha güçlü dağıtık compute katmanı = daha güvenilir bir contribution defteri.
+                Aşağıda <span className="cyan-text">1,000,000</span> hedefine giden milestone basamakları.
               </p>
             </div>
             <div className="text-right">
@@ -981,7 +981,7 @@ function EarningsExplorer({ stats, apk }) {
               <div className="font-mono-cyber font-black text-3xl matrix-text" data-testid="current-network-size">
                 <Users className="inline w-5 h-5 -mt-1 mr-1.5" />{netSize}
               </div>
-              <div className="text-[10px] text-white/45">aktif düğüm · ×{netMult.toFixed(1)} multiplier</div>
+              <div className="text-[10px] text-white/45">verified active nodes</div>
             </div>
           </div>
 
@@ -1011,12 +1011,9 @@ function EarningsExplorer({ stats, apk }) {
                   <div className={`font-mono-cyber font-black text-xl mt-1 ${reached ? "matrix-text" : "cyan-text"}`}>
                     {m.nodes.toLocaleString()}
                   </div>
-                  <div className="text-[10px] text-white/55 mt-0.5">düğüm · ×{m.multiplier.toFixed(1)}</div>
-                  <div className={`mt-2 font-mono-cyber font-black text-lg ${reached ? "matrix-text" : "text-white/85"}`}>
-                    {(m.flagship_monthly_usdt ? m.flagship_monthly_usdt * 0.5 : 6.0).toFixed(1)}
-                  </div>
-                  <div className="text-[9px] uppercase tracking-widest text-white/35 font-mono-term">
-                    TGC / ay (flagship)
+                  <div className="text-[10px] text-white/55 mt-0.5">verified nodes</div>
+                  <div className={`mt-2 text-[10px] uppercase tracking-widest font-mono-term ${reached ? "matrix-text" : "text-white/55"}`}>
+                    {reached ? "reached" : "growing"}
                   </div>
                 </div>
               );
@@ -1037,7 +1034,8 @@ function EarningsExplorer({ stats, apk }) {
                 <TrendingUp className="w-3 h-3" /> Radical Scarcity
               </div>
               <div className="text-xs text-white/65 mt-2 leading-relaxed">
-                Günlük üretim sadece 0.05–0.30 TGC/telefon. Pi'nin 10B+ arzına karşı $TGC max ~50–200M dolaşımda — değer korunur.
+                Edge node başına günlük üretim 0.05 – 0.30 TGC arasında kalır.
+                Şişirilmiş arz değil; ölçek yalnızca yeni doğrulanmış cihazlar ağa katıldıkça büyür.
               </div>
             </div>
             <div className="p-4 rounded-2xl bg-black/45 border border-white/10" data-testid="economy-explain-3">

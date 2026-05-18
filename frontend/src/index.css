@@ -38,6 +38,31 @@ html, body {
     margin: 0;
 }
 
+/* v1.5.4 — global subtle scanline + grain layer (non-interactive).
+   Sits above the body background and below every interactive element,
+   so the entire app reads as a premium cyber terminal surface without
+   ever blocking input.  Intensity is intentionally microscopic. */
+body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    background: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 255, 225, 0.018) 0px,
+        rgba(0, 255, 225, 0.018) 1px,
+        transparent 1px,
+        transparent 3px
+    );
+    mix-blend-mode: screen;
+}
+body::after {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    /* Tiny base64 SVG noise — under 200 bytes, no extra network hit. */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.65 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.22'/></svg>");
+    opacity: 0.06;
+    mix-blend-mode: overlay;
+}
+
 .font-display {
     font-family: 'JetBrains Mono', 'Unbounded', 'Space Grotesk', monospace;
     letter-spacing: -0.01em;
