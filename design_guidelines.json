@@ -1,167 +1,248 @@
 {
-  "theme": "dark",
-  "archetype": "Archetype 4 (Swiss & High-Contrast) + Archetype 5 (Jewel & Luxury) Dark Hybrid",
-  "mood": "Premium Dark Infrastructure, Professional, Trustworthy, Technical",
+  "project_context": {
+    "app_type": "hybrid_fullstack",
+    "theme": "DARK",
+    "archetype": "High-Contrast Cyber Operations Center (Fusion of E1 Archetype 4 & 7)",
+    "reference_feel": "Palantir + Stripe + Vercel + high-end cyber operations center",
+    "core_directive": "Dramatic, cinematic, premium-infrastructure full redesign. Must be unrecognizable from the previous version.",
+    "constraints": {
+      "backend_bindings": "STRICT_KEEP: /api/network/scarcity-progress, /api/foundation/buyback-status, /api/token/launch, /api/apk/version, /api/devices/summary",
+      "routes": "STRICT_KEEP: /, /token, /mobile, /dashboard, /customer, /admin",
+      "performance": "Must render at 60fps on 2020 mid-range phone",
+      "tech_stack": "React 19 + Tailwind + framer-motion + lucide-react + qrcode",
+      "forbidden_elements": [
+        "Three.js",
+        "R3F",
+        "Emojis",
+        "Rockets",
+        "Mining language",
+        "Guaranteed earnings language",
+        "Coin pump language",
+        "Fake node inflation"
+      ]
+    }
+  },
+  "visual_atmosphere_brief": {
+    "lighting": "Cinematic and directional. Deep shadows (pure black or #050505) punctuated by sharp, localized neon light bleeds (matrix green/cyan) underneath borders or data points.",
+    "typography_hierarchy": "Brutalist scale. H1s are massive, tight-tracked, and left-aligned. Data numbers (metrics, nodes) use monospace fonts and are intensely illuminated.",
+    "motion_vocabulary": "Deliberate, technical, hardware-like. No bouncy spring animations. Use ease-out-expo for drawer opens. Use slow, continuous linear drifts for background beams and topology data packets.",
+    "depth_treatment": "Optical clarity via glassmorphism (backdrop-blur-xl on top of dark translucent layers) paired with stark 1px solid borders (border-white/10). Elements feel layered on top of a motherboard, not floating in empty space.",
+    "the_palantir_stripe_vercel_factor": "Palantir's data-density and stark tension + Stripe's micro-interactions (hover glows, fluid transitions) + Vercel's absolute dark-mode minimalism and typography discipline."
+  },
   "typography": {
     "headings": {
-      "family": "Outfit, Cabinet Grotesk, or Plus Jakarta Sans",
-      "style": "Modern geometric, premium feel. NO Inter/Roboto for headings.",
-      "weights": ["400", "600", "700"],
-      "tracking": "tracking-tight"
+      "family": "Cabinet Grotesk, Outfit, or General Sans",
+      "styling": "font-light to font-medium, tracking-tighter, leading-none",
+      "usage": "Use for massive storytelling elements and section headers."
+    },
+    "monospace": {
+      "family": "JetBrains Mono, Roboto Mono, or IBM Plex Mono",
+      "styling": "tracking-widest, uppercase, text-xs to text-sm",
+      "usage": "Use for live data, telemetry, code snippets, overlines, and labels."
     },
     "body": {
-      "family": "IBM Plex Sans, Geist, or Inter",
-      "style": "Clean SaaS style, highly readable.",
-      "weights": ["400", "500"]
-    },
-    "mono": {
-      "family": "JetBrains Mono or Fira Code",
-      "style": "Used for metrics, live console snippets, and status pills.",
-      "weights": ["400", "500"]
+      "family": "Geist, Inter (body only), or Manrope",
+      "styling": "text-gray-400, leading-relaxed, text-base",
+      "usage": "Strictly for long-form reading and functional descriptions."
     }
   },
-  "colors": {
-    "background": {
-      "main": "bg-[#050814]",
-      "gradient": "bg-gradient-to-b from-[#050814] to-black"
+  "color_palette": {
+    "backgrounds": {
+      "void": "#000000",
+      "surface": "#050505",
+      "elevated": "#0A0A0A"
     },
-    "surface": {
-      "glass": "bg-white/[0.02] backdrop-blur-xl border border-white/[0.05]",
-      "card": "bg-slate-950 border border-slate-800"
-    },
-    "text": {
-      "primary": "text-white",
-      "muted": "text-slate-400",
-      "accent": "text-[#00ffe1]"
+    "borders": {
+      "subtle": "rgba(255,255,255,0.05)",
+      "defined": "rgba(255,255,255,0.1)",
+      "active": "rgba(0, 255, 136, 0.4)"
     },
     "accents": {
-      "primary_cyber_cyan": "#00ffe1",
-      "secondary_neon_green": "#00ff88",
-      "premium_soft_gold": "#facc15",
-      "warning_electric_orange": "#ff7a18"
+      "matrix_green": "#00ff88",
+      "cyan": "#00d9ff",
+      "violet": "#6c7bff",
+      "amber": "#fbbf24",
+      "alert_red": "#ff3366"
     }
   },
-  "spacing_and_layout": {
-    "general": "Generous spacing. Use py-24 to py-32 for main sections. Containers should use px-6 or px-8.",
-    "grids": "Bento-style grids for features. gap-8 or gap-12 between large cards.",
-    "radius": "rounded-2xl or rounded-3xl for premium glass panels. Avoid sharp corners for primary surfaces to maintain Apple Keynote feel."
+  "background_system_blueprint": {
+    "layer_1_grain": "CSS noise overlay (mix-blend-overlay, opacity-20) covering the entire viewport.",
+    "layer_2_grid": "SVG background pattern. 1px line thickness, rgba(255,255,255,0.03), 40px cell size. Fades out at the edges using mask-image: radial-gradient.",
+    "layer_3_radial_glows": "Absolute positioned divs with massive blur (blur-[120px]), low opacity (10-15%), using --grid-matrix or --grid-violet. Positioned strategically behind key components.",
+    "layer_4_moving_beams": "Framer Motion animated divs mapping to SVG paths or absolute coordinates, simulating data beams traversing the grid (opacity-50, linear easing).",
+    "layer_5_scanlines": "Repeating linear gradient (transparent 50%, rgba(0,0,0,0.25) 50%) applied via CSS, moving slowly vertically.",
+    "css_svg_technique": "Combine tailwind classes (`bg-[url(...)]`, `backdrop-blur`) with framer-motion `motion.div` for beams. Avoid heavy canvas. Ensure `pointer-events-none` on all background layers."
   },
-  "animation_strategy": {
-    "scroll_reveal": "Framer Motion 'whileInView' with opacity 0 to 1, y: 20 to 0, duration 0.6s.",
-    "hover_states": "Subtle translate-y (-translate-y-1), border color glow on hover (e.g., hover:border-[#00ffe1]/30).",
-    "metrics": "Framer motion count-up for numbers in the Trust Metrics Bar.",
-    "live_feed": "Smooth upward slide animations for the live console snippets."
+  "large_topology_centerpiece": {
+    "description": "A massive, purely SVG-based interactive data-globe/network-map that dominates the right side (>=40%) of the cinematic hero.",
+    "geometry": "A layered SVG construction. Base is a stylized orthographic or isometric network web (no 3D sphere). Consists of 100+ connected nodes of varying sizes.",
+    "animation": "Framer Motion orchestrates SVG `stroke-dasharray` and `stroke-dashoffset` to create 'data packets' moving along lines. Nodes pulse continuously using standard CSS `@keyframes` scale/opacity.",
+    "layering": "Bottom: Dimmed, static paths. Middle: Highlighted paths indicating active network routes. Top: Glowing circles (nodes) reflecting `verified_active_nodes` telemetry.",
+    "zero_state": "When `verified_active_nodes === 0`, the topology must NOT disappear or look broken. It shifts to an 'AWAITING VERIFIED NODES' state: lines turn amber/gray, pulses slow down, scanning radar animation activates."
   },
-  "media": {
-    "image_strategy": "Avoid generic stock. Use CSS-based abstract geometry, blurred glowing radial gradients, and Framer Motion particle effects. For specific visuals like the Hero and Command Center, use abstract UI mockups built with HTML/CSS or high-quality dark geometric backgrounds.",
-    "image_urls": [
-      {
-        "category": "abstract_background_lines",
-        "url": "https://images.unsplash.com/photo-1775057154553-0f3e8902fea3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MDV8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGRhcmslMjBuZXR3b3JrJTIwdGVjaG5vbG9neXxlbnwwfHx8fDE3Nzg0NDMzMjR8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Abstract geometric lines and shapes on black background. Use as a very low opacity (opacity-10) background layer behind specific sections like the CTA or Footer."
-      }
-    ],
-    "icons": "lucide-react (stroke-width: 1.5, sizes: 24 to 32)"
+  "scarcity_progress_console": {
+    "evolution": "Transform from a simple 'card' to a massive, full-viewport-width command console panel.",
+    "layout": "Bento-style metrics framing a giant central progress element.",
+    "dramatic_element": "A large neon progress bar utilizing --grid-matrix. The 1,000,000 target is displayed in massive monospace font (`text-6xl sm:text-8xl`).",
+    "phase_indicator": "Step-based timeline above the progress bar showing current epoch/phase, utilizing sharp geometric shapes and glowing active states."
   },
-  "sections": [
+  "b2b_saas_preview": {
+    "composition": "A high-fidelity visual slice of the customer portal integrated directly into the landing page. Not just a screenshot, but a layered DOM representation or a highly stylized image combined with HTML overlays.",
+    "visual_treatment": "Use the provided generated image as the base surface, apply a glassmorphism overlay containing live (or mock) stats fetching from `/api/devices/summary`.",
+    "motion": "On scroll-into-view, the interface 'boots up'—charts reveal via masking, numbers count up."
+  },
+  "final_cta_wall": {
+    "composition": "Deep, immersive full-screen section. Dark void background.",
+    "typography": "Massive central headline (e.g., 'INITIALIZE COMPUTATION').",
+    "interaction": "The CTA button is a complex component: glowing border, matrix-green hover state, trailing light beam. The entire wall reacts to mouse movement via slight background shift."
+  },
+  "landing_sections": [
     {
-      "name": "Hero Section",
-      "description": "Premium abstract compute core visualization.",
-      "components": [
-        "Status Pills: Top of section, using JetBrains Mono (e.g., 'Native Engine v1.3.8 Ready'). data-testid='hero-status-pill'",
-        "H1: 'Turn idle smartphones into a verified compute network.'",
-        "Subtitle: 'THE GRID connects Android devices into a distributed compute layer...'",
-        "CTA Buttons: 'Download Android Node' (data-testid='hero-cta-download'), 'View Live Network', 'Open Customer Portal' (data-testid='hero-cta-portal').",
-        "Visual: Center glowing compute core built with Framer Motion (animated pulsing div with radial gradients and cyan shadows), surrounding phone node capsules (lucide Smartphone icons in glass cards) connected by dashed SVG lines."
-      ]
+      "name": "1. Cinematic Hero",
+      "dominant_element": "Split View: Massive Typography (Left), Live SVG Topology (Right).",
+      "composition_rules": "Hero must fill 100vh. Content constrained in a max-w-[1400px] container but visual elements bleed to edge. Topology occupies exactly 40-50% width on desktop.",
+      "motion_notes": "Staggered fade-up for text. Topology boots sequentially (grid, then lines, then nodes).",
+      "do_dont": "DO: Use heavy contrast. DON'T: Center the text. DON'T: Overlay text on top of the complex topology."
     },
     {
-      "name": "Trust Metrics Bar",
-      "description": "5 honest live counters displayed in a clean, horizontal or grid layout.",
-      "components": [
-        "Metrics: Connected Devices, Active Mining Devices, Mobile Native Hashrate, Accepted Shares, Backend Miner Status.",
-        "Labels: 'Pending / simulation / example' if not real.",
-        "Test IDs: 'metric-devices', 'metric-active', 'metric-hashrate', 'metric-shares', 'metric-status'"
-      ],
-      "style": "Glassmorphism strip spanning the container width. Monospace large numbers, uppercase muted labels."
+      "name": "2. Live Network Command Panel",
+      "dominant_element": "Telemetry Data Strip.",
+      "composition_rules": "Full-width dark ribbon crossing the screen. Strict grid layout (cols-4 or cols-6).",
+      "motion_notes": "Numbers tick continuously. A scanning vertical beam sweeps across the panel.",
+      "do_dont": "DO: Bind directly to `/api/network/scarcity-progress`. DON'T: Use generic card wrappers."
     },
     {
-      "name": "How THE GRID Works",
-      "description": "4-step linear flow.",
-      "components": [
-        "Cards: (1) Install the Android Node, (2) Device Joins the Grid, (3) Safe Compute Starts, (4) Verified Contribution Pays.",
-        "Visual: Custom minimal icon for each, perhaps connected by a thin subtle dashed line (border-t border-slate-800)."
-      ]
+      "name": "3. Split-screen Compute-Time Receipt Manifesto",
+      "dominant_element": "High-contrast text manifesto vs conceptual receipt visual.",
+      "composition_rules": "50/50 split. Left: Large manifesto text. Right: A literal 'digital receipt' graphic, built with HTML/CSS, showing hash codes and timestamps.",
+      "motion_notes": "Receipt prints/scrolls upward slightly on viewport enter.",
+      "do_dont": "DO: Use monospace font for the receipt. DON'T: Make it look like a blog post."
     },
     {
-      "name": "Product Pillars",
-      "description": "4 premium bento cards.",
-      "components": [
-        "Cards: Mobile Compute Network, Native RandomX Engine, Verified Reward Ledger, Operator Command Center.",
-        "Style: Soft animated border on hover (Tracing beam effect). Short description + monospace tech detail line."
-      ]
+      "name": "4. Scarcity Progress Console",
+      "dominant_element": "Massive 1M Target Neon Bar.",
+      "composition_rules": "Full section width, heavy padding. Integrated into a 'control panel' UI rather than a generic section.",
+      "motion_notes": "Progress bar animates from 0 to current value over 2.5 seconds. Glow intensifies upon landing.",
+      "do_dont": "DO: Make the number feel intimidatingly large. DON'T: Hide the progress in a small widget."
     },
     {
-      "name": "Safety & Consent Section",
-      "description": "6 cards emphasizing user control and safety. No aggressive keywords.",
-      "components": [
-        "Cards: Explicit user permission, Charging-only mode, Wi-Fi-only transport, Thermal guard, Battery threshold, Stop anytime.",
-        "Style: Dark glass panels with green/cyan subtle glow icons indicating safety/security."
-      ]
+      "name": "5. Premium APK Deployment Module",
+      "dominant_element": "VERIFIED BUILD console.",
+      "composition_rules": "Terminal-like bento box. Darkest background layer (#000). Features a live QR code and version string from `/api/apk/version`.",
+      "motion_notes": "QR code pulses. Terminal cursor blinks.",
+      "do_dont": "DO: Treat the APK like a weapon deployment code. DON'T: Use standard App Store badges (must look like direct infrastructure download)."
     },
     {
-      "name": "Live Network Visualization",
-      "description": "Abstract node mesh + right side mini live feed.",
-      "components": [
-        "Left: Framer Motion animated abstract nodes (dots connected by lines). Colors: gray, blue, green, orange based on state.",
-        "Right: Live feed console snippets. Small monospace text sliding up. data-testid='live-network-feed'"
-      ]
+      "name": "6. Foundation Buyback Policy Panel",
+      "dominant_element": "Rigid Legal/System Window Status.",
+      "composition_rules": "Swiss grid. Highly structured text, stark lines. Fetches from `/api/foundation/buyback-status`.",
+      "motion_notes": "Hovering over terms highlights them with a sharp 1px border. No soft fades.",
+      "do_dont": "DO: Use strict, unemotional language. DON'T: Make it look promotional or guaranteed."
     },
     {
-      "name": "Revenue Flow Section",
-      "description": "Sankey-style or horizontal arrow flow diagram.",
-      "components": [
-        "Flow: Customer workload -> THE GRID verification layer -> contributor reward pool -> user wallet.",
-        "Include honest trust signals like 'payout wallet verified' in small monospace pills."
-      ]
+      "name": "7. B2B SaaS Compute Surface Preview",
+      "dominant_element": "Sleek Dashboard UI Mockup.",
+      "composition_rules": "Centered presentation, overflowing the container edges. Floating UI elements.",
+      "motion_notes": "Parallax effect on scroll.",
+      "do_dont": "DO: Use the provided generated image. DON'T: Show generic charts."
     },
     {
-      "name": "Command Center Preview",
-      "description": "Small premium product preview of the admin dashboard.",
-      "components": [
-        "Visual: A polished, blurred-edge mockup of an admin UI (NOT full screen). Rendered using HTML/CSS mock UI elements (mini charts, HUD panels, live console) inside a rotated perspective container."
-      ]
-    },
-    {
-      "name": "Customer / Operator CTA",
-      "description": "Two paths for conversion.",
-      "components": [
-        "Path 1: 'For Contributors: Install Android Node...'",
-        "Path 2: 'For Customers: Route workloads...'",
-        "Test IDs: 'cta-contributor-download', 'cta-customer-portal'"
-      ]
-    },
-    {
-      "name": "Footer",
-      "description": "Professional SaaS footer.",
-      "components": [
-        "Links: Product, Network, Rewards, Docs, Privacy, Terms, Contact.",
-        "Test IDs: 'footer-link-privacy', 'footer-link-terms'"
-      ]
+      "name": "8. Final CTA Wall",
+      "dominant_element": "Massive Trigger Button.",
+      "composition_rules": "Absolute center layout, negative space dominates.",
+      "motion_notes": "Button breathes. Background grid moves toward the user (scale animation).",
+      "do_dont": "DO: Make the button the undeniable focus. DON'T: Add secondary links to this section."
     }
   ],
-  "forbidden_elements": [
-    "Stealth, weapon, war, hidden keywords",
-    "Fake/exaggerated metrics without 'pending' label",
-    "Overly aggressive neon/cyberpunk aesthetics (keep neon minimal and purposeful)",
-    "Old background images and prototype feel"
+  "token_sections": [
+    {
+      "name": "1. Hero: TGC is not a coin",
+      "dominant_element": "Brutalist H1 Typography.",
+      "composition_rules": "Left-aligned, filling 80% of screen. Extreme negative space on the right. No imagery.",
+      "motion_notes": "Text enters with a hard, instant reveal (no soft opacity fade).",
+      "do_dont": "DO: Make it a statement of truth. DON'T: Use any crypto imagery."
+    },
+    {
+      "name": "2. Compute-Time Receipt",
+      "dominant_element": "Technical Flow Diagram.",
+      "composition_rules": "SVG flowchart mapping Energy -> Compute -> Receipt.",
+      "motion_notes": "Data flows through the diagram.",
+      "do_dont": "DO: Treat it like a whitepaper diagram brought to life."
+    },
+    {
+      "name": "3. Network Scarcity",
+      "dominant_element": "Data visualization of node caps.",
+      "composition_rules": "Grid of locked vs available slots. Deep dark red/amber accents for scarcity.",
+      "motion_notes": "Pulsing 'SLOTS REMAINING' indicator.",
+      "do_dont": "DO: Emphasize urgency through data, not marketing copy."
+    },
+    {
+      "name": "4. Radical Scarcity",
+      "dominant_element": "Halving/Difficulty Curve Graph.",
+      "composition_rules": "Large SVG line chart spanning the width of the container.",
+      "motion_notes": "Chart draws itself left to right.",
+      "do_dont": "DO: Make the math look rigorous."
+    },
+    {
+      "name": "5. Foundation Buyback",
+      "dominant_element": "Live status fetching panel.",
+      "composition_rules": "Terminal-style readout. Green for ACTIVE window, Amber/Gray for CLOSED.",
+      "motion_notes": "Blinking active indicator.",
+      "do_dont": "DO: Re-use the landing page component style for consistency."
+    },
+    {
+      "name": "6. Milestone Roadmap",
+      "dominant_element": "Vertical timeline with heavy connecting nodes.",
+      "composition_rules": "Left-aligned line. Completed phases are matrix-green. Future phases are wireframe/empty.",
+      "motion_notes": "Scroll-triggered line fill.",
+      "do_dont": "DO: Keep text highly technical."
+    },
+    {
+      "name": "7. Risk Clarity",
+      "dominant_element": "Monochrome, high-end legal text.",
+      "composition_rules": "Small monospace typography, multi-column layout.",
+      "motion_notes": "None. Static and serious.",
+      "do_dont": "DO: Make it look like a professional prospectus."
+    }
   ],
+  "anti_patterns": [
+    "The Bootstrap Standard Layout: Avoid equal-width columns. Asymmetry creates tension. Tension creates interest.",
+    "Card-Stacked Dashboard Syndrome: DO NOT wrap every piece of content in a rounded rectangle with a gray background and a drop shadow. Use the grid lines themselves (border-collapse style) or pure negative space.",
+    "Muddy Gray Backgrounds: Never use #1a1a1a or #333333. Use pure #000 or extremely dark tinted shades like #050505 to achieve optical depth.",
+    "Centered Everything: Centered layouts kill visual momentum. Use strong left alignment paired with heavy visual counterweights on the right.",
+    "The Gradient Overload: Do not use full-screen purple-blue generic web3 gradients. Use localized, sharp, blurred neon light spots under text or borders.",
+    "Default Inter Headings: Do not use Inter or generic sans-serif for massive H1/H2s. Use fonts with character (Cabinet Grotesk) and extremely tight tracking.",
+    "Floating Astronauts/Generic 3D: No irrelevant 3D blobs. The visual system must be strictly tied to topology, infrastructure, and command-line code.",
+    "Standard Button Padding: A button shouldn't look like a standard web form submit. It should look like an infrastructure deployment trigger."
+  ],
+  "acceptance_tests": {
+    "visual_delta_test": "Take a screenshot of the old version. Take a screenshot of the new version. If a non-technical user cannot instantly identify that the entire core layout and visual identity has transformed from a 'SaaS' to a 'Cyber Operations Command Center', the test fails.",
+    "hero_dominance_test": "On desktop (1440px), the SVG Topology right-side element must occupy no less than 40% of the viewport width and feel integrated, not like a pasted image.",
+    "performance_test": "Scroll from top to bottom on a mid-range mobile device profile. Frame rate must remain solid 60fps (ensured by pure SVG and avoiding heavy Three.js canvas).",
+    "scarcity_console_test": "The scarcity section must fill its own container horizontally and act as a commanding focal point, not a secondary metric."
+  },
+  "testing_attributes": {
+    "instructions": "All interactive and key informational elements MUST include a data-testid attribute to facilitate robust automated testing.",
+    "convention": "kebab-case, role-based (e.g., data-testid='scarcity-progress-bar', data-testid='b2b-preview-trigger')"
+  },
+  "media_urls": {
+    "cyber_infrastructure_bg": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/016a5561a43fdcd7e29a3f2ead1ee04fff6e4363ed7ea576dcf3e8dc297bf9b1.png",
+      "description": "High-end cinematic dark mode cyber infrastructure background. Use for hero or Final CTA background overlays with low opacity.",
+      "category": "background"
+    },
+    "b2b_saas_preview_mockup": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/49f3f661101acf7926fd8564f8811dd413075b568e6217087cdeb6cda286d658.png",
+      "description": "Abstract isometric view of a premium B2B SaaS dashboard interface. Use directly in the B2B SaaS Compute Surface section.",
+      "category": "preview_mockup"
+    }
+  },
   "instructions_to_main_agent": [
-    "DO NOT use generic Shadcn components out of the box; heavily customize them with the 'surface' and 'colors' specified above to achieve the premium Apple/Stripe keynote look.",
-    "Implement the hero compute core using Framer Motion and custom CSS radial-gradients. Do not rely on external images for the main focal point.",
-    "Use JetBrains Mono or similar for all technical readouts, metrics, and live logs.",
-    "Ensure the layout has massive whitespace (py-32 between major sections).",
-    "Implement the Live Network Visualization using an array of simulated events mapped to a list with Framer Motion AnimatePresence for smooth entry/exit.",
-    "Wire up existing endpoints (/api/stats/network, /api/apk/version) for the live metric pills if possible, otherwise use the labeled dummy state."
+    "Read this document as the absolute truth for the visual redesign.",
+    "You must completely gut the existing Landing.jsx and Token.jsx layouts, keeping ONLY the backend bindings and data hooks.",
+    "Implement the SVG Topology centerpiece manually using framer-motion and standard SVG paths. Do NOT try to install Three.js or R3F.",
+    "Ensure the exact CSS variables and colors defined in the palette section are used.",
+    "Do NOT add any new pages, stick to the provided routes.",
+    "Inject the provided media URLs directly into your `src` tags or background CSS classes."
   ]
 }
