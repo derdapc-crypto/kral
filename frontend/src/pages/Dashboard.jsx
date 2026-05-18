@@ -23,6 +23,21 @@ function StatCard({ label, value, suffix = "", testId, tone = "white" }) {
   );
 }
 
+// vNext — cockpit cell used by the new Dashboard header strip
+function CockpitCell({ k, v, tone }) {
+  const color = tone === "matrix" ? "#00ff88"
+              : tone === "cyan"   ? "#00d9ff"
+              : tone === "violet" ? "#6c7bff"
+              : tone === "amber"  ? "#fbbf24"
+              : "#f5f7fa";
+  return (
+    <div className="bg-black px-4 py-3.5">
+      <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">{k}</div>
+      <div className="font-mono font-bold text-[18px] mt-1 tabular-nums truncate" style={{ color }}>{v}</div>
+    </div>
+  );
+}
+
 /** Normalize a backend hashrate value into a user-facing "Processing Rate". */
 function processingRate(d) {
   // Hide raw H/s. Show a soft "Processing throughput" score (work units / min equivalent).
@@ -141,43 +156,58 @@ export default function Dashboard() {
   const contributionScore = Math.min(100, Math.round(((wallet?.tgc_total_earned ?? 0) / 1000) * 100));
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] landing-root font-sans-saas">
-      <div className="max-w-7xl mx-auto px-6 sm:px-10 py-10">
+    <div className="min-h-screen bg-black text-white font-sans-saas relative">
+      {/* vNext immersive background — matches Landing/Token */}
+      <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 bg-black" />
+        <div className="absolute inset-0 opacity-[0.35]"
+             style={{
+               backgroundImage:
+                 "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
+               backgroundSize: "44px 44px",
+               maskImage: "radial-gradient(ellipse at 50% 20%, black 40%, transparent 80%)",
+               WebkitMaskImage: "radial-gradient(ellipse at 50% 20%, black 40%, transparent 80%)",
+             }} />
+        <div className="absolute -top-32 left-1/4 w-[600px] h-[600px] rounded-full blur-[140px] opacity-[0.14]"
+             style={{ background: "radial-gradient(circle, #00ff88 0%, transparent 60%)" }} />
+        <div className="absolute bottom-1/4 right-0 w-[600px] h-[600px] rounded-full blur-[140px] opacity-[0.10]"
+             style={{ background: "radial-gradient(circle, #00d9ff 0%, transparent 60%)" }} />
+        <div className="absolute inset-0"
+             style={{
+               backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)",
+               mixBlendMode: "multiply", opacity: 0.5,
+             }} />
+      </div>
 
-        {/* Header */}
-        <div className="flex flex-wrap justify-between items-end gap-4 mb-10">
-          <div>
-            <div className="landing-pill info mb-3"><span className="dot" /> / compute network</div>
-            <h1 className="font-grotesk font-bold tracking-tight text-white" style={{ fontSize: "clamp(28px, 3.6vw, 44px)" }}>
-              Welcome back, <span style={{
-                background: "linear-gradient(90deg, #00ffe1, #00d4ff 50%, #00ff88)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              }}>{user?.name || "Contributor"}</span>
-            </h1>
-            <p className="text-white/55 mt-2 text-sm font-sans-saas">
-              Your distributed compute footprint at a glance — verified, observable, payout-tracked.
-            </p>
+      <div className="max-w-[1400px] mx-auto px-6 lg:px-10 pt-16 pb-20">
+        {/* vNext Cockpit Header */}
+        <div className="border-b border-white/[0.08] pb-8 mb-10">
+          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88] mb-4">
+            // edge_compute_node_operator · cockpit
           </div>
-          <Link to="/device" data-testid="dashboard-to-device-link" className="landing-cta-primary inline-flex items-center gap-2">
-            <Radio className="w-4 h-4" /> Open Compute Node
-          </Link>
-        </div>
-
-        {/* Stats — cloud-compute terminology only. v1.5.4: TGC balance with
-             5-decimal precision (crypto-style ticking) instead of $USDT
-             estimate, since redemption is gated by the Foundation Buyback
-             Program (milestone-driven, not date-driven). */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-          <StatCard label="Reward Balance"      value={`${(wallet?.tgc_balance ?? 0).toFixed(5)} TGC`}
-                    testId="stat-balance" tone="ok" />
-          <StatCard label="Lifetime TGC"        value={`${(wallet?.tgc_total_earned ?? 0).toFixed(5)} TGC`}
-                    testId="stat-earned" />
-          <StatCard label="Compute Nodes"       value={devices.length}
-                    testId="stat-devices" tone="info" />
-          <StatCard label="Network Contribution"
-                    value={totalWorkUnits === 0 ? "Pending" : `${contributionScore}%`}
-                    testId="stat-contribution"
-                    tone={totalWorkUnits === 0 ? "white" : "ok"} />
+          <div className="flex flex-wrap items-end justify-between gap-6">
+            <h1 className="font-display text-white"
+                style={{ fontSize: "clamp(40px, 5.5vw, 84px)", letterSpacing: "-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+              <span className="text-white/35">operator //</span><br/>
+              <span style={{
+                background: "linear-gradient(96deg, #00ff88, #00d9ff)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              }}>{user?.name || "anonymous"}</span>
+            </h1>
+            <Link to="/device" data-testid="dashboard-to-device-link"
+                  className="inline-flex items-center gap-3 px-6 py-3.5 rounded-md bg-[#00ff88] text-black font-mono font-bold text-[11px] uppercase tracking-[0.35em]
+                             shadow-[0_0_60px_-12px_rgba(0,255,136,0.7)] hover:shadow-[0_0_80px_-12px_rgba(0,255,136,1)] transition">
+              <Radio className="w-4 h-4" /> manage edge node
+            </Link>
+          </div>
+          <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-px bg-white/[0.06]">
+            <CockpitCell k="VERIFIED_BALANCE"      v={`${(wallet?.tgc_balance ?? 0).toFixed(5)} TGC`} tone="matrix" />
+            <CockpitCell k="LIFETIME_LEDGER"       v={`${(wallet?.tgc_total_earned ?? 0).toFixed(5)} TGC`} />
+            <CockpitCell k="EDGE_NODES"            v={devices.length}                                  tone="cyan" />
+            <CockpitCell k="CONTRIBUTION"          v={totalWorkUnits === 0 ? "PENDING" : `${contributionScore}%`}
+                         tone={totalWorkUnits === 0 ? "amber" : "matrix"} />
+            <CockpitCell k="SNAPSHOT_READINESS"    v="PRE-MAINNET · ACCUMULATING" tone="violet" />
+          </div>
         </div>
 
         {/* Power-Up + Tier Forecast (still visible — they reflect contribution velocity) */}

@@ -108,63 +108,92 @@ export default function CustomerPortal() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] grid-bg">
-      <div className="max-w-7xl mx-auto px-6 sm:px-10 py-10">
-        <div className="flex flex-wrap justify-between items-end gap-4 mb-10">
-          <div>
-            <div className="text-[11px] tracking-[0.3em] uppercase text-[#F2C94C]">/ enterprise console</div>
-            <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tighter mt-2">
-              Customer <span className="gold-text">Portal</span>
-            </h1>
-            <p className="text-white/60 mt-3 max-w-xl text-sm">
-              Upload AI workloads. Allocate a Compute Credit Budget. Watch the
-              distributed Edge Compute Node fleet resolve them in real time at 80% the cost of AWS.
-            </p>
+    <div className="min-h-screen bg-black text-white font-sans-saas relative">
+      {/* vNext immersive background — matches Landing */}
+      <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 bg-black" />
+        <div className="absolute inset-0 opacity-[0.35]"
+             style={{
+               backgroundImage:
+                 "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
+               backgroundSize: "44px 44px",
+               maskImage: "radial-gradient(ellipse at 50% 20%, black 40%, transparent 80%)",
+               WebkitMaskImage: "radial-gradient(ellipse at 50% 20%, black 40%, transparent 80%)",
+             }} />
+        <div className="absolute top-1/4 -right-32 w-[700px] h-[700px] rounded-full blur-[140px] opacity-[0.14]"
+             style={{ background: "radial-gradient(circle, #00d9ff 0%, transparent 60%)" }} />
+        <div className="absolute bottom-0 left-1/3 w-[600px] h-[400px] rounded-full blur-[160px] opacity-[0.10]"
+             style={{ background: "radial-gradient(circle, #6c7bff 0%, transparent 60%)" }} />
+        <div className="absolute inset-0"
+             style={{
+               backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)",
+               mixBlendMode: "multiply", opacity: 0.5,
+             }} />
+      </div>
+
+      <div className="max-w-[1400px] mx-auto px-6 lg:px-10 pt-16 pb-20">
+        <div className="border-b border-white/[0.08] pb-8 mb-10">
+          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00d9ff] mb-4">
+            // enterprise.compute_surface · console
           </div>
-          <button onClick={() => setOpen(true)} data-testid="customer-new-job-btn"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black font-semibold text-sm hover:shadow-[0_0_30px_rgba(242,201,76,0.6)] transition-shadow">
-            <Plus className="w-4 h-4" /> New Workload
-          </button>
+          <div className="flex flex-wrap items-end justify-between gap-6">
+            <h1 className="font-display text-white"
+                style={{ fontSize: "clamp(40px, 5.5vw, 80px)", letterSpacing: "-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+              Compute throughput,<br/>
+              <span style={{
+                background: "linear-gradient(96deg, #00d9ff, #6c7bff)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              }}>priced as infrastructure.</span>
+            </h1>
+            <button onClick={() => setOpen(true)} data-testid="customer-new-job-btn"
+              className="inline-flex items-center gap-3 px-6 py-3.5 rounded-md bg-[#00d9ff] text-black font-mono font-bold text-[11px] uppercase tracking-[0.35em]
+                         shadow-[0_0_60px_-12px_rgba(0,217,255,0.7)] hover:shadow-[0_0_80px_-12px_rgba(0,217,255,1)] transition">
+              <Plus className="w-4 h-4" /> dispatch workload
+            </button>
+          </div>
         </div>
 
-        {/* API Key panel */}
-        <div className="mb-8 p-6 rounded-3xl glass-strong">
-          <div className="flex justify-between items-start gap-4 flex-wrap">
+        {/* API Key panel — minimal */}
+        <div className="mb-8 p-5 border border-white/[0.08] bg-black/55 backdrop-blur-xl">
+          <div className="flex justify-between items-center gap-4 flex-wrap">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.3em] text-[#F2C94C] flex items-center gap-1.5">
-                <Key className="w-3 h-3" /> Programmatic Access
+              <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-[#00d9ff]/85 flex items-center gap-1.5">
+                <Key className="w-3 h-3" /> programmatic_access
               </div>
-              <div className="font-display font-bold text-lg mt-1">API Key</div>
-              <p className="text-xs text-white/50 mt-1">Use <code className="text-[#F2C94C]">X-API-Key</code> header to automate workload uploads from your CI/CD.</p>
+              <p className="text-[11px] text-white/45 mt-2 font-mono uppercase tracking-[0.2em]">
+                X-API-Key header · automate workload uploads from CI/CD
+              </p>
             </div>
             <div className="flex gap-2 flex-wrap items-center">
-              <div className="px-3 py-2 rounded-xl bg-black/50 border border-white/10 font-mono text-xs text-white/80 max-w-[420px] truncate" data-testid="api-key-display">{apiKey || "Loading…"}</div>
+              <div className="px-3 py-2 bg-black/60 border border-white/10 font-mono text-[11px] text-[#00d9ff]/85 max-w-[480px] truncate" data-testid="api-key-display">{apiKey || "loading…"}</div>
               <button onClick={copyKey} data-testid="api-key-copy"
-                className="px-3 py-2 rounded-full bg-[#F2C94C] text-black text-[10px] tracking-widest uppercase font-semibold inline-flex items-center gap-1.5">
-                <Copy className="w-3 h-3" /> {keyCopied ? "Copied!" : "Copy"}
+                className="px-3 py-2 bg-[#00d9ff] text-black text-[10px] tracking-widest uppercase font-bold inline-flex items-center gap-1.5">
+                <Copy className="w-3 h-3" /> {keyCopied ? "copied" : "copy"}
               </button>
               <button onClick={regenerateKey} data-testid="api-key-regen"
-                className="px-3 py-2 rounded-full border border-red-400/30 text-red-400 text-[10px] tracking-widest uppercase inline-flex items-center gap-1.5">
-                <RefreshCw className="w-3 h-3" /> Rotate
+                className="px-3 py-2 border border-red-400/30 text-red-400 text-[10px] tracking-widest uppercase inline-flex items-center gap-1.5">
+                <RefreshCw className="w-3 h-3" /> rotate
               </button>
             </div>
           </div>
         </div>
 
-        {/* Stats — v1.5.4 strict B2B SaaS vocabulary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        {/* Stats — strict B2B SaaS ribbon */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px bg-white/[0.06] mb-10">
           {[
-            { label: "Workload Queue", value: jobs.length },
-            { label: "Active Workloads", value: jobs.filter(j => j.status === "running").length },
-            { label: "Completed Dataset Batches", value: jobs.filter(j => j.status === "completed").length },
-            {
-              label: "Compute Credits Used",
-              value: jobs.reduce((s, j) => s + (j.spent_usdt || 0), 0).toFixed(4),
-            },
+            { k: "WORKLOAD_QUEUE",        v: jobs.length,                                                          tone: "white" },
+            { k: "ACTIVE_WORKLOADS",      v: jobs.filter(j => j.status === "running").length,                      tone: "matrix" },
+            { k: "COMPLETED_BATCHES",     v: jobs.filter(j => j.status === "completed").length,                    tone: "cyan" },
+            { k: "COMPUTE_CREDITS_USED",  v: `$${jobs.reduce((s, j) => s + (j.spent_usdt || 0), 0).toFixed(4)}`,    tone: "cyan" },
+            { k: "EDGE_NODE_FLEET",       v: "ACTIVE",                                                              tone: "matrix" },
+            { k: "ROUTING_LAYER",         v: "NOMINAL",                                                             tone: "matrix" },
           ].map((s) => (
-            <div key={s.label} className="p-6 rounded-2xl glass" data-testid={`customer-stat-${s.label.toLowerCase().replace(/\s/g,'-')}`}>
-              <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">{s.label}</div>
-              <div className="mt-3 text-3xl font-display font-black gold-text font-mono-num">{s.value}</div>
+            <div key={s.k} className="bg-black px-4 py-4" data-testid={`customer-stat-${s.k.toLowerCase().replace(/_/g,'-')}`}>
+              <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">{s.k}</div>
+              <div className={`font-mono font-bold text-[18px] mt-1 tabular-nums truncate ${
+                s.tone === "matrix" ? "text-[#00ff88]" :
+                s.tone === "cyan"   ? "text-[#00d9ff]" : "text-white"
+              }`}>{s.v}</div>
             </div>
           ))}
         </div>

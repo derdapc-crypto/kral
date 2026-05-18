@@ -110,20 +110,46 @@ export default function Admin() {
 
   return (
     <BootSequence>
-    <div className="min-h-[calc(100vh-4rem)] cyber-bg cyber-scanlines">
-      <div className="absolute inset-0 cyber-grid opacity-40 pointer-events-none" />
-      <div className="relative max-w-7xl mx-auto px-6 sm:px-10 py-10">
-        <div className="mb-10 flex justify-between flex-wrap items-end gap-4">
-          <div>
-            <div className="text-[10px] tracking-[0.4em] uppercase text-[#00ffe1] font-mono-term flex items-center gap-2">
-              <Terminal className="w-3 h-3" /> ./command_center · operator_only
-            </div>
-            <h1 className="font-mono-cyber text-4xl sm:text-5xl font-black tracking-tight mt-2 glitch-soft">
-              <span className="cyan-text">Grid</span>{" "}
-              <span className="matrix-text">Command_Center</span>
+    <div className="min-h-screen bg-black text-white relative">
+      {/* vNext immersive operations background */}
+      <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 bg-black" />
+        <div className="absolute inset-0 opacity-[0.4]"
+             style={{
+               backgroundImage:
+                 "linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)",
+               backgroundSize: "44px 44px",
+               maskImage: "radial-gradient(ellipse at 50% 20%, black 35%, transparent 80%)",
+               WebkitMaskImage: "radial-gradient(ellipse at 50% 20%, black 35%, transparent 80%)",
+             }} />
+        <div className="absolute -top-32 -left-32 w-[700px] h-[700px] rounded-full blur-[140px] opacity-[0.14]"
+             style={{ background: "radial-gradient(circle, #00ff88 0%, transparent 60%)" }} />
+        <div className="absolute top-1/2 -right-40 w-[640px] h-[640px] rounded-full blur-[140px] opacity-[0.12]"
+             style={{ background: "radial-gradient(circle, #00d9ff 0%, transparent 60%)" }} />
+        <div className="absolute inset-0"
+             style={{
+               backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)",
+               mixBlendMode: "multiply", opacity: 0.5,
+             }} />
+      </div>
+
+      <div className="relative max-w-[1500px] mx-auto px-6 lg:px-10 pt-12 pb-20">
+        {/* vNext Command Center Header */}
+        <div className="border-b border-white/[0.08] pb-7 mb-8">
+          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88] mb-4 flex items-center gap-2">
+            <Terminal className="w-3 h-3" /> // operator.command_center · operations_layer
+          </div>
+          <div className="flex flex-wrap justify-between items-end gap-4">
+            <h1 className="font-display text-white"
+                style={{ fontSize: "clamp(36px, 5vw, 72px)", letterSpacing: "-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+              GRID //{" "}
+              <span style={{
+                background: "linear-gradient(96deg, #00ff88, #00d9ff)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              }}>COMMAND_CENTER</span>
             </h1>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="mt-6 flex gap-2 flex-wrap">
             <Tab active={tab === "map"} onClick={() => setTab("map")} testId="admin-tab-map">Command Center</Tab>
             <Tab active={tab === "android"} onClick={() => setTab("android")} testId="admin-tab-android">
               <span className="inline-flex items-center gap-1.5"><Cpu className="w-3 h-3" /> Real Android</span>
@@ -140,23 +166,23 @@ export default function Admin() {
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {/* Telemetry Wall — ribbon */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/[0.06] mb-10">
           {[
-            { label: "ACTIVE_NODES", val: activeDevices.length, icon: Radio, testId: "stat-active-nodes" },
-            { label: "TOTAL_DEVICES", val: devices.length, icon: Globe2, testId: "stat-total-devices" },
-            { label: "PENDING_JOBS", val: pendingJobs, icon: Briefcase, testId: "stat-pending-jobs" },
-            { label: "REAL_WALLET·USDT", val: ledger ? ledger.worker_owed_usdt.toFixed(4) : "—",
-              sub: ledger?.rvn_payout_address ? "USDT BEP20 linked" : "no payout linked",
-              icon: CircleDollarSign, testId: "stat-real-wallet" },
+            { label: "VERIFIED_ACTIVE_NODES", val: activeDevices.length,                                          tone: "matrix", testId: "stat-active-nodes" },
+            { label: "TOTAL_REGISTERED",       val: devices.length,                                                tone: "cyan",   testId: "stat-total-devices" },
+            { label: "PENDING_WORKLOADS",      val: pendingJobs,                                                   tone: "amber",  testId: "stat-pending-jobs" },
+            { label: "TREASURY_OWED·USDT",     val: ledger ? ledger.worker_owed_usdt.toFixed(4) : "—",
+              sub: ledger?.rvn_payout_address ? "USDT BEP20 linked" : "no payout linked",                          tone: "white",  testId: "stat-real-wallet" },
           ].map((s) => (
-            <div key={s.label} className="p-6 rounded-2xl cyber-card" data-testid={s.testId}>
-              <div className="flex items-center justify-between">
-                <div className="text-[9px] uppercase tracking-[0.4em] text-[#00ffe1]/60 font-mono-term">{s.label}</div>
-                <s.icon className="w-4 h-4 cyan-text" />
-              </div>
-              <div className="mt-3 text-3xl font-mono-cyber font-black cyan-text">{s.val}</div>
-              {s.sub && <div className="mt-1 text-[9px] uppercase tracking-widest text-white/35 font-mono-term">{s.sub}</div>}
+            <div key={s.label} className="bg-black px-5 py-4" data-testid={s.testId}>
+              <div className="font-mono uppercase tracking-[0.3em] text-[9px] text-white/40">{s.label}</div>
+              <div className={`font-mono font-bold text-[24px] mt-1 tabular-nums ${
+                s.tone === "matrix" ? "text-[#00ff88]" :
+                s.tone === "cyan"   ? "text-[#00d9ff]" :
+                s.tone === "amber"  ? "text-amber-300" : "text-white"
+              }`}>{s.val}</div>
+              {s.sub && <div className="mt-1 font-mono uppercase tracking-[0.2em] text-[9px] text-white/30">{s.sub}</div>}
             </div>
           ))}
         </div>
