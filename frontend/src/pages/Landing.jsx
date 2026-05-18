@@ -1,1337 +1,860 @@
-import React, { useEffect, useRef, useState, lazy, Suspense } from "react";
+/*
+ * THE GRID — Landing (vNext "Immersive Authority Surface")
+ *
+ * Total rewrite per /app/design_guidelines.json:
+ * 8 sections, each its own visual language. No card-stacked dashboard.
+ *   1. Cinematic Hero (full-viewport split)
+ *   2. Live Network Command Panel (full-width telemetry ribbon)
+ *   3. Compute-Time Receipt Manifesto (split-screen)
+ *   4. Scarcity Progress Console (massive 1M neon bar)
+ *   5. Premium APK Deployment Module (VERIFIED BUILD console)
+ *   6. Foundation Buyback Policy Panel (rigid swiss grid)
+ *   7. B2B SaaS Compute Surface Preview (parallax mockup)
+ *   8. Final CTA Wall (massive trigger)
+ *
+ * Backend bindings preserved: /api/network/scarcity-progress,
+ * /api/apk/version, /api/token/launch, /api/foundation/buyback-status
+ */
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import {
-  Smartphone, Cpu, ShieldCheck, BatteryCharging, Wifi, Thermometer,
-  Hand, PowerOff, Layers, Server, Wallet, Terminal, ArrowRight,
-  Check, Activity, Globe2, Briefcase, Download, FileCheck2,
-  Lock, AlertTriangle, ArrowUpRight, Sparkles, TrendingUp, Users,
-  QrCode, Zap,
+  Cpu, Activity, ArrowRight, ArrowUpRight, Download, Server,
+  ShieldCheck, Lock, FileCheck2, Terminal, Globe2, Sparkles,
+  Briefcase, ChevronRight, Layers,
 } from "lucide-react";
 import QRCode from "qrcode";
-import { api } from "../lib/api";
+import NetworkTopology from "../components/NetworkTopology";
 
-// vNext — Three.js globe disabled in dev due to R3F+React 19 source-tracking
-// regression ("x-line-number" runtime overlay).  The SVG ComputeCoreVisual
-// already delivers a premium topology feel; we keep the lazy import wiring
-// behind a feature flag so we can flip it back on once R3F v9 patches React
-// 19's __source prop intercept.
-const ENABLE_THREEJS_GLOBE = false;
-// eslint-disable-next-line no-unused-vars
-const LiveGlobe3D = lazy(() => import("../components/LiveGlobe3D"));
+const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
 
-/* ----------------------------- helpers ----------------------------- */
-function useReveal() {
-  const ref = React.useRef(null);
-  const [shown, setShown] = useState(false);
+/* ============================================================ */
+/*  PAGE                                                        */
+/* ============================================================ */
+export default function Landing() {
+  const [scarcity, setScarcity] = useState(null);
+  const [apk, setApk] = useState(null);
+
   useEffect(() => {
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) setShown(true); },
-      { threshold: 0.12 });
-    if (ref.current) io.observe(ref.current);
-    return () => io.disconnect();
-  }, []);
-  return [ref, shown];
-}
-
-function useCountUp(target, dur = 900) {
-  const [v, setV] = useState(0);
-  useEffect(() => {
-    const start = 0;
-    const t0 = Date.now();
-    let raf;
-    const tick = () => {
-      const t = Math.min(1, (Date.now() - t0) / dur);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setV(start + (Number(target) - start) * eased);
-      if (t < 1) raf = requestAnimationFrame(tick);
+    const load = async () => {
+      try {
+        const s = await fetch(`${BACKEND}/api/network/scarcity-progress`).then(r => r.json());
+        setScarcity(s);
+      } catch {}
+      try {
+        const a = await fetch(`${BACKEND}/api/apk/version`).then(r => r.json());
+        setApk(a);
+      } catch {}
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, dur]);
-  return v;
-}
+    load();
+    const t = setInterval(load, 25_000);
+    return () => clearInterval(t);
+  }, []);
 
-/* ----------------------------- HERO ----------------------------- */
-function HeroStatusPill({ tone = "info", flash = false, children, testId }) {
   return (
-    <span className={`landing-pill ${tone} ${flash ? "pill-flash" : ""}`} data-testid={testId}>
-      <span className="dot" /> {children}
-    </span>
+    <main className="bg-black text-white antialiased selection:bg-[#00ff88] selection:text-black overflow-x-hidden" data-testid="landing-page">
+      <BackgroundSystem />
+      <NavBar apk={apk} />
+      <Hero scarcity={scarcity} apk={apk} />
+      <LiveCommandPanel scarcity={scarcity} />
+      <ManifestoSection />
+      <ScarcityConsole scarcity={scarcity} />
+      <DeploymentModule apk={apk} />
+      <BuybackPolicyPanel />
+      <B2BPreview />
+      <FinalCTA apk={apk} />
+      <FooterStrip apk={apk} />
+    </main>
   );
 }
 
-function ComputeCoreVisual() {
-  // SVG beams from satellites to nucleus center (relative to 460x460 viewBox)
-  const beams = [
-    { x: 60, y: 60 },   // top-left
-    { x: 400, y: 60 },  // top-right
-    { x: 30, y: 380 },  // bottom-left
-    { x: 420, y: 410 }, // bottom-right
-    { x: 470, y: 230 }, // right
-  ];
+/* ============================================================ */
+/*  Background System — 5 layered cinematic ambient layers      */
+/* ============================================================ */
+function BackgroundSystem() {
   return (
-    <div className="compute-core" data-testid="hero-compute-core">
-      <span className="core-ring" />
-      <span className="core-ring" />
-      <span className="core-ring" />
-      {/* beams */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 460 460">
-        <defs>
-          <linearGradient id="beamGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"  stopColor="rgba(0,212,255,0.0)" />
-            <stop offset="55%" stopColor="rgba(0,255,225,0.55)" />
-            <stop offset="100%" stopColor="rgba(0,255,225,0.0)" />
-          </linearGradient>
-        </defs>
-        {beams.map((b, i) => (
-          <line key={i} x1={b.x} y1={b.y} x2={230} y2={230}
-                stroke="url(#beamGrad)" strokeWidth="1.2" className="beam-line"
-                style={{ animationDelay: `${i * 0.7}s` }} />
-        ))}
-      </svg>
-      <span className="core-nucleus" />
-      <div className="node-sat sat-1"><Smartphone className="w-5 h-5" /></div>
-      <div className="node-sat sat-2"><Smartphone className="w-5 h-5" /></div>
-      <div className="node-sat sat-3"><Smartphone className="w-5 h-5" /></div>
-      <div className="node-sat sat-4"><Smartphone className="w-5 h-5" /></div>
-      <div className="node-sat sat-5"><Smartphone className="w-5 h-5" /></div>
+    <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+      {/* layer 1 — pure black floor */}
+      <div className="absolute inset-0 bg-black" />
+
+      {/* layer 2 — circuit grid (SVG repeating, soft fade) */}
+      <div className="absolute inset-0 opacity-[0.4]"
+           style={{
+             backgroundImage:
+               "linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), " +
+               "linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)",
+             backgroundSize: "44px 44px",
+             maskImage: "radial-gradient(ellipse at 50% 30%, black 35%, transparent 78%)",
+             WebkitMaskImage: "radial-gradient(ellipse at 50% 30%, black 35%, transparent 78%)",
+           }} />
+
+      {/* layer 3 — radial neon glows */}
+      <div className="absolute -top-32 -left-32 w-[720px] h-[720px] rounded-full blur-[140px] opacity-[0.16]"
+           style={{ background: "radial-gradient(circle, #00ff88 0%, transparent 60%)" }} />
+      <div className="absolute top-1/3 -right-40 w-[640px] h-[640px] rounded-full blur-[140px] opacity-[0.14]"
+           style={{ background: "radial-gradient(circle, #00d9ff 0%, transparent 60%)" }} />
+      <div className="absolute bottom-0 left-1/4 w-[800px] h-[420px] rounded-full blur-[160px] opacity-[0.10]"
+           style={{ background: "radial-gradient(circle, #6c7bff 0%, transparent 60%)" }} />
+
+      {/* layer 4 — slow moving beams */}
+      <motion.div className="absolute top-[18%] -left-[10%] w-[60%] h-px"
+                  style={{ background: "linear-gradient(90deg, transparent, rgba(0,217,255,0.4), transparent)" }}
+                  animate={{ x: ["0%", "180%"] }}
+                  transition={{ duration: 14, repeat: Infinity, ease: "linear" }} />
+      <motion.div className="absolute top-[62%] -left-[10%] w-[55%] h-px"
+                  style={{ background: "linear-gradient(90deg, transparent, rgba(0,255,136,0.35), transparent)" }}
+                  animate={{ x: ["0%", "180%"] }}
+                  transition={{ duration: 18, repeat: Infinity, ease: "linear", delay: 4 }} />
+
+      {/* layer 5 — scanline + grain */}
+      <div className="absolute inset-0"
+           style={{
+             backgroundImage:
+               "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)",
+             mixBlendMode: "multiply", opacity: 0.5,
+           }} />
+      <div className="absolute inset-0 opacity-[0.05] mix-blend-overlay"
+           style={{
+             backgroundImage:
+               "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\")",
+           }} />
     </div>
   );
 }
 
-function Hero({ stats, apk }) {
-  // Detect when an important live signal changes and pulse the matching pill.
-  const [flashNodes, setFlashNodes] = useState(false);
-  const [flashShares, setFlashShares] = useState(false);
-  const prevNodes = useRef(null);
-  const prevShares = useRef(null);
-  // Lazy-load the 3D globe only on viewports wide enough to benefit from it.
-  const [enable3D, setEnable3D] = useState(false);
-  // vNext — fetch real scarcity for the hero stat strip
-  const [scarcity, setScarcity] = useState(null);
+/* ============================================================ */
+/*  NavBar — minimal, command-bar style                         */
+/* ============================================================ */
+function NavBar({ apk }) {
+  return (
+    <header className="fixed top-0 inset-x-0 z-40 border-b border-white/[0.06] bg-black/55 backdrop-blur-xl"
+            data-testid="nav-bar">
+      <div className="max-w-[1400px] mx-auto px-6 lg:px-10 h-16 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-3" data-testid="nav-home">
+          <div className="w-8 h-8 rounded-md border border-[#00ff88]/40 grid place-items-center bg-black">
+            <Cpu className="w-4 h-4 text-[#00ff88]" />
+          </div>
+          <div className="font-mono uppercase tracking-[0.3em] text-[12px] text-white">the.grid</div>
+          <span className="hidden sm:inline-block text-[10px] uppercase tracking-[0.3em] text-white/35 border-l border-white/10 pl-3 ml-1">
+            distributed compute · pre-mainnet
+          </span>
+        </Link>
+        <nav className="hidden md:flex items-center gap-7 text-[12px] uppercase tracking-[0.25em] text-white/65">
+          <a href="#network"  className="hover:text-white transition">network</a>
+          <a href="#protocol" className="hover:text-white transition">protocol</a>
+          <a href="#deploy"   className="hover:text-white transition">deploy</a>
+          <Link to="/token"   className="hover:text-white transition">tgc</Link>
+          <Link to="/customer"className="hover:text-white transition">enterprise</Link>
+        </nav>
+        <div className="flex items-center gap-2">
+          <Link to="/login" className="text-[12px] uppercase tracking-[0.25em] text-white/55 hover:text-white px-3 py-1.5"
+                data-testid="nav-signin">sign in</Link>
+          <a href={apk?.download_url || "#deploy"}
+             data-testid="nav-deploy"
+             className="text-[11px] font-mono uppercase tracking-[0.3em] px-4 py-2 rounded-md bg-[#00ff88] text-black font-bold
+                        shadow-[0_0_24px_-4px_rgba(0,255,136,0.55)] hover:shadow-[0_0_36px_-4px_rgba(0,255,136,0.85)] transition">
+            deploy node
+          </a>
+        </div>
+      </div>
+    </header>
+  );
+}
 
-  useEffect(() => {
-    const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const r = await fetch(`${BACKEND}/api/network/scarcity-progress`);
-        const d = await r.json();
-        if (!cancelled) setScarcity(d);
-      } catch { /* */ }
-    };
-    load();
-    const t = setInterval(load, 20000);
-    return () => { cancelled = true; clearInterval(t); };
-  }, []);
+/* ============================================================ */
+/*  1. Cinematic Hero — full viewport split                     */
+/* ============================================================ */
+function Hero({ scarcity, apk }) {
+  const verified = scarcity?.verified_active_nodes ?? 0;
+  const phase    = (scarcity?.phase || "growth").toUpperCase();
 
-  useEffect(() => {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const wide   = window.matchMedia("(min-width: 1024px)").matches;
-    if (!reduce && wide && ENABLE_THREEJS_GLOBE) setEnable3D(true);
-  }, []);
+  return (
+    <section className="relative min-h-screen flex items-center pt-24 pb-16 px-6 lg:px-10" data-testid="hero">
+      <div className="max-w-[1400px] mx-auto w-full grid lg:grid-cols-[1.05fr_0.95fr] gap-10 lg:gap-14 items-center">
 
-  useEffect(() => {
-    if (!stats) return;
-    const newNodes = stats.mining_devices ?? 0;
-    const newShares = stats.accepted_shares_total ?? 0;
-    if (prevNodes.current !== null && newNodes !== prevNodes.current) {
-      setFlashNodes(true);
-      const t = setTimeout(() => setFlashNodes(false), 1200);
-      return () => clearTimeout(t);
-    }
-    if (prevShares.current !== null && newShares > prevShares.current) {
-      setFlashShares(true);
-      const t = setTimeout(() => setFlashShares(false), 1200);
-      return () => clearTimeout(t);
-    }
-  }, [stats?.mining_devices, stats?.accepted_shares_total]);
+        {/* LEFT — Brutalist headline */}
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
+          {/* eyebrow */}
+          <div className="flex items-center gap-3 mb-8">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#00ff88] shadow-[0_0_10px_2px_rgba(0,255,136,0.65)]" />
+            <span className="font-mono uppercase tracking-[0.4em] text-[10px] text-white/65">
+              global.distributed.compute / pre-mainnet
+            </span>
+          </div>
 
-  useEffect(() => {
-    if (stats) {
-      prevNodes.current = stats.mining_devices ?? 0;
-      prevShares.current = stats.accepted_shares_total ?? 0;
-    }
-  }, [stats]);
+          <h1 className="font-display text-white"
+              style={{
+                fontSize: "clamp(56px, 8.4vw, 124px)",
+                lineHeight: "0.92",
+                letterSpacing: "-0.045em",
+                fontWeight: 600,
+              }}>
+            Idle&nbsp;devices.<br/>
+            <span style={{
+              background: "linear-gradient(96deg, #00ff88 0%, #00d9ff 55%, #6c7bff 100%)",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}>Verified&nbsp;compute.</span><br/>
+            <span className="text-white/65">Global&nbsp;scale.</span>
+          </h1>
 
+          <p className="mt-10 text-[17px] leading-relaxed text-white/55 max-w-[540px]">
+            THE GRID transforms ordinary phones into a verified distributed compute layer.
+            Every cycle is recorded as a <span className="text-[#00ff88]">compute-time receipt</span> —
+            a pre-mainnet protocol bound to <em className="not-italic text-white">verified network growth</em>,
+            not an arbitrary countdown.
+          </p>
+
+          {/* CTA */}
+          <div className="mt-12 flex flex-wrap gap-3 items-center">
+            <a href={apk?.download_url || "#deploy"}
+               data-testid="hero-cta-primary"
+               className="group inline-flex items-center gap-3 px-7 py-4 rounded-md bg-[#00ff88] text-black font-mono font-bold text-[12px] uppercase tracking-[0.35em]
+                          shadow-[0_0_60px_-12px_rgba(0,255,136,0.7)] hover:shadow-[0_0_80px_-12px_rgba(0,255,136,1)] transition-all">
+              <Download className="w-4 h-4" />
+              deploy node client
+              <ArrowRight className="w-4 h-4 -mr-1 group-hover:translate-x-1 transition-transform" />
+            </a>
+            <Link to="/token"
+                  data-testid="hero-cta-protocol"
+                  className="inline-flex items-center gap-2 px-6 py-4 rounded-md border border-white/15 hover:border-white/40 text-white/85 hover:text-white
+                             font-mono text-[12px] uppercase tracking-[0.3em] transition-colors">
+              read protocol
+              <ArrowUpRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* tiny telemetry foot */}
+          <div className="mt-14 grid grid-cols-3 gap-px bg-white/[0.06] max-w-[520px]" data-testid="hero-telemetry-strip">
+            <FootMetric label="VERIFIED NODES"  value={verified.toLocaleString()} tone="matrix" />
+            <FootMetric label="NETWORK TARGET"  value="1,000,000"                tone="cyan" />
+            <FootMetric label="PHASE"           value={phase}                     tone="violet" />
+          </div>
+        </motion.div>
+
+        {/* RIGHT — Topology centerpiece */}
+        <motion.div initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
+                    className="relative aspect-square w-full max-w-[640px] lg:max-w-none mx-auto self-stretch">
+          {/* black bordered window */}
+          <div className="absolute inset-0 border border-white/[0.08] rounded-lg bg-black/55 overflow-hidden">
+            <NetworkTopology className="w-full h-full" />
+          </div>
+          {/* corner crosshair marks */}
+          {["top-0 left-0", "top-0 right-0 rotate-90", "bottom-0 left-0 -rotate-90", "bottom-0 right-0 rotate-180"].map((c, i) => (
+            <span key={i} className={`absolute ${c} w-4 h-4 border-l border-t border-[#00ff88]/65 m-2`} />
+          ))}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function FootMetric({ label, value, tone }) {
+  const color = tone === "matrix" ? "#00ff88" : tone === "cyan" ? "#00d9ff" : "#6c7bff";
+  return (
+    <div className="bg-black px-4 py-3" data-testid={`foot-${label.toLowerCase().replace(/\s/g,'-')}`}>
+      <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">{label}</div>
+      <div className="font-mono font-bold text-[20px] mt-1 tabular-nums" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+/* ============================================================ */
+/*  2. Live Network Command Panel — full-width ribbon           */
+/* ============================================================ */
+function LiveCommandPanel({ scarcity }) {
   const verified = scarcity?.verified_active_nodes ?? 0;
   const target   = scarcity?.target_active_nodes ?? 1_000_000;
   const pct      = scarcity?.progress_pct ?? 0;
 
   return (
-    <section className="relative pt-20 pb-28 md:pt-28 md:pb-36 px-6 sm:px-10 overflow-hidden grid-immersive-bg" data-testid="hero">
-      <div className="max-w-7xl mx-auto grid lg:grid-cols-[1.05fr_1fr] gap-12 lg:gap-20 items-center relative z-10">
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
-          {/* terminal eyebrow */}
-          <div className="flex items-center gap-3 mb-6">
-            <span className="eyebrow eyebrow-matrix">// distributed_compute</span>
-            <span className="h-px flex-1 bg-gradient-to-r from-[#00ff88]/40 to-transparent max-w-[140px]" />
-          </div>
+    <section className="relative py-6 border-y border-white/[0.06] bg-black/80 backdrop-blur" id="network" data-testid="live-command-panel">
+      {/* sweeping vertical beam */}
+      <motion.div className="absolute top-0 bottom-0 w-px"
+                  style={{ background: "linear-gradient(180deg, transparent, rgba(0,255,136,0.55), transparent)" }}
+                  animate={{ x: [0, 1400] }}
+                  transition={{ duration: 9, repeat: Infinity, ease: "linear" }} />
+      <div className="max-w-[1400px] mx-auto px-6 lg:px-10">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="motion-telemetry-blink w-2 h-2 rounded-full bg-[#00ff88]" />
+          <span className="font-mono uppercase tracking-[0.4em] text-[10px] text-white/45">
+            // live.command.feed — verified telemetry only
+          </span>
+          <span className="ml-auto font-mono uppercase tracking-[0.25em] text-[10px] text-white/45 tabular-nums">
+            t-{(Date.now()/1000).toFixed(0)}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-px bg-white/[0.05]">
+          <RibbonCell label="VERIFIED_NODES"     value={verified.toLocaleString()}                           tone="matrix" />
+          <RibbonCell label="NETWORK_TARGET"     value={target.toLocaleString()} />
+          <RibbonCell label="PROGRESS"           value={`${pct.toFixed(4)}%`}                                tone="cyan" />
+          <RibbonCell label="PHASE"              value={(scarcity?.phase || "growth").toUpperCase()}         tone="violet" />
+          <RibbonCell label="LEDGER"             value="SEALED · PRE-MAINNET"                                tone="amber" />
+          <RibbonCell label="BUYBACK_WINDOW"     value="CLOSED"                                              tone="amber" />
+        </div>
+      </div>
+    </section>
+  );
+}
 
-          {/* status pills — premium */}
-          <div className="flex flex-wrap gap-2 mb-7">
-            <HeroStatusPill tone={apk == null ? "info" : apk?.native_lib_embedded ? "ok" : "warn"} testId="hero-status-pill">
-              {apk == null ? "Booting telemetry…" :
-               apk?.native_lib_embedded ? `Native Engine v${apk.version} Ready` : "Native Engine Pending"}
-            </HeroStatusPill>
-            <HeroStatusPill tone={verified > 0 ? "ok" : "info"} flash={flashNodes} testId="pill-active-nodes">
-              {verified > 0
-                ? `${verified.toLocaleString()} Verified Edge Node${verified === 1 ? "" : "s"}`
-                : "Awaiting first verified cohort"}
-            </HeroStatusPill>
-            <HeroStatusPill tone="info">
-              Pre-Mainnet · Milestone-Driven
-            </HeroStatusPill>
-          </div>
+function RibbonCell({ label, value, tone }) {
+  const color = tone === "matrix" ? "#00ff88"
+              : tone === "cyan"   ? "#00d9ff"
+              : tone === "violet" ? "#6c7bff"
+              : tone === "amber"  ? "#fbbf24"
+              : "#f5f7fa";
+  return (
+    <div className="bg-black px-4 py-4">
+      <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/35">{label}</div>
+      <div className="font-mono font-bold text-[16px] md:text-[18px] mt-1 tabular-nums truncate" style={{ color }}>
+        {value}
+      </div>
+    </div>
+  );
+}
 
-          {/* cinematic headline */}
-          <h1 className="font-display leading-[0.98] text-white"
-              style={{ fontSize: "clamp(42px, 6.5vw, 80px)", letterSpacing: "-0.035em", fontWeight: 800 }}>
-            Idle devices.<br/>
-            <span style={{
-              background: "linear-gradient(90deg, #00ff88 0%, #1be7ff 55%, #6c7bff 100%)",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}>Verified compute.</span><br/>
-            <span className="text-white/70">Global scale.</span>
-          </h1>
-
-          <p className="mt-7 text-[17px] leading-relaxed text-white/65 max-w-xl font-sans-saas">
-            THE GRID, sıradan akıllı telefonları doğrulanmış bir distributed compute katmanına dönüştürür.
-            Her katkı bir <span className="text-[#00ff88]">compute-time receipt</span> olarak kaydedilir —
-            zamana değil, doğrulanmış ağ büyümesine bağlı bir pre-mainnet protokolü.
-          </p>
-
-          {/* premium CTA row */}
-          <div className="mt-9 flex flex-wrap gap-3">
-            <a href={apk?.download_url || "/grid-worker-v1.5.8.apk"}
-               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-mono-cyber font-black text-sm tracking-widest uppercase
-                          bg-[#00ff88] text-black edge-glow-matrix transition-transform hover:scale-[1.02]"
-               data-testid="hero-cta-download">
-              <Download className="w-4 h-4" /> Deploy Node Client
-            </a>
-            <a href="#network"
-               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-mono-cyber font-bold text-sm tracking-widest uppercase
-                          border border-[#00d9ff]/30 text-[#00d9ff] bg-[#00d9ff]/[0.04] hover:bg-[#00d9ff]/10 transition"
-               data-testid="hero-cta-network">
-              <Activity className="w-4 h-4" /> Live Topology
-            </a>
-            <Link to="/register?role=customer"
-                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-mono-cyber font-bold text-sm tracking-widest uppercase
-                             border border-white/15 text-white/75 hover:border-white/40 hover:text-white transition"
-                  data-testid="hero-cta-portal">
-              <Briefcase className="w-4 h-4" /> Enterprise Compute
-            </Link>
+/* ============================================================ */
+/*  3. Compute-Time Receipt Manifesto — split screen            */
+/* ============================================================ */
+function ManifestoSection() {
+  return (
+    <section className="relative py-32 px-6 lg:px-10" id="protocol" data-testid="manifesto">
+      <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[1fr_1fr] gap-16 items-center">
+        <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, amount: 0.4 }}
+                    transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
+          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-6">
+            // protocol.thesis
           </div>
-
-          {/* live telemetry strip */}
-          <div className="mt-10 grid grid-cols-3 gap-3 max-w-2xl" data-testid="hero-telemetry-strip">
-            <HeroTelemetry label="Verified Nodes"  value={verified.toLocaleString()}                   tone="matrix" />
-            <HeroTelemetry label="Network Target"  value={target.toLocaleString()}                     tone="cyan" />
-            <HeroTelemetry label="Phase"           value={(scarcity?.phase || "growth").toUpperCase()} tone="violet" />
+          <h2 className="font-display text-white"
+              style={{ fontSize: "clamp(40px, 5vw, 76px)", lineHeight: 0.96, letterSpacing: "-0.04em", fontWeight: 600 }}>
+            Useful compute,<br/>
+            <span style={{ background:"linear-gradient(96deg, #00ff88, #00d9ff)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+              recorded as contribution.
+            </span>
+          </h2>
+          <div className="mt-10 space-y-5 text-white/55 leading-relaxed text-[15px] max-w-xl">
+            <p>$TGC is <span className="text-white">not a coin</span>. It is the cryptographic receipt of every verified compute cycle the network has consumed.</p>
+            <p>Each edge node submits proof of useful work — small, signed, deterministic packets. The protocol seals them into an immutable contribution ledger.</p>
+            <p>At <span className="text-[#00ff88]">1,000,000 verified active nodes</span>, the ledger may enter Snapshot Readiness. The roadmap is conditional, never automatic.</p>
           </div>
-          <div className="mt-3 text-[11px] text-white/35 font-mono-tech">
-            // {pct.toFixed(4)}% of 1M target · subject to community, legal, technical and ecosystem conditions
-          </div>
+          <Link to="/token"
+                data-testid="manifesto-cta"
+                className="mt-10 inline-flex items-center gap-2 text-white/80 hover:text-[#00ff88] font-mono uppercase tracking-[0.3em] text-[11px] transition-colors">
+            read the full protocol page <ChevronRight className="w-3 h-3" />
+          </Link>
         </motion.div>
 
-        {/* Globe / topology canvas */}
-        <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 1.0, delay: 0.15 }}
-                    className="relative grid place-items-center">
-          <div className="relative w-full max-w-[520px] aspect-square">
-            <div className="absolute inset-0 rounded-full"
-                 style={{
-                   background:
-                     "radial-gradient(circle at 50% 50%, rgba(0,217,255,0.18) 0%, rgba(108,123,255,0.06) 40%, transparent 70%)",
-                 }} />
-            {enable3D ? (
-              <Suspense fallback={<ComputeCoreVisual />}>
-                <LiveGlobe3D className="absolute inset-0" />
-              </Suspense>
-            ) : (
-              <ComputeCoreVisual />
-            )}
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/65 border border-[#00d9ff]/25
-                            text-[10px] font-mono tracking-[0.3em] uppercase text-[#00d9ff]">
-              live topology · verified data only
-            </div>
-          </div>
+        {/* receipt visual */}
+        <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.4 }}
+                    transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+                    className="relative">
+          <Receipt />
         </motion.div>
       </div>
     </section>
   );
 }
 
-function HeroTelemetry({ label, value, tone }) {
-  const color = tone === "matrix" ? "#00ff88" : tone === "cyan" ? "#00d9ff" : "#6c7bff";
+function Receipt() {
+  const lines = [
+    ["device_id",        "edge-node-04a9bf"],
+    ["verified_work",    "0x8c7a…f3b1"],
+    ["timestamp_utc",    "2026-02-14T18:07:42Z"],
+    ["signature",        "ed25519:9e21…0a7d"],
+    ["contribution_ms",  "42,810 ms"],
+    ["receipt_hash",     "0x4b2d8e…3a1c"],
+    ["ledger_seq",       "#001,839,204"],
+    ["status",           "VERIFIED"],
+  ];
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-black/40 px-3 py-2.5">
-      <div className="text-[9px] uppercase tracking-[0.3em] font-mono-term text-white/45">{label}</div>
-      <div className="font-display font-black text-lg num-display mt-0.5" style={{ color }}>{value}</div>
+    <div className="font-mono text-[12px] relative">
+      {/* paper background */}
+      <div className="bg-[#06090d] border border-white/[0.08] p-6 lg:p-7 relative overflow-hidden"
+           style={{ clipPath: "polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%)" }}>
+        <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 mb-4">
+          <span className="text-[#00ff88] uppercase tracking-[0.3em] text-[10px]">// compute-time receipt</span>
+          <span className="text-white/35 text-[10px]">v0.4</span>
+        </div>
+        <div className="space-y-2.5">
+          {lines.map(([k, v], i) => (
+            <motion.div key={k} className="grid grid-cols-[1fr_1.4fr] gap-3"
+                        initial={{ opacity: 0, x: -6 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.4, delay: i * 0.08 }}>
+              <span className="text-white/40 uppercase tracking-[0.2em] text-[10px]">{k}</span>
+              <span className={`tabular-nums ${k === "status" ? "text-[#00ff88]" : "text-white/85"}`}>{v}</span>
+            </motion.div>
+          ))}
+        </div>
+        <div className="mt-5 pt-3 border-t border-dashed border-white/[0.12] text-[10px] text-white/35 uppercase tracking-[0.3em]">
+          // sealed · pre-mainnet · contribution ledger
+        </div>
+      </div>
+      {/* glow */}
+      <div className="absolute -inset-8 -z-10 bg-[#00ff88]/10 blur-3xl rounded-full" />
     </div>
   );
 }
 
-function DeploySpec({ k, v, tone }) {
+/* ============================================================ */
+/*  4. Scarcity Progress Console — massive 1M bar               */
+/* ============================================================ */
+function ScarcityConsole({ scarcity }) {
+  const verified = scarcity?.verified_active_nodes ?? 0;
+  const target   = scarcity?.target_active_nodes ?? 1_000_000;
+  const pct      = scarcity?.progress_pct ?? 0;
+  const phase    = (scarcity?.phase || "growth").toUpperCase();
+  const phases = ["GROWTH", "SNAPSHOT_REVIEW", "AUDIT", "GOVERNANCE", "MAINNET_CANDIDATE"];
+
+  return (
+    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]"
+             data-testid="scarcity-console">
+      <div className="max-w-[1400px] mx-auto">
+        {/* console header */}
+        <div className="flex items-baseline justify-between flex-wrap gap-4 border-b border-white/[0.08] pb-5 mb-10">
+          <div>
+            <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-2">
+              // network.scarcity_progress
+            </div>
+            <h2 className="font-display text-white"
+                style={{ fontSize: "clamp(34px, 4vw, 60px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 1 }}>
+              The clock does not exist.<br/>
+              <span className="text-white/55">Only the network does.</span>
+            </h2>
+          </div>
+          <div className="text-right">
+            <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/40">target</div>
+            <div className="font-display font-bold text-[40px] lg:text-[56px] tabular-nums text-[#00d9ff]" style={{ letterSpacing: "-0.04em" }}>
+              1,000,000
+            </div>
+          </div>
+        </div>
+
+        {/* phase pipeline */}
+        <div className="grid grid-cols-5 gap-2 mb-10" data-testid="phase-pipeline">
+          {phases.map((p) => {
+            const active = p === phase;
+            return (
+              <div key={p}
+                   className={`px-3 py-2.5 border ${active ? "border-[#00ff88]/70 bg-[#00ff88]/[0.06]" : "border-white/[0.08] bg-black/30"}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-[#00ff88]" : "bg-white/20"}`}
+                        style={active ? { boxShadow: "0 0 8px 1px #00ff88" } : {}} />
+                  <span className={`font-mono uppercase tracking-[0.2em] text-[9px] ${active ? "text-[#00ff88]" : "text-white/35"} truncate`}>
+                    {p.replace("_", " ")}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* gigantic verified count */}
+        <div className="grid lg:grid-cols-[1.4fr_1fr] gap-10 items-end mb-8">
+          <div>
+            <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/45 mb-3">
+              verified_active_nodes
+            </div>
+            <div className="font-display tabular-nums leading-none"
+                 style={{
+                   fontSize: "clamp(80px, 13vw, 200px)",
+                   letterSpacing: "-0.06em", fontWeight: 700,
+                   background: "linear-gradient(180deg, #00ff88 0%, #00d9ff 100%)",
+                   WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                 }}
+                 data-testid="scarcity-mega-count">
+              {verified.toLocaleString()}
+            </div>
+          </div>
+          <div className="space-y-4 text-white/55 text-[14px] leading-relaxed">
+            <p>
+              Pre-mainnet contribution accumulation is tied to <span className="text-white">real verified network growth</span>,
+              not a calendar. When the count reaches <span className="text-[#00ff88]">1,000,000</span>, the ledger may enter
+              Snapshot Readiness review.
+            </p>
+            <p className="text-amber-300/85 text-[12px] font-mono uppercase tracking-[0.2em]">
+              // roadmap progression is subject to community, legal,
+              <br/>technical and ecosystem conditions
+            </p>
+          </div>
+        </div>
+
+        {/* neon progress bar */}
+        <div className="relative" data-testid="scarcity-bar">
+          <div className="flex items-baseline justify-between mb-3">
+            <span className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/45">
+              0
+            </span>
+            <span className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/45">
+              {target.toLocaleString()}
+            </span>
+          </div>
+          <div className="relative h-4 bg-white/[0.03] border border-white/[0.08] overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.max(0.4, pct)}%` }}
+              transition={{ duration: 2.5, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute top-0 bottom-0 left-0"
+              style={{
+                background: "linear-gradient(90deg, #00ff88, #00d9ff)",
+                boxShadow: "0 0 40px 4px rgba(0,255,136,0.5)",
+              }}
+            />
+            <motion.div className="absolute top-0 bottom-0 w-32"
+                        style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)" }}
+                        animate={{ x: ["-100%", "1400%"] }}
+                        transition={{ duration: 6, repeat: Infinity, ease: "linear" }} />
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-white/35">
+              // no fake inflation
+            </span>
+            <span className="font-mono font-bold text-[15px] text-[#00ff88] tabular-nums">
+              {pct.toFixed(4)}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ============================================================ */
+/*  5. Premium APK Deployment Module                            */
+/* ============================================================ */
+function DeploymentModule({ apk }) {
+  const [qr, setQr] = useState(null);
+  useEffect(() => {
+    if (!apk?.download_url) return;
+    const url = apk.download_url.startsWith("http") ? apk.download_url : window.location.origin + apk.download_url;
+    QRCode.toDataURL(url, { width: 320, margin: 0,
+      color: { dark: "#00ff88", light: "#00000000" } }).then(setQr);
+  }, [apk]);
+
+  const apkUrl = apk?.download_url
+    ? (apk.download_url.startsWith("http") ? apk.download_url : window.location.origin + apk.download_url)
+    : "";
+
+  return (
+    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" id="deploy" data-testid="deploy-module">
+      <div className="max-w-[1400px] mx-auto">
+        <div className="flex items-end justify-between flex-wrap gap-4 mb-10">
+          <div>
+            <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-3">
+              // deploy_node_client.exec
+            </div>
+            <h2 className="font-display text-white"
+                style={{ fontSize: "clamp(34px, 4.2vw, 64px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 0.96 }}>
+              The installer is a <span className="text-[#00ff88]">verified binary</span>,<br/>
+              not an app-store badge.
+            </h2>
+          </div>
+          <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-[#00ff88]">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#00ff88] mr-2 align-middle motion-telemetry-blink" />
+            signed v2 + v3
+          </div>
+        </div>
+
+        <div className="border border-white/[0.08] bg-black/70 backdrop-blur-xl">
+          {/* console top bar */}
+          <div className="flex items-center gap-3 px-5 py-3 border-b border-white/[0.08] text-[10px] font-mono uppercase tracking-[0.3em] text-white/55">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#00ff88]/85" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#00d9ff]/55" />
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400/55" />
+            <span className="ml-3 truncate">/grid/dist/grid-worker-v{apk?.version || "—"}.apk</span>
+            <span className="ml-auto text-[#00ff88]/85">OK</span>
+          </div>
+
+          <div className="grid lg:grid-cols-[1fr_1fr] gap-0">
+            {/* LEFT: specs */}
+            <div className="p-6 lg:p-8 border-b lg:border-b-0 lg:border-r border-white/[0.08]">
+              <div className="space-y-4 font-mono text-[12px]">
+                <SpecLine k="package"        v={`grid-worker-v${apk?.version || "—"}`} />
+                <SpecLine k="size"           v={`${((apk?.size_bytes || 0) / 1024).toFixed(0)} KB`} />
+                <SpecLine k="min_android"    v={apk?.min_android || "7.0"} />
+                <SpecLine k="abi"            v={(apk?.abi && apk.abi[0]) || "arm64-v8a"} />
+                <SpecLine k="native_engine"  v={apk?.native_lib_embedded ? "EMBEDDED" : "PENDING"} tone={apk?.native_lib_embedded ? "matrix" : "amber"} />
+                <SpecLine k="sha256"         v={`${(apk?.sha256 || "").slice(0, 28)}…`} tone="cyan" mono />
+              </div>
+              <div className="mt-8 flex gap-3 flex-wrap">
+                <a href={apkUrl} download
+                   data-testid="deploy-direct-download"
+                   className="inline-flex items-center gap-3 px-6 py-3.5 rounded-md bg-[#00ff88] text-black font-mono font-bold text-[11px] uppercase tracking-[0.35em]
+                              shadow-[0_0_60px_-12px_rgba(0,255,136,0.7)] hover:shadow-[0_0_80px_-12px_rgba(0,255,136,1)] transition">
+                  <Download className="w-4 h-4" /> direct download
+                </a>
+                <button onClick={() => navigator.clipboard?.writeText(apkUrl)}
+                        data-testid="deploy-copy-url"
+                        className="inline-flex items-center gap-2 px-5 py-3.5 rounded-md border border-white/15 text-white/75 hover:border-white/40 hover:text-white font-mono text-[11px] uppercase tracking-[0.3em] transition">
+                  copy url
+                </button>
+              </div>
+            </div>
+
+            {/* RIGHT: QR */}
+            <div className="p-6 lg:p-8 grid place-items-center bg-[#020405]">
+              <div className="text-center">
+                <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/45 mb-4">
+                  scan_to_install
+                </div>
+                <div className="relative inline-block p-3 border border-[#00ff88]/50"
+                     style={{ boxShadow: "0 0 60px -10px rgba(0,255,136,0.55), inset 0 0 30px -10px rgba(0,255,136,0.3)" }}>
+                  {qr ? (
+                    <img src={qr} alt="apk qr" className="w-52 h-52" data-testid="deploy-qr-image" />
+                  ) : (
+                    <div className="w-52 h-52 grid place-items-center text-white/30">…</div>
+                  )}
+                  <span className="absolute -top-2 -right-2 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-[0.3em] bg-[#00ff88] text-black">
+                    v{apk?.version || "—"}
+                  </span>
+                </div>
+                <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.3em] text-white/45">
+                  android · arm64-v8a · {apk?.native_lib_embedded ? "native" : "pending"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-5 py-3 border-t border-white/[0.08] font-mono text-[10px] text-white/35 break-all" data-testid="deploy-apk-url">
+            // {apkUrl || "awaiting build descriptor…"}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SpecLine({ k, v, tone, mono }) {
   const color = tone === "matrix" ? "#00ff88"
               : tone === "cyan"   ? "#00d9ff"
               : tone === "amber"  ? "#fbbf24"
               : "#f5f7fa";
   return (
-    <div className="flex items-baseline justify-between px-3 py-2 rounded-lg bg-black/40 border border-white/[0.05]">
-      <span className="text-white/40 uppercase tracking-[0.2em] text-[9px]">{k}</span>
-      <span className="font-mono-cyber font-bold tabular-nums" style={{ color }}>{v}</span>
+    <div className="grid grid-cols-[140px_1fr] items-baseline gap-3 border-b border-white/[0.05] pb-2">
+      <span className="uppercase tracking-[0.25em] text-[10px] text-white/35">{k}</span>
+      <span className={`tabular-nums ${mono ? "break-all" : "truncate"} font-bold`} style={{ color }}>{v}</span>
     </div>
   );
 }
 
-/* ----------------------------- TRUST METRICS ----------------------------- */
-function MetricCard({ label, value, sublabel, tone = "white", testId }) {
-  // Render value either as a number (count-up) or as a raw label string
-  const isNum = typeof value === "number";
-  const animated = useCountUp(isNum ? value : 0);
-  const [flash, setFlash] = useState(false);
-  const prevRef = useRef(value);
-  useEffect(() => {
-    const changed = isNum
-      ? Number(value) !== Number(prevRef.current)
-      : String(value) !== String(prevRef.current);
-    if (changed && prevRef.current !== undefined) {
-      setFlash(true);
-      const t = setTimeout(() => setFlash(false), 1100);
-      prevRef.current = value;
-      return () => clearTimeout(t);
-    }
-    prevRef.current = value;
-  }, [value, isNum]);
-  const toneCls = tone === "ok" ? "text-[#00ff88]" : tone === "warn" ? "text-[#ff7a18]" : tone === "info" ? "text-[#00d4ff]" : "text-white";
+/* ============================================================ */
+/*  6. Foundation Buyback Policy Panel — swiss grid             */
+/* ============================================================ */
+function BuybackPolicyPanel() {
   return (
-    <div className={`landing-glass p-6 sm:p-7 transition-all ${flash ? "metric-flash" : ""}`} data-testid={testId}>
-      <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-mono-tech mb-3">{label}</div>
-      <div className={`font-grotesk font-bold leading-none ${toneCls}`} style={{ fontSize: "clamp(28px, 3.6vw, 40px)" }}>
-        {isNum
-          ? Number(animated).toLocaleString(undefined, { maximumFractionDigits: 0 })
-          : value}
-      </div>
-      {sublabel && <div className="mt-3 text-[12px] text-white/45 font-mono-tech">{sublabel}</div>}
-    </div>
-  );
-}
-
-function TrustMetrics({ stats }) {
-  const [ref, shown] = useReveal();
-  const safe = stats || {};
-  return (
-    <section ref={ref} className={`px-6 sm:px-10 py-12 ${shown ? "" : "opacity-0"}`} data-testid="trust-metrics">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-[11px] uppercase tracking-[0.3em] text-white/40 font-mono-tech mb-6 inline-flex items-center gap-2">
-          <span className="dot w-1.5 h-1.5 rounded-full bg-[#00ff88]" style={{ boxShadow: "0 0 6px #00ff88" }} />
-          Live · as of {safe.as_of ? new Date(safe.as_of).toLocaleTimeString() : "—"}
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          <MetricCard label="Connected Devices" value={safe.connected_devices ?? 0}
-                      sublabel="registered nodes" testId="metric-devices" />
-          <MetricCard label="Active Compute Nodes" value={safe.mining_devices ?? 0}
-                      sublabel={(safe.mining_devices ?? 0) === 0 ? "awaiting first cycle" : "processing now"}
-                      tone={(safe.mining_devices ?? 0) > 0 ? "ok" : "white"}
-                      testId="metric-active" />
-          <MetricCard label="Verified Compute Rate"
-                      value={safe.mobile_native_hashrate_label ?? "Waiting for verified output"}
-                      sublabel="aggregated from verified nodes"
-                      tone={(safe.mobile_native_hashrate_hps ?? 0) > 0 ? "ok" : "warn"}
-                      testId="metric-hashrate" />
-          <MetricCard label="Verified Outputs"
-                      value={safe.accepted_shares_label ?? "Waiting for verified output"}
-                      sublabel="checked by verification layer"
-                      tone={(safe.accepted_shares_total ?? 0) > 0 ? "ok" : "warn"}
-                      testId="metric-shares" />
-          <MetricCard label="Backend Compute Engine"
-                      value={safe.backend_miner?.status_label || "Core engine pending"}
-                      sublabel="core processing layer"
-                      tone={safe.backend_miner?.running ? "ok" : "warn"}
-                      testId="metric-status" />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ----------------------------- HOW IT WORKS ----------------------------- */
-function HowItWorks() {
-  const steps = [
-    { n: "01", title: "Install the Android Node", desc: "Users download the signed APK, opt in and accept the safety contract.",
-      icon: Download, accent: "#00d4ff" },
-    { n: "02", title: "Device Joins the Grid", desc: "Phone announces itself, sends heartbeat, health and availability signals.",
-      icon: Wifi, accent: "#00ffe1" },
-    { n: "03", title: "Safe Compute Starts", desc: "Compute begins only when the user permits and every safety rule passes.",
-      icon: ShieldCheck, accent: "#00ff88" },
-    { n: "04", title: "Verified Contribution Pays", desc: "Rewards are based on verified compute output — every work unit cleared by the verification layer.",
-      icon: Wallet, accent: "#facc15" },
-  ];
-  return (
-    <section id="how" className="px-6 sm:px-10 py-24 md:py-32" data-testid="how-it-works">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-14 max-w-3xl">
-          <div className="landing-pill info mb-5"><span className="dot" /> Workflow</div>
-          <h2 className="font-grotesk font-bold text-white" style={{ fontSize: "clamp(28px, 4vw, 48px)" }}>
-            How THE GRID works
+    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="buyback-panel">
+      <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[0.9fr_1.1fr] gap-12">
+        <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, amount: 0.3 }}
+                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
+          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#6c7bff] mb-4">
+            // foundation.buyback_program
+          </div>
+          <h2 className="font-display text-white"
+              style={{ fontSize: "clamp(34px, 4vw, 64px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 0.95 }}>
+            A policy.<br/>Not a promise.
           </h2>
-          <p className="mt-4 text-white/60 text-[16px] font-sans-saas">
-            From a phone in a desk drawer to a verified payout — every step is consent-driven and observable.
+          <p className="mt-8 text-white/55 leading-relaxed max-w-md">
+            Contributors who reach <span className="text-white">100 TGC</span> may apply to a Foundation Buyback
+            Window when it is opened by the Ecosystem Treasury — subject to
+            verification, regional eligibility and treasury liquidity.
           </p>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {steps.map((s, i) => (
-            <motion.div key={s.n} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.08 }}
-                        className="bento-card p-7 relative overflow-hidden" data-testid={`how-step-${i + 1}`}>
-              <span className="accent-bar" />
-              <div className="text-[11px] font-mono-tech mb-4" style={{ color: s.accent, opacity: 0.85 }}>{s.n} / step</div>
-              <div className="w-11 h-11 rounded-xl grid place-items-center mb-5"
-                   style={{ background: `${s.accent}15`, border: `1px solid ${s.accent}40` }}>
-                <s.icon className="w-5 h-5" style={{ color: s.accent }} strokeWidth={1.6} />
-              </div>
-              <div className="font-grotesk font-semibold text-white text-[18px] mb-2">{s.title}</div>
-              <div className="text-white/55 text-[14px] leading-relaxed font-sans-saas">{s.desc}</div>
-            </motion.div>
+          <p className="mt-4 text-amber-300/80 font-mono text-[11px] uppercase tracking-[0.2em] leading-relaxed">
+            // no guaranteed price · no guaranteed listing
+            <br/>// no instant cashout · indicative only
+          </p>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.3 }}
+                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+                    className="border border-white/[0.08]">
+          {[
+            ["window_status",    "CLOSED",                    "amber"],
+            ["eligibility",      "100 TGC required",          "white"],
+            ["current_program",  "up to $300 USDT",           "cyan"],
+            ["risk_review",      "required",                  "white"],
+            ["regional_check",   "subject to jurisdiction",   "white"],
+            ["treasury_state",   "policy-based liquidity",    "violet"],
+          ].map(([k, v, tone]) => (
+            <div key={k} className="grid grid-cols-[1fr_1.2fr] gap-6 px-6 py-5 border-b border-white/[0.06] last:border-b-0">
+              <div className="font-mono uppercase tracking-[0.25em] text-[11px] text-white/45">{k}</div>
+              <div className={`font-mono uppercase tracking-[0.2em] text-[13px] tabular-nums font-bold ${
+                tone === "amber"  ? "text-amber-300" :
+                tone === "cyan"   ? "text-[#00d9ff]" :
+                tone === "violet" ? "text-[#6c7bff]" : "text-white"
+              }`}>{v}</div>
+            </div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );
 }
 
-/* ----------------------------- PRODUCT PILLARS ----------------------------- */
-function ProductPillars() {
-  const pillars = [
-    { icon: Layers,    title: "Mobile Compute Network",
-      desc: "Distributed across Android devices in pockets, drawers and shelves — a verified compute layer that scales horizontally.",
-      tech: "REST + WebSocket · device heartbeat & job scheduling", accent: "#00d4ff" },
-    { icon: Cpu,       title: "Native Compute Engine",
-      desc: "An NDK r28 native compute layer runs on arm64 phones — not a JavaScript proxy. Real on-device work, supervised by the safety contract.",
-      tech: "native engine · light mode · 1–4 threads · v2+v3 signed", accent: "#00ffe1" },
-    { icon: FileCheck2, title: "Verified Reward Ledger",
-      desc: "Every contribution, every work unit and every payout is reconciled by the verification layer. No phantom credits.",
-      tech: "audit chain · verification ACK reconciliation", accent: "#00ff88" },
-    { icon: Terminal,  title: "Operator Command Center",
-      desc: "Live observability for the entire fleet — gauges, console, contribution podium and device-health risk signals.",
-      tech: "WebSocket streams · sub-second event latency", accent: "#facc15" },
-  ];
+/* ============================================================ */
+/*  7. B2B SaaS Compute Surface Preview                         */
+/* ============================================================ */
+function B2BPreview() {
   return (
-    <section id="pillars" className="px-6 sm:px-10 py-24 md:py-32 border-t border-white/[0.04]" data-testid="product-pillars">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-14 max-w-3xl">
-          <div className="landing-pill ok mb-5"><span className="dot" /> Platform</div>
-          <h2 className="font-grotesk font-bold text-white" style={{ fontSize: "clamp(28px, 4vw, 48px)" }}>
-            The infrastructure behind THE GRID
-          </h2>
-          <p className="mt-4 text-white/60 text-[16px] font-sans-saas">
-            Four independent layers — designed to compose, observable end-to-end, and built to be audited.
-          </p>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-5">
-          {pillars.map((p, i) => (
-            <motion.div key={p.title} initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }} transition={{ duration: 0.55, delay: i * 0.08 }}
-                        className="bento-card p-8" data-testid={`pillar-${i}`}>
-              <span className="accent-bar" />
-              <div className="flex items-start gap-5">
-                <div className="w-12 h-12 rounded-xl grid place-items-center shrink-0"
-                     style={{ background: `${p.accent}10`, border: `1px solid ${p.accent}30` }}>
-                  <p.icon className="w-5 h-5" style={{ color: p.accent }} strokeWidth={1.6} />
-                </div>
-                <div className="min-w-0">
-                  <div className="font-grotesk font-semibold text-white text-[20px] mb-2.5">{p.title}</div>
-                  <p className="text-white/60 text-[14.5px] leading-relaxed font-sans-saas">{p.desc}</p>
-                  <div className="mt-4 text-[11.5px] font-mono-tech text-white/40">{p.tech}</div>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ----------------------------- SAFETY & CONSENT ----------------------------- */
-function SafetyConsent() {
-  const cards = [
-    { icon: Hand,            title: "Explicit user permission",  desc: "Compute never starts unless the device owner approves on every install." },
-    { icon: BatteryCharging, title: "Charging-only mode",        desc: "Workloads pause whenever the device is on battery to protect daily use." },
-    { icon: Wifi,            title: "Wi-Fi-only transport",      desc: "No cellular data spend — heartbeat and uploads gate on Wi-Fi connectivity." },
-    { icon: Thermometer,     title: "Thermal guard",             desc: "Throttles automatically when CPU temperature crosses a safe threshold." },
-    { icon: BatteryCharging, title: "Battery threshold",         desc: "Idle below 30% battery — the phone is yours first, the grid second." },
-    { icon: PowerOff,        title: "Stop anytime",              desc: "One tap pauses compute. One uninstall removes everything cleanly." },
-  ];
-  return (
-    <section id="safety" className="px-6 sm:px-10 py-24 md:py-32" data-testid="safety">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-14 max-w-3xl">
-          <div className="landing-pill warn mb-5"><span className="dot" /> Safety</div>
-          <h2 className="font-grotesk font-bold text-white" style={{ fontSize: "clamp(28px, 4vw, 48px)" }}>
-            Compute only when conditions are safe.
-          </h2>
-          <p className="mt-4 text-white/60 text-[16px] font-sans-saas">
-            Six guards check every cycle before a single hash leaves the device.
-            The user keeps the controls — always.
-          </p>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cards.map((c, i) => (
-            <motion.div key={c.title} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }} transition={{ duration: 0.45, delay: i * 0.05 }}
-                        className="landing-glass p-6" data-testid={`safety-${i}`}>
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg grid place-items-center shrink-0"
-                     style={{ background: "rgba(0,255,136,0.06)", border: "1px solid rgba(0,255,136,0.22)" }}>
-                  <c.icon className="w-4.5 h-4.5" style={{ color: "#00ff88" }} strokeWidth={1.6} />
-                </div>
-                <div>
-                  <div className="font-grotesk font-semibold text-white text-[16px]">{c.title}</div>
-                  <div className="text-white/55 text-[13.5px] mt-1.5 leading-relaxed font-sans-saas">{c.desc}</div>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ----------------------------- LIVE NETWORK ----------------------------- */
-function NodeMesh({ stats }) {
-  // Lightweight abstract mesh — 24 deterministic dots with light edges.
-  const W = 540, H = 360;
-  const nodes = React.useMemo(() => {
-    const ns = [];
-    for (let i = 0; i < 24; i++) {
-      const angle = (i / 24) * Math.PI * 2;
-      const r = 90 + (i % 3) * 50;
-      ns.push({
-        id: i,
-        x: W / 2 + Math.cos(angle) * r + Math.sin(i * 0.7) * 18,
-        y: H / 2 + Math.sin(angle) * r * 0.85 + Math.cos(i * 0.5) * 14,
-      });
-    }
-    return ns;
-  }, []);
-  const mining = stats?.mining_devices || 0;
-  const active = stats?.active_devices || 0;
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full">
-      <defs>
-        <radialGradient id="meshCore" cx="50%" cy="50%" r="40%">
-          <stop offset="0%" stopColor="rgba(0,255,225,0.9)" />
-          <stop offset="60%" stopColor="rgba(0,212,255,0.25)" />
-          <stop offset="100%" stopColor="rgba(0,212,255,0)" />
-        </radialGradient>
-      </defs>
-      <circle cx={W / 2} cy={H / 2} r="90" fill="url(#meshCore)" opacity="0.5" />
-      {nodes.map((n) => (
-        <line key={`e${n.id}`} x1={W / 2} y1={H / 2} x2={n.x} y2={n.y}
-              stroke="rgba(0,255,225,0.10)" strokeWidth="0.7" />
-      ))}
-      {nodes.map((n, i) => {
-        // Color logic: first `mining` count = green, next `active-mining` count = blue, rest gray
-        let color = "rgba(160,180,200,0.55)";
-        if (i < mining) color = "#00ff88";
-        else if (i < (active)) color = "#00d4ff";
-        else if (i > 20) color = "rgba(255,122,24,0.85)";
-        const r = (i < mining) ? 3.6 : 2.4;
-        return (
-          <g key={n.id}>
-            <circle cx={n.x} cy={n.y} r={r} fill={color}
-                    style={{ filter: i < (active) ? `drop-shadow(0 0 4px ${color})` : "none" }} />
-          </g>
-        );
-      })}
-      <circle cx={W / 2} cy={H / 2} r="4" fill="#fff" />
-      <circle cx={W / 2} cy={H / 2} r="4" fill="none" stroke="#00ffe1" strokeWidth="1">
-        <animate attributeName="r" values="4;20;4" dur="2.6s" repeatCount="indefinite" />
-        <animate attributeName="opacity" values="1;0;1" dur="2.6s" repeatCount="indefinite" />
-      </circle>
-    </svg>
-  );
-}
-
-const SYNTHETIC_FEED = [
-  { t: 0,    src: "node", lvl: "info", msg: "device · connected · NODE_a3f9b2" },
-  { t: 1500, src: "node", lvl: "info", msg: "native engine · loaded · safety contract accepted" },
-  { t: 3000, src: "core", lvl: "ok",   msg: "compute session · engaged · 4 threads" },
-  { t: 4500, src: "core", lvl: "ok",   msg: "work unit · submitted to verification layer" },
-  { t: 6000, src: "core", lvl: "ok",   msg: "output VERIFIED · credited to reward ledger" },
-  { t: 7500, src: "node", lvl: "info", msg: "heartbeat · device 412e · battery 78% · charging" },
-  { t: 9000, src: "node", lvl: "warn", msg: "thermal guard · throttling 2/4 cores · 41°C" },
-  { t: 10500,src: "node", lvl: "ok",   msg: "thermal recovered · resuming · 36°C" },
-];
-
-function LiveNetwork({ stats }) {
-  const [events, setEvents] = useState([]);
-  useEffect(() => {
-    let i = 0;
-    const id = setInterval(() => {
-      const ev = SYNTHETIC_FEED[i % SYNTHETIC_FEED.length];
-      setEvents((p) => [{ ...ev, ts: new Date().toLocaleTimeString(), id: `${Date.now()}-${i}` }, ...p].slice(0, 8));
-      i++;
-    }, 1500);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <section id="network" className="px-6 sm:px-10 py-24 md:py-32 border-t border-white/[0.04]" data-testid="live-network">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-14 max-w-3xl">
-          <div className="landing-pill info mb-5"><span className="dot" /> Observability</div>
-          <h2 className="font-grotesk font-bold text-white" style={{ fontSize: "clamp(28px, 4vw, 48px)" }}>
-            Watch the network breathe.
-          </h2>
-          <p className="mt-4 text-white/60 text-[16px] font-sans-saas">
-            Live event feed from connected nodes — every join, every verified output, every safety event surfaces in the operator console.
-          </p>
-        </div>
-        <div className="grid lg:grid-cols-[1.4fr_1fr] gap-5">
-          <div className="landing-glass p-6 sm:p-8" data-testid="live-network-mesh">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/45 font-mono-tech">
-                <Globe2 className="w-3.5 h-3.5" /> Network topology · live preview
-              </div>
-              <div className="flex items-center gap-3 text-[10px] font-mono-tech text-white/45">
-                <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#00ff88]" /> processing</span>
-                <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#00d4ff]" /> online</span>
-                <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-white/40" /> idle</span>
-                <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#ff7a18]" /> throttled</span>
-              </div>
+    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06] overflow-hidden" data-testid="b2b-preview">
+      <div className="max-w-[1400px] mx-auto">
+        <div className="flex items-end justify-between flex-wrap gap-4 mb-10">
+          <div>
+            <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00d9ff]/85 mb-3">
+              // enterprise.compute_surface
             </div>
-            <div className="aspect-[3/2]">
-              <NodeMesh stats={stats} />
-            </div>
+            <h2 className="font-display text-white"
+                style={{ fontSize: "clamp(34px, 4.2vw, 64px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 0.96 }}>
+              Compute throughput<br/>
+              <span className="text-white/55">priced as infrastructure.</span>
+            </h2>
           </div>
-          <div className="landing-glass p-5" data-testid="live-network-feed">
-            <div className="flex items-center justify-between mb-4 px-2">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/45 font-mono-tech">
-                <Terminal className="w-3.5 h-3.5" /> Operator feed · simulation
-              </div>
-              <span className="landing-pill info"><span className="dot" /> live</span>
-            </div>
-            <div className="space-y-2">
-              <AnimatePresence initial={false}>
-                {events.map((ev) => (
-                  <motion.div key={ev.id} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0 }} transition={{ duration: 0.35 }}
-                              className={`feed-row ${ev.lvl === "ok" ? "ok" : ev.lvl === "warn" ? "warn" : "info"}`}>
-                    <span className="ts">[{ev.ts}]</span>&nbsp; <span className="text-white/45">{ev.src}</span>&nbsp; {ev.msg}
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-            <div className="mt-4 text-[10.5px] font-mono-tech text-white/35 px-2">
-              · simulated for preview · production feed available in operator console
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ----------------------------- REVENUE FLOW ----------------------------- */
-function RevenueFlow({ stats, apk }) {
-  const steps = [
-    { label: "Customer workload", sub: "or verified compute task", icon: Briefcase, accent: "#00d4ff" },
-    { label: "Distribution layer", sub: "splits into small work units", icon: Layers, accent: "#00ffe1" },
-    { label: "Verification layer", sub: "validates each output", icon: ShieldCheck, accent: "#00ffe1" },
-    { label: "Contributor reward", sub: "weighted by verified output", icon: Layers, accent: "#00ff88" },
-    { label: "User wallet",       sub: "threshold-gated payout", icon: Wallet, accent: "#facc15" },
-  ];
-  return (
-    <section className="px-6 sm:px-10 py-24 md:py-32 border-t border-white/[0.04]" data-testid="revenue-flow">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-14 max-w-3xl">
-          <div className="landing-pill gold mb-5"><span className="dot" /> Rewards</div>
-          <h2 className="font-grotesk font-bold text-white" style={{ fontSize: "clamp(28px, 4vw, 48px)" }}>
-            From verified compute to user rewards.
-          </h2>
-          <p className="mt-4 text-white/60 text-[16px] font-sans-saas">
-            Every reward originates from a verification-layer ACK or a verified customer workload — never from extrapolated estimates.
-          </p>
-        </div>
-        <div className="landing-glass-strong p-6 sm:p-10">
-          <div className="flex flex-col md:flex-row md:items-stretch md:gap-2 gap-4">
-            {steps.map((s, i) => (
-              <React.Fragment key={s.label}>
-                <motion.div initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }} transition={{ duration: 0.4, delay: i * 0.08 }}
-                            className="bento-card p-6 flex-1 min-w-0">
-                  <span className="accent-bar" />
-                  <div className="w-10 h-10 rounded-xl grid place-items-center mb-4"
-                       style={{ background: `${s.accent}12`, border: `1px solid ${s.accent}35` }}>
-                    <s.icon className="w-4.5 h-4.5" style={{ color: s.accent }} strokeWidth={1.6} />
-                  </div>
-                  <div className="text-[10px] font-mono-tech mb-1" style={{ color: s.accent, opacity: 0.85 }}>
-                    {String(i + 1).padStart(2, "0")} / phase
-                  </div>
-                  <div className="font-grotesk font-semibold text-white text-[16px]">{s.label}</div>
-                  <div className="mt-2 text-white/50 text-[13px] font-sans-saas">{s.sub}</div>
-                </motion.div>
-                {i < steps.length - 1 && (
-                  <div className="hidden md:flex items-center justify-center text-white/25 px-1 shrink-0">
-                    <ArrowRight className="w-5 h-5" />
-                  </div>
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-          <div className="mt-8 pt-6 border-t border-white/[0.06] flex flex-wrap gap-2">
-            <span className="landing-pill ok"><Check className="w-3 h-3" />payout wallet {stats?.payout_wallet_verified ? "verified" : "pending"}</span>
-            <span className="landing-pill info"><span className="dot" />verification layer reconciliation</span>
-            <span className="landing-pill info"><span className="dot" />reward = verified outputs × tier weight</span>
-            <span className="landing-pill warn"><span className="dot" />minimum payout threshold</span>
-            <span className="landing-pill gold"><span className="dot" />contribution score per user</span>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ----------------------------- COMMAND CENTER PREVIEW ----------------------------- */
-function CommandCenterPreview() {
-  return (
-    <section className="px-6 sm:px-10 py-24 md:py-32 border-t border-white/[0.04]" data-testid="command-preview">
-      <div className="max-w-7xl mx-auto grid lg:grid-cols-[1fr_1.15fr] gap-12 items-center">
-        <div>
-          <div className="landing-pill info mb-5"><span className="dot" /> Operator</div>
-          <h2 className="font-grotesk font-bold text-white" style={{ fontSize: "clamp(28px, 4vw, 48px)" }}>
-            Grid Command Center
-          </h2>
-          <p className="mt-4 text-white/60 text-[16px] font-sans-saas max-w-xl">
-            A purpose-built console for the team running the fleet — gauges, live operator feed, verified-output podium and risk signals. Built for visibility and response, not for spectacle.
-          </p>
-          <ul className="mt-7 space-y-3 text-[14.5px] text-white/70 font-sans-saas">
-            <li className="flex items-start gap-3"><Check className="w-4 h-4 mt-0.5 text-[#00ff88] shrink-0" /> Active nodes, processing devices, compute throughput at-a-glance</li>
-            <li className="flex items-start gap-3"><Check className="w-4 h-4 mt-0.5 text-[#00ff88] shrink-0" /> Live operator feed with verified-output highlights</li>
-            <li className="flex items-start gap-3"><Check className="w-4 h-4 mt-0.5 text-[#00ff88] shrink-0" /> Device health, risk signals, payout queue</li>
-            <li className="flex items-start gap-3"><Check className="w-4 h-4 mt-0.5 text-[#00ff88] shrink-0" /> WebSocket-streamed, sub-second latency</li>
-          </ul>
-          <Link to="/admin" className="mt-8 landing-cta-secondary inline-flex items-center gap-2" data-testid="cmd-preview-cta">
-            Open command center <ArrowUpRight className="w-4 h-4" />
+          <Link to="/customer"
+                data-testid="b2b-cta"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-md border border-[#00d9ff]/40 text-[#00d9ff] hover:bg-[#00d9ff]/10 font-mono text-[11px] uppercase tracking-[0.3em] transition">
+            <Briefcase className="w-4 h-4" /> open enterprise portal
           </Link>
         </div>
-        <div className="landing-glass-strong p-6 sm:p-8">
-          {/* mini HUD mockup */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            {[
-              { l: "Active Nodes",    v: "—", c: "#00ff88" },
-              { l: "Total Compute",   v: "—",  c: "#00d4ff" },
-              { l: "Mobile Native",   v: "Pending", c: "#00ff88" },
-              { l: "Accepted · 24h",  v: "—", c: "#facc15" },
-            ].map((m) => (
-              <div key={m.l} className="bento-card p-4">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-mono-tech">{m.l}</div>
-                <div className="mt-2 font-grotesk font-bold text-[24px]" style={{ color: m.c }}>{m.v}</div>
-                <div className="mt-2 h-1 rounded-full bg-white/5 overflow-hidden">
-                  <div className="h-full" style={{ width: "32%", background: m.c, opacity: 0.7 }} />
-                </div>
-              </div>
-            ))}
+
+        <div className="relative border border-white/[0.08] bg-black/55 backdrop-blur-xl p-5 lg:p-7">
+          {/* simulated dashboard */}
+          <div className="flex items-center gap-2 mb-5 font-mono text-[10px] uppercase tracking-[0.3em] text-white/45">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#00ff88]/85" />
+            <span>customer · enterprise · ACME-CORP</span>
+            <span className="ml-auto">region · global · routed</span>
           </div>
-          <div className="bento-card p-4">
-            <div className="flex items-center justify-between mb-2.5">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-mono-tech inline-flex items-center gap-2">
-                <Terminal className="w-3 h-3" /> live operator feed
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            <PreviewMetric k="Compute Credit Balance"      v="$ 12,480.00"  tone="cyan" />
+            <PreviewMetric k="Workload Queue"              v="14"           tone="white" />
+            <PreviewMetric k="Active Workloads"            v="9"            tone="matrix" />
+            <PreviewMetric k="Verified Output / hr"        v="1,284,902"    tone="cyan" />
+          </div>
+          <div className="grid lg:grid-cols-[1.4fr_1fr] gap-5">
+            <div className="border border-white/[0.06] p-4">
+              <div className="font-mono uppercase tracking-[0.25em] text-[10px] text-white/45 mb-3">workload_throughput · 24h</div>
+              <SparkBars />
+              <div className="flex items-baseline justify-between mt-3 font-mono text-[11px] uppercase tracking-[0.2em] text-white/35">
+                <span>00:00</span><span>12:00</span><span>24:00</span>
               </div>
-              <span className="landing-pill ok"><span className="dot" /> live</span>
             </div>
-            <div className="space-y-1.5">
-              <div className="feed-row ok">[—] core · work unit VERIFIED · credited to ledger</div>
-              <div className="feed-row info">[—] node · NODE_a3f9b2 · heartbeat · battery 78%</div>
-              <div className="feed-row info">[—] core · new work unit assigned</div>
-              <div className="feed-row warn">[—] node · thermal guard · throttle 2/4</div>
+            <div className="border border-white/[0.06] p-4">
+              <div className="font-mono uppercase tracking-[0.25em] text-[10px] text-white/45 mb-3">routing_layer · status</div>
+              <div className="space-y-2.5 font-mono text-[11px]">
+                {[
+                  ["edge_compute_node fleet", "running"],
+                  ["compute_routing_layer", "nominal"],
+                  ["network_latency_opt",   "p99 32ms"],
+                  ["verified_output ratio", "99.84%"],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex items-baseline justify-between border-b border-white/[0.05] pb-1.5">
+                    <span className="text-white/45 uppercase tracking-[0.2em] text-[10px]">{k}</span>
+                    <span className="text-[#00ff88] tabular-nums">{v}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
+          {/* outer glow */}
+          <div className="absolute -inset-px -z-10"
+               style={{ background: "linear-gradient(90deg, rgba(0,217,255,0.18), transparent 50%, rgba(0,255,136,0.12))",
+                        filter: "blur(40px)", opacity: 0.45 }} />
         </div>
       </div>
     </section>
   );
 }
 
-/* ----------------------------- DUAL CTA ----------------------------- */
-function DualCTA({ apk }) {
+function PreviewMetric({ k, v, tone }) {
+  const color = tone === "matrix" ? "#00ff88" : tone === "cyan" ? "#00d9ff" : "#f5f7fa";
   return (
-    <section className="px-6 sm:px-10 py-24 md:py-32 border-t border-white/[0.04]" data-testid="dual-cta">
-      <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-5">
-        <div className="landing-glass-strong p-10" data-testid="cta-contributor">
-          <div className="landing-pill ok mb-5"><Smartphone className="w-3 h-3" /> For Contributors</div>
-          <h3 className="font-grotesk font-bold text-white text-[28px] leading-tight">
-            Install the Android Node. Earn from verified contribution.
-          </h3>
-          <p className="mt-4 text-white/60 font-sans-saas">
-            Opt in once. Compute runs only when your phone is plugged in, cool and on Wi-Fi. Rewards are reconciled against verified compute output.
-          </p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <a href={apk?.download_url || "/grid-worker-v1.3.8.apk"} className="landing-cta-primary inline-flex items-center gap-2"
-               data-testid="cta-contributor-download">
-              <Download className="w-4 h-4" /> Download Node v{apk?.version || "1.3.8"}
-            </a>
-            <Link to="/register" className="landing-cta-secondary inline-flex items-center gap-2">
-              Create contributor account <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-        <div className="landing-glass-strong p-10" data-testid="cta-customer">
-          <div className="landing-pill info mb-5"><Briefcase className="w-3 h-3" /> For Customers</div>
-          <h3 className="font-grotesk font-bold text-white text-[28px] leading-tight">
-            Route workloads to distributed mobile compute.
-          </h3>
-          <p className="mt-4 text-white/60 font-sans-saas">
-            Submit verified compute jobs against the network. Pay for accepted output. Observe execution end-to-end through the customer portal.
-          </p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Link to="/register?role=customer" className="landing-cta-primary inline-flex items-center gap-2"
-                  data-testid="cta-customer-portal">
-              <Briefcase className="w-4 h-4" /> Open Customer Portal
-            </Link>
-            <Link to="/dashboard" className="landing-cta-secondary inline-flex items-center gap-2">
-              Operator dashboard <ArrowUpRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
+    <div className="border border-white/[0.06] px-4 py-3">
+      <div className="font-mono uppercase tracking-[0.22em] text-[9px] text-white/40">{k}</div>
+      <div className="font-mono font-bold text-[20px] mt-1 tabular-nums" style={{ color }}>{v}</div>
+    </div>
+  );
+}
+
+function SparkBars() {
+  const data = [22, 38, 31, 49, 62, 70, 55, 64, 78, 88, 72, 91, 85, 96, 80, 74, 62, 70, 88, 95, 84, 78, 66, 72];
+  return (
+    <div className="flex items-end gap-[3px] h-20">
+      {data.map((d, i) => (
+        <div key={i} className="flex-1 bg-[#00d9ff]/40 hover:bg-[#00d9ff]" style={{ height: `${d}%` }} />
+      ))}
+    </div>
+  );
+}
+
+/* ============================================================ */
+/*  8. Final CTA Wall                                           */
+/* ============================================================ */
+function FinalCTA({ apk }) {
+  return (
+    <section className="relative min-h-[72vh] grid place-items-center px-6 lg:px-10 py-32 border-t border-white/[0.06]" data-testid="final-cta">
+      {/* heavy radial glow */}
+      <div className="absolute inset-0 -z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-black" />
+        <motion.div className="absolute inset-0"
+                    style={{
+                      background: "radial-gradient(circle at 50% 50%, rgba(0,255,136,0.12) 0%, transparent 55%)",
+                    }}
+                    animate={{ scale: [1, 1.08, 1] }}
+                    transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }} />
       </div>
+
+      <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+                  className="relative text-center max-w-3xl">
+        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88] mb-8">
+          // initialize.computation
+        </div>
+        <h2 className="font-display text-white"
+            style={{ fontSize: "clamp(48px, 8vw, 128px)", letterSpacing: "-0.045em", fontWeight: 600, lineHeight: 0.92 }}>
+          Join the<br/>
+          <span style={{
+            background: "linear-gradient(96deg, #00ff88, #00d9ff)",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+          }}>verified&nbsp;compute&nbsp;layer.</span>
+        </h2>
+        <p className="mt-8 text-white/55 text-[16px] max-w-xl mx-auto">
+          One installer. One ENGAGE NODE. Your device becomes a verified edge node
+          on a global, milestone-driven compute network.
+        </p>
+        <a href={apk?.download_url || "#deploy"}
+           data-testid="final-cta-btn"
+           className="group mt-12 inline-flex items-center gap-4 px-10 py-5 rounded-md bg-[#00ff88] text-black font-mono font-bold text-[12px] uppercase tracking-[0.45em]
+                      shadow-[0_0_80px_-12px_rgba(0,255,136,0.9)] hover:shadow-[0_0_120px_-12px_rgba(0,255,136,1)] transition-all">
+          <Download className="w-5 h-5" />
+          deploy node client
+          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+        </a>
+        <div className="mt-6 font-mono uppercase tracking-[0.3em] text-[10px] text-white/30">
+          // v{apk?.version || "—"} · arm64-v8a · signed v2+v3 · 60fps verified
+        </div>
+      </motion.div>
     </section>
   );
 }
 
-/* ----------------------------- FOOTER ----------------------------- */
-function Footer({ apk }) {
+/* ============================================================ */
+/*  Footer strip                                                */
+/* ============================================================ */
+function FooterStrip({ apk }) {
   return (
-    <footer className="px-6 sm:px-10 pt-16 pb-10 border-t border-white/[0.06] mt-12" data-testid="footer">
-      <div className="max-w-7xl mx-auto grid md:grid-cols-[1.4fr_1fr_1fr_1fr_1fr] gap-10">
-        <div>
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-7 h-7 rounded-lg grid place-items-center"
-                 style={{ background: "linear-gradient(135deg, #00ffe1, #00d4ff)" }}>
-              <Cpu className="w-4 h-4 text-black" strokeWidth={2.4} />
-            </div>
-            <span className="font-grotesk font-bold text-white text-[17px]">THE GRID</span>
-          </div>
-          <p className="text-[13.5px] text-white/45 leading-relaxed font-sans-saas max-w-sm">
-            Distributed mobile compute, designed for safety, observability and verification-layer rewards.
-          </p>
-          <div className="mt-5 text-[11px] font-mono-tech text-white/30">
-            APK v{apk?.version} · sha256 {apk?.sha256?.slice(0, 12) || "—"}…
-          </div>
-        </div>
-        <FooterCol title="Product" links={[
-          ["Mobile Node", "#how"], ["Engine", "#pillars"], ["Safety", "#safety"], ["Network", "#network"],
-        ]} />
-        <FooterCol title="Network" links={[
-          ["Live status", "#network"], ["Command center", "/admin"], ["Operator dashboard", "/dashboard"],
-        ]} />
-        <FooterCol title="Rewards" links={[
-          ["Reward model", "/#rewards"], ["Payout threshold", "/#rewards"], ["Contribution score", "/#rewards"],
-        ]} />
-        <FooterCol title="Company" links={[
-          ["Docs", "#"], ["Privacy", "#"], ["Terms", "#"], ["Contact", "mailto:hello@thegrid.io"],
-        ]} testId="footer-company" />
-      </div>
-      <div className="max-w-7xl mx-auto mt-12 pt-6 border-t border-white/[0.05] flex flex-wrap items-center justify-between gap-3">
-        <div className="text-[12px] text-white/35 font-sans-saas">© THE GRID · All rights reserved.</div>
-        <div className="flex items-center gap-2 text-[11px] font-mono-tech text-white/35">
-          <Lock className="w-3 h-3" /> consent-driven · audit-logged · verification-backed
-        </div>
+    <footer className="border-t border-white/[0.06] px-6 lg:px-10 py-10 text-[11px] font-mono uppercase tracking-[0.3em] text-white/30"
+            data-testid="footer-strip">
+      <div className="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-3">
+        <span>// the.grid · distributed compute · pre-mainnet</span>
+        <span>v{apk?.version || "—"} · build verified · arm64-v8a</span>
+        <span>tgc · contribution receipt · no price guarantee</span>
       </div>
     </footer>
-  );
-}
-
-function FooterCol({ title, links, testId }) {
-  return (
-    <div data-testid={testId}>
-      <div className="font-grotesk font-semibold text-white text-[13px] mb-4">{title}</div>
-      <ul className="space-y-2.5">
-        {links.map(([label, href]) => (
-          <li key={label}>
-            <a href={href} className="text-[13px] text-white/50 hover:text-white transition-colors font-sans-saas">{label}</a>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/* ----------------------------- WHY REWARDS ----------------------------- */
-function WhyRewards() {
-  return (
-    <section className="px-6 sm:px-10 pt-8 pb-20" data-testid="why-rewards">
-      <div className="max-w-7xl mx-auto landing-glass-strong p-8 sm:p-12 grid lg:grid-cols-[1fr_1.4fr] gap-10 items-start">
-        <div>
-          <div className="landing-pill gold mb-5"><span className="dot" /> Why this earns rewards</div>
-          <h2 className="font-grotesk font-bold text-white" style={{ fontSize: "clamp(26px, 3.4vw, 38px)" }}>
-            Idle device power, turned into verifiable work units.
-          </h2>
-        </div>
-        <div className="text-white/65 text-[15.5px] leading-relaxed font-sans-saas space-y-4">
-          <p>
-            THE GRID converts unused device capacity into <span className="text-white">verifiable work units</span>.
-            When a device joins the network, it only runs with the user's explicit permission and only when battery,
-            thermal and network conditions are safe.
-          </p>
-          <p>
-            Completed work passes through the <span className="text-white">verification layer</span>. Outputs that
-            fail validation are excluded from rewards. Verified contributions are added to the user's
-            <span className="text-white"> reward balance</span>.
-          </p>
-          <p>
-            Technical compute engines run quietly in the background. On the user side, the only metrics that
-            matter are <span className="text-[#00ff88]">Verified Work Units</span> and
-            <span className="text-[#00ff88]"> Reward Balance</span>.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ----------------------------- REVENUE FLOW DETAIL ----------------------------- */
-function RevenueFlowDetail() {
-  const phases = [
-    {
-      n: "01", t: "Work source",
-      d: "A customer workload or a verifiable compute task enters the system.",
-      icon: Briefcase, accent: "#00d4ff",
-    },
-    {
-      n: "02", t: "Distribution layer",
-      d: "Tasks are split into small work units and routed to suitable devices.",
-      icon: Layers, accent: "#00ffe1",
-    },
-    {
-      n: "03", t: "Verification layer",
-      d: "Outputs are checked. Fake or failed results never reach reward calculation.",
-      icon: ShieldCheck, accent: "#00ff88",
-    },
-    {
-      n: "04", t: "Reward layer",
-      d: "Verified contributions land in the user's Reward Balance. Payouts run once the threshold is met.",
-      icon: Wallet, accent: "#facc15",
-    },
-  ];
-  return (
-    <section className="px-6 sm:px-10 py-24 md:py-28 border-t border-white/[0.04]" data-testid="revenue-flow-detail">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-12 max-w-3xl">
-          <div className="landing-pill info mb-5"><span className="dot" /> Revenue flow</div>
-          <h2 className="font-grotesk font-bold text-white" style={{ fontSize: "clamp(28px, 4vw, 48px)" }}>
-            How revenue flows through the network.
-          </h2>
-          <p className="mt-4 text-white/60 text-[16px] font-sans-saas">
-            Four explicit phases, every one independently observable. No estimated metrics — only what the verification layer accepts.
-          </p>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {phases.map((p, i) => (
-            <motion.div key={p.n} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }} transition={{ duration: 0.45, delay: i * 0.08 }}
-                        className="bento-card p-7" data-testid={`phase-${i + 1}`}>
-              <span className="accent-bar" />
-              <div className="text-[10px] font-mono-tech mb-3" style={{ color: p.accent, opacity: 0.85 }}>{p.n} / phase</div>
-              <div className="w-11 h-11 rounded-xl grid place-items-center mb-4"
-                   style={{ background: `${p.accent}15`, border: `1px solid ${p.accent}40` }}>
-                <p.icon className="w-5 h-5" style={{ color: p.accent }} strokeWidth={1.6} />
-              </div>
-              <div className="font-grotesk font-semibold text-white text-[17px] mb-2">{p.t}</div>
-              <div className="text-white/55 text-[13.5px] leading-relaxed font-sans-saas">{p.d}</div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================== ROOT ============================== */
-/* ----------------------------- EARN WITH YOUR PHONE (v1.4.10) ----------------------------- */
-function EarningsExplorer({ stats, apk }) {
-  const { ref, shown } = useReveal();
-  const [qrSrc, setQrSrc] = useState(null);
-  const apkUrl = apk?.absolute_url || (typeof window !== "undefined" ? `${window.location.origin}${apk?.download_url || "/grid-worker-v1.5.2.apk"}` : "");
-  const earningsTable = stats?.earnings_table || [
-    { tier: "core",     tier_label: "Core / Top Flagship",                    daily_tgc: 0.30, monthly_tgc: 9.0, ticket_days: 333 },
-    { tier: "flagship", tier_label: "Flagship (S24, iPhone 15, Pixel 8)",     daily_tgc: 0.20, monthly_tgc: 6.0, ticket_days: 500 },
-    { tier: "mid",      tier_label: "Standard / Mid-range",                   daily_tgc: 0.15, monthly_tgc: 4.5, ticket_days: 666 },
-    { tier: "budget",   tier_label: "Budget / Entry-level",                   daily_tgc: 0.05, monthly_tgc: 1.5, ticket_days: 2000 },
-  ];
-  const milestones = stats?.network_milestones || [];
-  const netSize = stats?.network_size ?? 0;
-  const netMult = stats?.network_multiplier ?? 1.0;
-  const nextMilestone = stats?.next_milestone;
-
-  useEffect(() => {
-    if (!apkUrl) return;
-    QRCode.toDataURL(apkUrl, {
-      width: 320, margin: 1, errorCorrectionLevel: "M",
-      color: { dark: "#00ffe1", light: "#000000" },
-    }).then(setQrSrc).catch(() => {});
-  }, [apkUrl]);
-
-  return (
-    <section ref={ref} id="earn" className="px-6 sm:px-10 py-24 md:py-32 border-t border-white/[0.04]"
-             data-testid="earn-section">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className={`mb-12 transition-all duration-700 ${shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] cyan-text font-mono-term mb-3">
-            <Sparkles className="w-3 h-3" /> / earn_with_your_phone
-          </div>
-          <h2 className="font-mono-cyber text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter leading-[0.95]"
-              data-testid="earn-headline">
-            Telefonun <span className="cyan-text">çalışıyor</span>,<br/>
-            <span className="matrix-text">sen kazanıyorsun.</span>
-          </h2>
-          <p className="mt-5 text-white/55 max-w-2xl text-base leading-relaxed">
-            Telefonun şarjdayken THE GRID şebekesine bağlanır ve doğrulanmış cloud compute
-            işleri tamamlar. Her iş bir <span className="cyan-text font-semibold">TGC contribution receipt</span> kazandırır.
-            Ağ <span className="matrix-text font-semibold">1,000,000 doğrulanmış aktif cihaza</span> ulaştığında,
-            pre-mainnet katkı dönemi Snapshot Readiness incelemesine girebilir.
-            Erken katılan, contribution defteri daha kalabalıkken katılır.
-          </p>
-        </div>
-
-        {/* Network Scarcity Progress (replaces earnings table v1.5.4) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
-          <LandingScarcityCard />
-
-          {/* APK Deployment Module — premium console framing */}
-          <div className="card-deployment p-7 relative overflow-hidden motion-fade-rise" data-testid="apk-deployment-module">
-            <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-[#00ff88]/10 blur-3xl" />
-            <div className="relative">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="eyebrow eyebrow-matrix">// deploy_node_client</span>
-                <span className="h-px flex-1 bg-gradient-to-r from-[#00ff88]/40 to-transparent" />
-                <span className="status-pill" style={{ color: "#00ff88" }}>
-                  <span className="dot" /> verified build
-                </span>
-              </div>
-
-              <h3 className="font-display font-black text-3xl tracking-tight">
-                Mobile Edge Node <span className="text-[#00ff88]">Installer</span>
-              </h3>
-              <p className="text-white/55 text-sm mt-2 leading-relaxed max-w-md">
-                Verified APK distribution channel. Native compute engine bundled.
-                Cryptographically signed (v2 + v3) build.
-              </p>
-
-              {/* spec strip */}
-              <div className="mt-6 grid grid-cols-2 gap-2 text-[11px] font-mono-term"
-                   data-testid="apk-spec-strip">
-                <DeploySpec k="version"        v={`v${apk?.version || "—"}`} tone="matrix" />
-                <DeploySpec k="package size"   v={`${((apk?.size_bytes || 0)/1024).toFixed(0)} KB`} />
-                <DeploySpec k="min android"    v={apk?.min_android || "7.0"} />
-                <DeploySpec k="abi"            v={(apk?.abi && apk.abi[0]) || "arm64-v8a"} />
-                <DeploySpec k="native engine"  v={apk?.native_lib_embedded ? "EMBEDDED" : "PENDING"} tone={apk?.native_lib_embedded ? "matrix" : "amber"} />
-                <DeploySpec k="signed"         v="v2 + v3" tone="cyan" />
-              </div>
-
-              <div className="mt-6 flex items-center gap-5 flex-wrap">
-                {qrSrc ? (
-                  <div className="relative p-3 rounded-2xl bg-black border border-[#00ff88]/35 edge-glow-matrix">
-                    <img src={qrSrc} alt="APK QR Code"
-                         className="w-40 h-40 rounded-lg" data-testid="apk-qr-image" />
-                    <div className="absolute -top-2 -right-2 status-pill" style={{ color: "#00ff88" }}>
-                      <span className="dot" /> v{apk?.version || "—"}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-40 h-40 rounded-2xl bg-black/60 border border-[#00d9ff]/20 grid place-items-center">
-                    <QrCode className="w-10 h-10 text-white/30" />
-                  </div>
-                )}
-                <div className="flex-1 min-w-[180px] space-y-3">
-                  <a href={apkUrl} download
-                     data-testid="qr-direct-download"
-                     className="block px-5 py-3.5 rounded-xl bg-[#00ff88] text-black font-mono-cyber font-black text-sm tracking-[0.25em] uppercase text-center edge-glow-matrix transition-transform hover:scale-[1.02]">
-                    <Download className="inline w-3.5 h-3.5 mr-1.5 -mt-0.5" />
-                    Direct Download
-                  </a>
-                  <div className="text-[10px] text-white/45 font-mono-term leading-relaxed">
-                    SHA-256<br/>
-                    <span className="text-[#00d9ff] break-all">
-                      {(apk?.sha256 || "").slice(0, 32)}…
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 text-[10px] text-white/35 font-mono-term break-all" data-testid="qr-apk-url">
-                // {apkUrl}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Network Effect milestones */}
-        <div className="cyber-card rounded-3xl p-7" data-testid="network-milestones-card">
-          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
-                / network_milestones
-              </div>
-              <h3 className="font-mono-cyber text-2xl font-black mt-1 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 matrix-text" />
-                Ağ büyüdükçe ekosistem <span className="matrix-text">daha sağlam</span>
-              </h3>
-              <p className="text-white/55 text-sm mt-2 max-w-2xl">
-                Daha fazla verified edge compute node = daha güçlü dağıtık compute katmanı = daha güvenilir bir contribution defteri.
-                Aşağıda <span className="cyan-text">1,000,000</span> hedefine giden milestone basamakları.
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-[9px] uppercase tracking-widest text-white/40 font-mono-term">current network</div>
-              <div className="font-mono-cyber font-black text-3xl matrix-text" data-testid="current-network-size">
-                <Users className="inline w-5 h-5 -mt-1 mr-1.5" />{netSize}
-              </div>
-              <div className="text-[10px] text-white/45">verified active nodes</div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {milestones.map((m) => {
-              const reached = netSize >= m.nodes;
-              const isNext = nextMilestone && nextMilestone.nodes === m.nodes;
-              return (
-                <div key={m.nodes}
-                     data-testid={`milestone-${m.nodes}`}
-                     className={`p-4 rounded-2xl border transition relative ${
-                       reached ? "border-[#00ff88]/40 bg-[#00ff88]/8" :
-                       isNext ?  "border-[#00ffe1]/45 bg-[#00ffe1]/8 animate-pulse" :
-                                 "border-white/8 bg-black/35"
-                     }`}>
-                  {reached && (
-                    <Check className="absolute top-2 right-2 w-3.5 h-3.5 matrix-text" />
-                  )}
-                  {isNext && (
-                    <span className="absolute -top-2 left-3 px-2 py-0.5 rounded-full bg-[#00ffe1] text-black text-[9px] font-bold uppercase tracking-widest">
-                      next
-                    </span>
-                  )}
-                  <div className="text-[9px] uppercase tracking-[0.25em] text-white/45 font-mono-term">
-                    {m.label}
-                  </div>
-                  <div className={`font-mono-cyber font-black text-xl mt-1 ${reached ? "matrix-text" : "cyan-text"}`}>
-                    {m.nodes.toLocaleString()}
-                  </div>
-                  <div className="text-[10px] text-white/55 mt-0.5">verified nodes</div>
-                  <div className={`mt-2 text-[10px] uppercase tracking-widest font-mono-term ${reached ? "matrix-text" : "text-white/55"}`}>
-                    {reached ? "reached" : "growing"}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-2xl bg-black/45 border border-white/10" data-testid="economy-explain-1">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
-                <Zap className="w-3 h-3" /> Compute-time Receipt
-              </div>
-              <div className="text-xs text-white/65 mt-2 leading-relaxed">
-                Her TGC, ağa verdiğin gerçek CPU saatinin makbuzudur — bilimsel ve AI compute işlerine yapılan ölçülebilir katkının dijital sertifikası.
-              </div>
-            </div>
-            <div className="p-4 rounded-2xl bg-black/45 border border-white/10" data-testid="economy-explain-2">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
-                <TrendingUp className="w-3 h-3" /> Radical Scarcity
-              </div>
-              <div className="text-xs text-white/65 mt-2 leading-relaxed">
-                Edge node başına günlük üretim 0.05 – 0.30 TGC arasında kalır.
-                Şişirilmiş arz değil; ölçek yalnızca yeni doğrulanmış cihazlar ağa katıldıkça büyür.
-              </div>
-            </div>
-            <div className="p-4 rounded-2xl bg-black/45 border border-white/10" data-testid="economy-explain-3">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
-                <Wallet className="w-3 h-3" /> Foundation Buyback
-              </div>
-              <div className="text-xs text-white/65 mt-2 leading-relaxed">
-                100 TGC eşiğine ulaşan contributor'lar, Foundation Buyback Window açıldığında bakiyelerini USDT karşılığı geri alım programına sunabilir.
-                Program şartlara tabidir. Detaylar <Link to="/token" className="cyan-text underline">/token</Link>.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-
-/* ----------------------------- Recent Contributor Rewards (v1.5.0) ----------------------------- */
-function RecentContributorRewards() {
-  const { ref, shown } = useReveal();
-  const [winners, setWinners] = useState([]);
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const { data } = await api.get("/rewards/drop/recent-winners");
-        if (!cancelled) setWinners(data?.winners || []);
-      } catch {}
-    };
-    load();
-    const t = setInterval(load, 30_000);
-    return () => { cancelled = true; clearInterval(t); };
-  }, []);
-  if (winners.length === 0) return null;
-  return (
-    <section ref={ref} id="contributor-rewards"
-             className="px-6 sm:px-10 py-20 border-t border-white/[0.04]"
-             data-testid="recent-contributor-rewards">
-      <div className="max-w-7xl mx-auto">
-        <div className={`mb-10 transition-all duration-700 ${shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] cyan-text font-mono-term mb-3">
-            <Sparkles className="w-3 h-3" /> / recent_contributor_rewards
-          </div>
-          <h2 className="font-mono-cyber text-3xl sm:text-4xl font-black tracking-tighter">
-            Latest <span className="matrix-text">Contributor Drop</span> Winners
-          </h2>
-          <p className="text-white/55 text-sm mt-3 max-w-2xl">
-            Every 100 lifetime TGC earns a Grid Ticket. Each month a verified Contributor Drop distributes the reward pool across many winners.
-            Privacy-first: only masked usernames + ticket IDs shown.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {winners.slice(0, 9).map((w, i) => (
-            <div key={i}
-                 data-testid={`landing-winner-${i}`}
-                 className="cyber-card rounded-2xl p-4 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl grid place-items-center bg-[#00ff88]/15 border border-[#00ff88]/30">
-                <Sparkles className="w-5 h-5 matrix-text" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] uppercase tracking-widest text-white/40 font-mono-term">
-                  {w.prize_tier || "Contributor Drop"}
-                </div>
-                <div className="font-mono-cyber font-black text-sm cyan-text truncate">
-                  {w.username_masked}
-                </div>
-                <div className="text-[10px] text-white/45 font-mono-term">
-                  {w.ticket_id_masked} · {w.month || ""}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="font-mono-cyber font-black text-xl matrix-text">
-                  ${w.amount_usdt}
-                </div>
-                <div className="text-[9px] uppercase tracking-widest text-white/35">USDT</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-
-/* ----------------------------- Landing main ----------------------------- */
-export default function Landing() {
-  const [stats, setStats] = useState(null);
-  const [apk, setApk] = useState(null);
-
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      try {
-        const [s, a] = await Promise.all([
-          api.get("/stats/public").catch(() => ({ data: null })),
-          api.get("/apk/version").catch(() => ({ data: null })),
-        ]);
-        if (!mounted) return;
-        setStats(s.data || {});
-        setApk(a.data || {});
-      } catch {}
-    };
-    load();
-    const id = setInterval(load, 12000);
-    return () => { mounted = false; clearInterval(id); };
-  }, []);
-
-  return (
-    <main className="landing-root font-sans-saas" data-testid="landing-page">
-      <Hero stats={stats} apk={apk} />
-      <EarningsExplorer stats={stats} apk={apk} />
-      <RecentContributorRewards />
-      <TrustMetrics stats={stats} />
-      <WhyRewards />
-      <HowItWorks />
-      <RevenueFlowDetail />
-      <ProductPillars />
-      <SafetyConsent />
-      <LiveNetwork stats={stats} />
-      <RevenueFlow stats={stats} apk={apk} />
-      <CommandCenterPreview />
-      <DualCTA apk={apk} />
-      <Footer apk={apk} />
-    </main>
-  );
-}
-
-// v1.5.4 — Landing-side Network Scarcity Progress card (replaces earnings table)
-function LandingScarcityCard() {
-  const [data, setData] = useState(null);
-  useEffect(() => {
-    const url = (process.env.REACT_APP_BACKEND_URL || "") + "/api/network/scarcity-progress";
-    fetch(url).then(r => r.json()).then(setData).catch(() => {});
-  }, []);
-  const verified = data?.verified_active_nodes ?? 0;
-  const target   = data?.target_active_nodes ?? 1_000_000;
-  const pct      = data?.progress_pct ?? 0;
-  return (
-    <div className="cyber-card rounded-3xl p-7" data-testid="landing-scarcity-card">
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
-            / network_scarcity_progress
-          </div>
-          <h3 className="font-mono-cyber text-2xl font-black mt-1">
-            <span className="matrix-text">1,000,000</span> Active Nodes
-          </h3>
-        </div>
-        <span className="cyber-pill matrix-pill text-[10px]">
-          live · real data
-        </span>
-      </div>
-
-      <div className="font-mono-cyber font-black text-5xl tabular-nums tracking-tighter">
-        <span className="matrix-text" data-testid="landing-scarcity-count">{verified.toLocaleString()}</span>
-        <span className="text-white/40 text-xl font-mono-term ml-2">/ {target.toLocaleString()}</span>
-      </div>
-
-      <div className="h-2 rounded-full bg-white/[0.05] overflow-hidden border border-white/[0.04] mt-5"
-           data-testid="landing-scarcity-bar">
-        <div className="h-full rounded-full transition-all duration-700"
-             style={{
-               width: `${Math.max(0.15, pct)}%`,
-               background: "linear-gradient(90deg, #00ff88, #00ffe1)",
-               boxShadow: "0 0 24px rgba(0,255,136,0.4)",
-             }} />
-      </div>
-
-      <div className="flex items-baseline justify-between mt-3">
-        <div className="text-[10px] text-white/45 font-mono-term">
-          // verified active nodes · no fake inflation
-        </div>
-        <div className="font-mono-cyber font-black text-base matrix-text" data-testid="landing-scarcity-pct">
-          {pct.toFixed(4)}%
-        </div>
-      </div>
-
-      <p className="text-[11px] text-amber-300/80 font-mono-term mt-5 leading-relaxed">
-        // 1,000,000 doğrulanmış aktif cihaza ulaşıldığında ağ Snapshot Readiness
-        incelemesine girebilir. Roadmap topluluk, hukuki, teknik ve ekosistem
-        koşullarına bağlıdır.
-      </p>
-    </div>
   );
 }

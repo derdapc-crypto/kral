@@ -1,514 +1,438 @@
 /*
- * THE GRID — TGC Token Page (v1.5.4 "Absolute Authority")
+ * THE GRID — /token (vNext "Immersive Authority Surface")
  *
- * Date-based countdown narrative is RETIRED. New narrative is
- * milestone-driven, centred on the 1,000,000 verified active node target
- * (NETWORK SCARCITY PROGRESS).  Snapshot Readiness, audit, governance and
- * mainnet candidacy are framed as conditional phases — never guaranteed.
- *
- * Surfaces added:
- *   1. Hero  — "THE GRID is not a coin."
- *   2. Compute-Time Receipt philosophy (3 cards)
- *   3. Network Scarcity Progress (live, real backend data, no inflation)
- *   4. Foundation Buyback Program (config-driven, never guaranteed)
- *   5. Tokenomics (70/15/15, marked PLANNED · DRAFT)
- *   6. Milestone-based Roadmap (no dates)
- *   7. Tokenomics Simulator (slider widget)
- *   8. Risk / Clarity disclaimer
+ * Total rewrite per /app/design_guidelines.json — 7 sections, manifesto style.
+ *   1. Brutalist Hero  "TGC is not a coin"
+ *   2. Compute-Time Receipt  technical flow diagram
+ *   3. Network Scarcity     locked-slot grid
+ *   4. Radical Scarcity     drip curve graph
+ *   5. Foundation Buyback   terminal status panel
+ *   6. Milestone Roadmap    vertical timeline
+ *   7. Risk Clarity         multi-column legal
  */
-import React, { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Cpu, Layers, Sparkles, Globe, ShieldCheck, Activity,
-  TrendingUp, Share2, ChevronRight, Lock, Wallet, AlertTriangle,
-} from "lucide-react";
-import { api } from "../lib/api";
+import { motion } from "framer-motion";
+import { Cpu, ArrowRight, ChevronRight, ShieldCheck, AlertTriangle } from "lucide-react";
+import NetworkTopology from "../components/NetworkTopology";
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
 
-const tokenomics = [
-  { label: "Public Compute Reserve",   pct: 70, color: "#00ff88", note: "Earned exclusively by contributing real compute time. Distributed to verified edge nodes during the pre-mainnet phase." },
-  { label: "Operator Reserve",         pct: 15, color: "#00d9ff", note: "24-month vesting cliff. Funds infrastructure scaling, independent review and ecosystem readiness." },
-  { label: "Ecosystem Treasury (DAO)", pct: 15, color: "#a78bfa", note: "Multi-sig governance vault. Bounty programs, integrations, conditional buyback liquidity." },
-];
-
-const milestones = [
-  { id: 1, title: "Verified Node Growth",        desc: "Pre-mainnet contribution ledger expands as new edge nodes come online and pass verification." },
-  { id: 2, title: "Snapshot Readiness Review",   desc: "When the network reaches 1,000,000 verified active nodes, the ledger may be reviewed for sealing. Conditional on community, legal, technical and ecosystem readiness." },
-  { id: 3, title: "Independent Review / Audit",  desc: "Tier-1 firm audit of the token contract candidate, ledger integrity and treasury controls." },
-  { id: 4, title: "Community Governance",        desc: "DAO contracts deployed; multi-sig handover; conditional buyback windows opened by treasury vote." },
-  { id: 5, title: "Mainnet Candidate",           desc: "If all readiness gates are satisfied, a mainnet candidate may be proposed. Listing and liquidity are subject to market and regulatory conditions." },
-];
-
 export default function TokenPage() {
-  const [launch, setLaunch] = useState(null);
   const [scarcity, setScarcity] = useState(null);
-  const [buyback, setBuyback] = useState(null);
-
   useEffect(() => {
-    fetch(`${BACKEND}/api/token/launch`).then(r => r.json()).then(setLaunch).catch(() => {});
-    fetch(`${BACKEND}/api/network/scarcity-progress`).then(r => r.json()).then(setScarcity).catch(() => {});
-    api.get("/foundation/buyback-status").then(r => setBuyback(r.data)).catch(() => setBuyback(null));
+    fetch(`${BACKEND}/api/network/scarcity-progress`).then(r => r.json()).then(setScarcity).catch(()=>{});
   }, []);
-
   return (
-    <div className="min-h-screen text-white" data-testid="token-page"
-         style={{ background: "radial-gradient(ellipse at top, rgba(0,255,136,0.06), transparent 60%), #050608" }}>
+    <main className="bg-black text-white antialiased selection:bg-[#00ff88] selection:text-black" data-testid="token-page">
+      <SharedBg />
+      <TokenNav />
+      <BrutalistHero />
+      <ReceiptFlow />
+      <SlotScarcity scarcity={scarcity} />
+      <DripCurve />
+      <BuybackTerminal />
+      <RoadmapTimeline />
+      <RiskClarity />
+      <FooterStrip />
+    </main>
+  );
+}
 
-      {/* nav */}
-      <nav className="px-6 lg:px-12 py-6 flex items-center justify-between border-b border-white/[0.05]">
-        <Link to="/" className="flex items-center gap-3" data-testid="token-home-link">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#00ff88] to-[#00d9ff] flex items-center justify-center">
-            <Cpu className="w-5 h-5 text-black" />
+function SharedBg() {
+  return (
+    <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+      <div className="absolute inset-0 bg-black" />
+      <div className="absolute inset-0 opacity-[0.35]"
+           style={{
+             backgroundImage:
+               "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
+             backgroundSize: "44px 44px",
+             maskImage: "radial-gradient(ellipse at 50% 20%, black 40%, transparent 80%)",
+             WebkitMaskImage: "radial-gradient(ellipse at 50% 20%, black 40%, transparent 80%)",
+           }} />
+      <div className="absolute -top-32 left-1/3 w-[600px] h-[600px] rounded-full blur-[140px] opacity-[0.14]"
+           style={{ background: "radial-gradient(circle, #00ff88 0%, transparent 60%)" }} />
+      <div className="absolute bottom-1/4 right-0 w-[600px] h-[600px] rounded-full blur-[140px] opacity-[0.12]"
+           style={{ background: "radial-gradient(circle, #6c7bff 0%, transparent 60%)" }} />
+      <div className="absolute inset-0"
+           style={{
+             backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px)",
+             mixBlendMode: "multiply", opacity: 0.5,
+           }} />
+    </div>
+  );
+}
+
+function TokenNav() {
+  return (
+    <header className="border-b border-white/[0.06] bg-black/55 backdrop-blur-xl sticky top-0 z-30" data-testid="token-nav">
+      <div className="max-w-[1400px] mx-auto px-6 lg:px-10 h-16 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-md border border-[#00ff88]/40 grid place-items-center bg-black">
+            <Cpu className="w-4 h-4 text-[#00ff88]" />
           </div>
-          <span className="font-mono-cyber font-black tracking-tight">THE GRID</span>
+          <div className="font-mono uppercase tracking-[0.3em] text-[12px]">the.grid <span className="text-white/40">/ tgc.protocol</span></div>
         </Link>
-        <Link to="/" className="text-xs uppercase tracking-[0.3em] text-white/45 hover:text-white/85 transition" data-testid="token-back-link">
-          ← back to home
-        </Link>
-      </nav>
+        <Link to="/" className="font-mono uppercase tracking-[0.3em] text-[11px] text-white/55 hover:text-white">← back to overview</Link>
+      </div>
+    </header>
+  );
+}
 
-      {/* HERO */}
-      <section className="px-6 lg:px-12 pt-16 pb-12 max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-          <span className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] text-[#00ff88]/85 font-mono-term border border-[#00ff88]/20 rounded-full px-3 py-1.5">
-            <Lock className="w-3 h-3" />
-            Pre-Mainnet Contribution Phase
-          </span>
-
-          <h1 className="font-mono-cyber font-black mt-6 text-5xl sm:text-6xl lg:text-7xl tracking-tighter leading-[0.95]">
-            <span className="text-white">THE GRID is not a coin.</span><br/>
-            <span className="bg-gradient-to-r from-[#00ff88] via-[#00d9ff] to-[#a78bfa] bg-clip-text text-transparent">
-              It is a record of useful compute.
-            </span>
+/* ============================================================ */
+/*  1. Brutalist Hero                                           */
+/* ============================================================ */
+function BrutalistHero() {
+  return (
+    <section className="relative min-h-[78vh] flex items-center px-6 lg:px-10 py-32" data-testid="token-hero">
+      <div className="max-w-[1400px] mx-auto w-full grid lg:grid-cols-[1.4fr_1fr] gap-10 items-center">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88] mb-8">
+            // tgc.protocol_thesis · pre-mainnet
+          </div>
+          <h1 className="font-display text-white"
+              style={{ fontSize: "clamp(56px, 9vw, 152px)", letterSpacing: "-0.05em", lineHeight: 0.88, fontWeight: 700 }}>
+            TGC is<br/>
+            <span className="text-white/35">not a coin.</span><br/>
+            <span style={{
+              background:"linear-gradient(96deg, #00ff88, #00d9ff)",
+              WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+            }}>It is a record</span><br/>
+            <span className="text-white/65">of useful compute.</span>
           </h1>
-
-          <p className="mt-7 max-w-2xl text-white/65 leading-relaxed text-lg">
-            $TGC, ağa katkıda bulunan her edge compute node'un pre-mainnet katkı defteridir.
-            Bir altcoin değil, bir <span className="text-[#00ff88] font-semibold">compute-time receipt</span> —
-            ölçülebilir hesaplama katkısının dijital sertifikası.
+          <p className="mt-10 text-white/55 text-[16px] leading-relaxed max-w-[520px]">
+            A pre-mainnet contribution receipt. Cryptographically sealed.
+            Conditional on verified network growth. Subject to community, legal,
+            technical and ecosystem readiness — never to a calendar.
           </p>
         </motion.div>
-      </section>
-
-      {/* COMPUTE-TIME RECEIPT */}
-      <section className="px-6 lg:px-12 py-12 max-w-6xl mx-auto border-t border-white/[0.05]">
-        <div className="text-[10px] uppercase tracking-[0.4em] text-[#00d9ff]/85 font-mono-term mb-2">// philosophy</div>
-        <h2 className="font-mono-cyber font-black text-3xl sm:text-4xl tracking-tight mb-10">
-          Compute-Time <span className="text-[#00ff88]">Receipt</span>.
-        </h2>
-        <div className="grid lg:grid-cols-3 gap-6">
-          <PhilCard testId="phil-receipt" icon={<Layers className="w-5 h-5" />} title="Useful Compute"
-            body="Sadece gerçek compute katkısı sırasında TGC üretilir. Atıl cihazlar ya da sahte tıklamalar üretmez — her TGC, ağa verilmiş ölçülebilir CPU saatinin makbuzudur." />
-          <PhilCard testId="phil-scarcity" icon={<Sparkles className="w-5 h-5" />} title="Radical Scarcity"
-            body="Günlük drip cihaz başına 0.05–0.30 TGC arasında kalır. Üretim, milyarlarca arz şişiremez — ölçek yalnızca yeni doğrulanmış cihazlar geldikçe büyür." />
-          <PhilCard testId="phil-non-currency" icon={<Globe className="w-5 h-5" />} title="Post-Currency Unit"
-            body="$TGC bugün bir kripto para birimi değildir; gelecekteki mainnet aşaması koşullara bağlıdır. Sahip olmak = ağı erken aşamada ayakta tutanlar arasında olmak demektir." />
-        </div>
-      </section>
-
-      {/* NETWORK SCARCITY PROGRESS */}
-      <NetworkScarcityProgress scarcity={scarcity} />
-
-      {/* FOUNDATION BUYBACK PROGRAM */}
-      <FoundationBuybackCard buyback={buyback} onApplied={() => {
-        api.get("/foundation/buyback-status").then(r => setBuyback(r.data)).catch(() => {});
-      }} />
-
-      {/* TOKENOMICS */}
-      <section className="px-6 lg:px-12 py-12 max-w-6xl mx-auto border-t border-white/[0.05]">
-        <div className="flex items-baseline justify-between flex-wrap gap-3 mb-2">
-          <div className="text-[10px] uppercase tracking-[0.4em] text-[#a78bfa]/85 font-mono-term">// tokenomics</div>
-          <span className="text-[10px] uppercase tracking-[0.3em] text-amber-300/85 font-mono-term border border-amber-300/25 rounded-full px-2.5 py-1">
-            planned · draft
-          </span>
-        </div>
-        <h2 className="font-mono-cyber font-black text-3xl sm:text-4xl tracking-tight mb-3">
-          Dağılım <span className="text-[#00ff88]">küçük</span>, kontrol <span className="text-[#00d9ff]">adil</span>.
-        </h2>
-        <p className="text-white/55 max-w-2xl mb-10 text-sm leading-relaxed">
-          Aşağıdaki dağılım yapısı pre-mainnet planlamasıdır. Snapshot Readiness aşamasında
-          kesinleştirilir; bağımsız denetim ve topluluk yönetişimi onayına tabidir.
-        </p>
-        <div className="space-y-4">
-          {tokenomics.map((t, i) => (
-            <div key={i} className="rounded-2xl border border-white/[0.07] bg-black/40 p-5" data-testid={`tkn-row-${i}`}>
-              <div className="flex items-baseline justify-between mb-2">
-                <span className="font-mono-term text-sm text-white/85">{t.label}</span>
-                <span className="font-mono-cyber font-black text-2xl" style={{ color: t.color }}>{t.pct}%</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${t.pct}%`, background: t.color }} />
-              </div>
-              <p className="text-[12px] text-white/55 mt-3 leading-relaxed">{t.note}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* TOKENOMICS SIMULATOR */}
-      <TokenomicsSimulator />
-
-      {/* MILESTONE ROADMAP (no dates) */}
-      <section className="px-6 lg:px-12 py-12 max-w-6xl mx-auto border-t border-white/[0.05]">
-        <div className="text-[10px] uppercase tracking-[0.4em] text-amber-300/85 font-mono-term mb-2">// milestones</div>
-        <h2 className="font-mono-cyber font-black text-3xl sm:text-4xl tracking-tight mb-10">
-          Tarih değil, <span className="text-amber-300">milestone</span>.
-        </h2>
-        <div className="space-y-4">
-          {milestones.map((m) => (
-            <div key={m.id} className="rounded-2xl border border-white/[0.07] bg-black/40 p-5 flex gap-5 items-start"
-                 data-testid={`milestone-${m.id}`}>
-              <div className="shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-amber-300/15 to-amber-300/5 flex items-center justify-center">
-                <span className="font-mono-cyber font-black text-amber-300 text-lg">{m.id}</span>
-              </div>
-              <div className="flex-1">
-                <div className="font-mono-cyber font-black text-lg text-white">{m.title}</div>
-                <p className="text-[13px] text-white/60 mt-1 leading-relaxed">{m.desc}</p>
-              </div>
-              <Activity className="w-5 h-5 text-white/25 shrink-0 mt-1" />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* RISK / CLARITY NOTE */}
-      <section className="px-6 lg:px-12 py-12 max-w-6xl mx-auto border-t border-white/[0.05]">
-        <div className="rounded-3xl border border-amber-300/25 bg-amber-300/[0.04] p-7" data-testid="token-risk-note">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] text-amber-300/85 font-mono-term mb-3">
-            <AlertTriangle className="w-3 h-3" /> Risk / Clarity Note
-          </div>
-          <ul className="space-y-2 text-sm text-white/70 leading-relaxed">
-            <li>• TGC bugün bir kripto para birimi değildir.</li>
-            <li>• TGC'nin gelecekteki piyasa değeri garanti edilmez.</li>
-            <li>• Mainnet, snapshot, token launch, buyback windows ve likidite programları
-              topluluk, hukuki, teknik ve ekosistem koşullarına bağlıdır.</li>
-            <li>• Bu sayfadaki tüm rakamlar yalnızca <span className="text-amber-300">indicative</span>'dir;
-              ileride değişebilir veya iptal edilebilir.</li>
-          </ul>
-        </div>
-      </section>
-
-      <footer className="px-6 lg:px-12 py-10 text-center text-[11px] text-white/35 font-mono-term">
-        // {launch?.label || "TGC · Pre-Mainnet Contribution Phase"} ·
-        no price guarantee · milestone-driven roadmap
-      </footer>
-    </div>
-  );
-}
-
-/* ============================================================ */
-/*  Components                                                  */
-/* ============================================================ */
-
-function PhilCard({ icon, title, body, testId }) {
-  return (
-    <div className="rounded-2xl border border-white/[0.07] bg-black/40 p-6" data-testid={testId}>
-      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00ff88]/15 to-[#00d9ff]/10 flex items-center justify-center text-[#00ff88]">
-        {icon}
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.9, delay: 0.15 }}
+                    className="relative aspect-square w-full max-w-[520px] lg:max-w-none mx-auto border border-white/[0.08]">
+          <NetworkTopology className="w-full h-full" />
+        </motion.div>
       </div>
-      <h3 className="font-mono-cyber font-black text-xl mt-4">{title}</h3>
-      <p className="text-[13px] text-white/60 leading-relaxed mt-2">{body}</p>
-    </div>
+    </section>
   );
 }
 
-function NetworkScarcityProgress({ scarcity }) {
+/* ============================================================ */
+/*  2. Compute-Time Receipt — flow diagram                      */
+/* ============================================================ */
+function ReceiptFlow() {
+  const steps = [
+    { k: "01", t: "ENERGY",        s: "Idle device battery + CPU cycles otherwise wasted." },
+    { k: "02", t: "COMPUTE",       s: "Native engine resolves a verified cloud-task sequence." },
+    { k: "03", t: "TELEMETRY",     s: "Output is signed, deterministic, replay-protected." },
+    { k: "04", t: "RECEIPT",       s: "Sealed into the immutable contribution ledger." },
+  ];
+  return (
+    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="receipt-flow">
+      <div className="max-w-[1400px] mx-auto">
+        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-6">
+          // compute_time_receipt.flow
+        </div>
+        <h2 className="font-display text-white max-w-[920px]"
+            style={{ fontSize: "clamp(36px, 5vw, 76px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+          Four stages. <span className="text-white/55">One sealed receipt.</span>
+        </h2>
+        <div className="mt-14 grid md:grid-cols-4 gap-px bg-white/[0.06]" data-testid="flow-steps">
+          {steps.map((s, i) => (
+            <motion.div key={s.k}
+                        initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.1 }}
+                        className="relative bg-black p-7 group">
+              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#00d9ff]/55">{s.k}</div>
+              <div className="mt-5 font-display font-bold text-[24px] text-white" style={{ letterSpacing: "-0.02em" }}>{s.t}</div>
+              <p className="mt-3 text-[13px] text-white/55 leading-relaxed">{s.s}</p>
+              {i < steps.length - 1 && (
+                <ArrowRight className="hidden md:block absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#00ff88]/55 z-10 bg-black p-0.5 rounded-full border border-white/[0.06]" />
+              )}
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ============================================================ */
+/*  3. Network Scarcity — locked-slot grid                      */
+/* ============================================================ */
+function SlotScarcity({ scarcity }) {
   const verified = scarcity?.verified_active_nodes ?? 0;
-  const target   = scarcity?.target_active_nodes ?? 1_000_000;
-  const pct      = scarcity?.progress_pct ?? 0;
-  const phase    = scarcity?.phase || "growth";
-
+  const target   = 1_000_000;
+  const taken    = verified;
+  const slots    = Array.from({ length: 240 }, (_, i) => i);
   return (
-    <section className="px-6 lg:px-12 py-12 max-w-6xl mx-auto border-t border-white/[0.05]"
-             data-testid="network-scarcity-section">
-      <div className="text-[10px] uppercase tracking-[0.4em] text-[#00ff88]/85 font-mono-term mb-2">// network scarcity</div>
-      <h2 className="font-mono-cyber font-black text-3xl sm:text-4xl tracking-tight mb-3">
-        NETWORK SCARCITY <span className="text-[#00ff88]">PROGRESS</span>.
-      </h2>
-      <p className="text-white/55 max-w-2xl mb-8 text-sm leading-relaxed">
-        Ağ <span className="text-white">1,000,000 doğrulanmış aktif cihaza</span> ulaştığında,
-        pre-mainnet katkı dönemi Snapshot Readiness incelemesine girebilir. Bu aşama topluluk,
-        hukuki, teknik ve ekosistem koşullarına bağlıdır.
-      </p>
-
-      <div className="rounded-3xl border border-[#00ff88]/25 bg-gradient-to-br from-[#00ff88]/[0.05] to-[#00d9ff]/[0.03] p-8"
-           data-testid="scarcity-progress-card">
-        <div className="flex items-baseline justify-between flex-wrap gap-3 mb-4">
-          <div className="font-mono-cyber font-black text-5xl sm:text-6xl tabular-nums tracking-tighter">
-            <span className="bg-gradient-to-r from-[#00ff88] to-[#00d9ff] bg-clip-text text-transparent"
-                  data-testid="scarcity-verified-count">
-              {verified.toLocaleString()}
-            </span>
-            <span className="text-white/40 text-2xl ml-3 font-mono-term">/ {target.toLocaleString()}</span>
+    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="slot-scarcity">
+      <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[0.95fr_1.05fr] gap-12">
+        <div>
+          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-amber-300/85 mb-6">
+            // network.scarcity
           </div>
-          <span className="text-[10px] uppercase tracking-[0.3em] text-[#00ff88]/85 font-mono-term border border-[#00ff88]/25 rounded-full px-3 py-1.5">
-            phase · {phase.replace("_", " ")}
-          </span>
-        </div>
-
-        <div className="h-2 rounded-full bg-white/[0.05] overflow-hidden border border-white/[0.04]" data-testid="scarcity-bar">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${Math.max(0.15, pct)}%` }}
-            transition={{ duration: 1.0, ease: "easeOut" }}
-            className="h-full rounded-full"
-            style={{ background: "linear-gradient(90deg, #00ff88, #00d9ff)", boxShadow: "0 0 24px rgba(0,255,136,0.45)" }}
-          />
-        </div>
-
-        <div className="flex items-baseline justify-between flex-wrap gap-3 mt-4">
-          <div className="text-[11px] text-white/50 font-mono-term">
-            // verified active nodes · live · no fake inflation
+          <h2 className="font-display text-white"
+              style={{ fontSize: "clamp(38px, 5vw, 76px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+            Slots are <span className="text-amber-300">finite</span>.<br/>
+            Inflation is <span className="text-white/55">forbidden</span>.
+          </h2>
+          <div className="mt-10 grid grid-cols-3 gap-px bg-white/[0.06] max-w-[480px]" data-testid="scarcity-stats">
+            <StatCell k="VERIFIED"  v={verified.toLocaleString()} tone="matrix" />
+            <StatCell k="TARGET"    v={target.toLocaleString()}    tone="cyan" />
+            <StatCell k="REMAINING" v={(target - taken).toLocaleString()} tone="amber" />
           </div>
-          <div className="font-mono-cyber font-black text-base text-[#00ff88]" data-testid="scarcity-pct">
-            {pct.toFixed(4)} %
-          </div>
-        </div>
-
-        <p className="text-[11px] text-amber-300/80 font-mono-term mt-5 leading-relaxed">
-          // {scarcity?.subtitle_long || "Roadmap progression is subject to community, legal, technical and ecosystem conditions."}
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function FoundationBuybackCard({ buyback, onApplied }) {
-  const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState(null);
-
-  const windowOpen = buyback?.window_status === "open";
-  const eligible   = !!buyback?.user_is_eligible;
-
-  const handleApply = async () => {
-    setSubmitting(true);
-    setResult(null);
-    try {
-      const r = await api.post("/foundation/buyback-apply", {});
-      setResult({ ok: true, msg: r.data?.status === "already_submitted"
-        ? "Application already on file. Status is being reviewed."
-        : "Application submitted. You'll be notified after review." });
-      onApplied && onApplied();
-    } catch (e) {
-      const detail = e?.response?.data?.detail || "unknown_error";
-      setResult({ ok: false, msg: `Cannot submit: ${detail}` });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <section className="px-6 lg:px-12 py-12 max-w-6xl mx-auto border-t border-white/[0.05]"
-             data-testid="foundation-buyback-section">
-      <div className="text-[10px] uppercase tracking-[0.4em] text-[#00d9ff]/85 font-mono-term mb-2">// foundation</div>
-      <h2 className="font-mono-cyber font-black text-3xl sm:text-4xl tracking-tight mb-3">
-        THE GRID FOUNDATION // <span className="text-[#00d9ff]">BUYBACK PROGRAM</span>
-      </h2>
-      <p className="text-white/55 max-w-3xl mb-8 text-sm leading-relaxed">
-        {buyback?.target_tgc ?? 100} TGC'ye ulaşan contributor'lar, Foundation Buyback Window
-        açıldığında bakiyelerini USDT karşılığı geri alım programına sunabilir. Program;
-        dönemsel bütçe, kullanıcı doğrulaması, fraud/risk kontrolü, bölgesel uygunluk
-        ve Ecosystem Treasury likiditesine bağlıdır.
-      </p>
-
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="rounded-3xl border border-white/[0.07] bg-black/45 p-7 space-y-4" data-testid="buyback-status-card">
-          <StatusRow label="Window Status"
-                     value={(buyback?.window_status || "closed").toUpperCase()}
-                     tone={windowOpen ? "ok" : "amber"}
-                     testId="bb-window-status" />
-          <StatusRow label="Eligibility"
-                     value={buyback?.eligibility_label || "100 TGC required"}
-                     tone="info"
-                     testId="bb-eligibility" />
-          <StatusRow label="Current Program"
-                     value={buyback?.current_program_label || "Up to $300 USDT"}
-                     tone="info"
-                     testId="bb-program" />
-          <StatusRow label="Your TGC Balance"
-                     value={`${(buyback?.user_tgc_balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 5, maximumFractionDigits: 5 })} TGC`}
-                     tone={eligible ? "ok" : "muted"}
-                     testId="bb-user-balance" />
-          <p className="text-[11px] text-amber-300/80 font-mono-term leading-relaxed pt-2 border-t border-white/[0.05]">
-            // {buyback?.terms || "subject to treasury availability, verification, risk review and regional eligibility"}
+          <p className="mt-8 text-white/55 max-w-[480px] leading-relaxed">
+            Each lit cell represents a verified active edge node.
+            The protocol never inflates supply ahead of real network growth.
           </p>
         </div>
-
-        <div className="rounded-3xl border border-[#00d9ff]/20 bg-gradient-to-br from-[#00d9ff]/[0.05] to-[#a78bfa]/[0.03] p-7 flex flex-col"
-             data-testid="buyback-action-card">
-          <div className="text-[10px] uppercase tracking-[0.4em] text-[#00d9ff]/85 font-mono-term mb-3">// action</div>
-          <h3 className="font-mono-cyber font-black text-2xl tracking-tight mb-2">
-            Apply for Buyback
-          </h3>
-          <p className="text-[13px] text-white/55 leading-relaxed mb-5">
-            Eligible contributor'lar, açık bir Buyback Window olduğunda bu butondan
-            başvurularını gönderebilir. Onaylanan başvurular Ecosystem Treasury
-            likiditesine ve doğrulama sürecine tabidir.
-          </p>
-
-          <button
-            onClick={handleApply}
-            disabled={!eligible || submitting}
-            data-testid="buyback-apply-btn"
-            className={`mt-auto w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-mono-cyber font-black tracking-wide text-sm transition-all
-              ${eligible
-                ? "bg-[#00d9ff] text-black shadow-[0_0_40px_rgba(0,217,255,0.35)] hover:shadow-[0_0_60px_rgba(0,217,255,0.55)]"
-                : "bg-white/[0.05] text-white/30 cursor-not-allowed"}`}
-          >
-            <Wallet className="w-4 h-4" />
-            {submitting ? "SUBMITTING…" : (eligible ? "APPLY FOR BUYBACK" : "NOT ELIGIBLE YET")}
-          </button>
-
-          {!eligible && (
-            <p className="text-[11px] text-white/40 font-mono-term mt-3 text-center">
-              {!windowOpen
-                ? "// window is currently closed"
-                : (buyback?.risk_flagged
-                    ? "// account under review"
-                    : `// reach ${buyback?.target_tgc ?? 100} TGC to unlock`)}
-            </p>
-          )}
-
-          {result && (
-            <p className={`text-[12px] mt-4 font-mono-term ${result.ok ? "text-[#00ff88]" : "text-amber-300"}`}
-               data-testid="buyback-result">
-              // {result.msg}
-            </p>
-          )}
+        {/* slot grid */}
+        <div className="grid grid-cols-20 gap-[3px] p-3 border border-white/[0.06] bg-black/40"
+             style={{ gridTemplateColumns: "repeat(20, minmax(0,1fr))" }}
+             data-testid="scarcity-grid">
+          {slots.map((i) => {
+            const lit = i < Math.min(taken, slots.length);
+            return (
+              <div key={i}
+                   className="aspect-square"
+                   style={{
+                     background: lit ? "#00ff88" : "rgba(255,255,255,0.05)",
+                     boxShadow:  lit ? "0 0 10px 1px rgba(0,255,136,0.6)" : "none",
+                   }} />
+            );
+          })}
         </div>
       </div>
     </section>
   );
 }
 
-function StatusRow({ label, value, tone = "muted", testId }) {
-  const colorMap = {
-    ok: "text-[#00ff88]",
-    info: "text-[#00d9ff]",
-    amber: "text-amber-300",
-    muted: "text-white/55",
-  };
+function StatCell({ k, v, tone }) {
+  const color = tone === "matrix" ? "#00ff88" : tone === "cyan" ? "#00d9ff" : tone === "amber" ? "#fbbf24" : "#f5f7fa";
   return (
-    <div className="flex items-baseline justify-between" data-testid={testId}>
-      <span className="text-[11px] uppercase tracking-[0.2em] text-white/45 font-mono-term">{label}</span>
-      <span className={`font-mono-cyber font-bold text-sm tabular-nums ${colorMap[tone]}`}>{value}</span>
+    <div className="bg-black px-4 py-3">
+      <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">{k}</div>
+      <div className="font-mono font-bold text-[18px] mt-1 tabular-nums" style={{ color }}>{v}</div>
     </div>
   );
 }
 
 /* ============================================================ */
-/*  Tokenomics Simulator (preserved from v1.5.3)                */
+/*  4. Radical Scarcity — drip curve graph                      */
 /* ============================================================ */
-function TokenomicsSimulator() {
-  const [days, setDays] = useState(365);
-  const [dripDaily, setDripDaily] = useState(0.18);
-  const [devices, setDevices] = useState(1);
-  const [copied, setCopied] = useState(false);
-
-  const totalTgc = useMemo(() => days * dripDaily * devices, [days, dripDaily, devices]);
-
-  const shareText = `THE GRID · ${devices} edge node × ${days} day × ${dripDaily.toFixed(2)} TGC/day → ${totalTgc.toFixed(2)} $TGC contribution receipt · ${typeof window !== "undefined" ? window.location.origin : "thegrid.io"}/token`;
-
-  const handleShare = async () => {
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "THE GRID — my TGC contribution projection", text: shareText });
-      } else {
-        await navigator.clipboard.writeText(shareText);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1800);
-      }
-    } catch { /* user cancelled */ }
-  };
-
+function DripCurve() {
+  // synthetic illustrative drip curve — labelled as illustrative
+  const W = 800, H = 260;
+  const pts = Array.from({ length: 100 }, (_, i) => {
+    const x = (i / 99) * W;
+    // logarithmic decay
+    const y = H - (Math.pow(0.96, i) * H * 0.85) - 14;
+    return [x, y];
+  });
+  const path = "M " + pts.map(p => p.join(" ")).join(" L ");
   return (
-    <section className="px-6 lg:px-12 py-12 max-w-6xl mx-auto border-t border-white/[0.05]"
-             data-testid="tokenomics-simulator-section">
-      <div className="text-[10px] uppercase tracking-[0.4em] text-[#00ff88]/85 font-mono-term mb-2">// simulator</div>
-      <h2 className="font-mono-cyber font-black text-3xl sm:text-4xl tracking-tight mb-3">
-        Senin contribution defterin <span className="text-[#00ff88]">ne kadar büyür</span>?
-      </h2>
-      <p className="text-white/55 max-w-2xl mb-10 text-sm leading-relaxed">
-        Aşağıdaki kaydırıcılarla kendi senaryonu modelle. Hesaplama protokol drip
-        oranlarını kullanır (edge node başına günlük 0.05 – 0.30 TGC).
-        <span className="text-amber-300/85"> Hiçbir fiyat veya piyasa değeri garantisi değildir.</span>
-      </p>
+    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="drip-curve">
+      <div className="max-w-[1400px] mx-auto">
+        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#6c7bff] mb-6">
+          // radical.scarcity_curve
+        </div>
+        <h2 className="font-display text-white max-w-[920px]"
+            style={{ fontSize: "clamp(36px, 5vw, 76px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+          Drip per node decays as the network grows.
+        </h2>
+        <p className="mt-6 text-white/55 max-w-[640px]">
+          Per-device daily contribution is capped between
+          <span className="text-white"> 0.05 – 0.30 TGC</span>. As the network expands, the curve
+          tightens — radical scarcity by design.
+        </p>
+        <div className="mt-12 border border-white/[0.08] p-6 bg-black/40">
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
+            {/* grid lines */}
+            {[0.25, 0.5, 0.75].map((g) => (
+              <line key={g} x1="0" y1={H*g} x2={W} y2={H*g} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+            ))}
+            {/* fill under curve */}
+            <motion.path
+              d={`${path} L ${W} ${H} L 0 ${H} Z`}
+              fill="url(#dripFill)" opacity="0.4"
+              initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }}
+              viewport={{ once: true }} transition={{ duration: 1.4 }}
+            />
+            <motion.path
+              d={path} fill="none"
+              stroke="#00ff88" strokeWidth="2.5"
+              initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }}
+              viewport={{ once: true }} transition={{ duration: 1.6, ease: "easeOut" }}
+            />
+            <defs>
+              <linearGradient id="dripFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#00ff88" stopOpacity="0.45" />
+                <stop offset="100%" stopColor="#00ff88" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {/* axes labels */}
+            <text x="0" y={H-2} fill="rgba(255,255,255,0.35)" fontSize="10" fontFamily="JetBrains Mono">network_size →</text>
+            <text x={W-110} y={H-2} fill="rgba(255,255,255,0.35)" fontSize="10" fontFamily="JetBrains Mono">1,000,000 cap</text>
+          </svg>
+          <div className="mt-3 font-mono uppercase tracking-[0.3em] text-[10px] text-amber-300/80">
+            // illustrative · actual drip rates are determined by the protocol
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
-      <div className="grid lg:grid-cols-2 gap-8 items-start">
-        <div className="rounded-3xl border border-white/[0.07] bg-black/50 backdrop-blur p-7 space-y-7" data-testid="simulator-controls">
-          <SliderRow testId="sim-days" label="Aktif Gün Sayısı" sublabel="contribution defterindeki gün"
-                     value={days} min={1} max={730} step={1} display={`${days} gün`} color="#00ff88"
-                     onChange={setDays} />
-          <SliderRow testId="sim-drip" label="Günlük Drip Oranı" sublabel="edge node başı · TGC/gün"
-                     value={dripDaily} min={0.05} max={0.30} step={0.01}
-                     display={`${dripDaily.toFixed(2)} TGC`} color="#00d9ff"
-                     onChange={setDripDaily} />
-          <SliderRow testId="sim-devices" label="Edge Node Sayısı" sublabel="telefon + tablet"
-                     value={devices} min={1} max={5} step={1} display={`${devices} node`} color="#a78bfa"
-                     onChange={setDevices} />
-          <div className="grid grid-cols-3 gap-2 pt-4 border-t border-white/[0.05]">
+/* ============================================================ */
+/*  5. Foundation Buyback — terminal status panel               */
+/* ============================================================ */
+function BuybackTerminal() {
+  return (
+    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="buyback-terminal">
+      <div className="max-w-[1400px] mx-auto">
+        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#6c7bff] mb-6">
+          // foundation.buyback_program
+        </div>
+        <h2 className="font-display text-white max-w-[920px]"
+            style={{ fontSize: "clamp(38px, 5vw, 76px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+          A policy window. <span className="text-white/55">Not a price guarantee.</span>
+        </h2>
+
+        <div className="mt-12 border border-white/[0.08] bg-black/70 backdrop-blur-xl">
+          <div className="flex items-center gap-3 px-5 py-3 border-b border-white/[0.08] font-mono uppercase text-[10px] tracking-[0.3em] text-white/55">
+            <span className="w-2 h-2 rounded-full bg-amber-300 motion-telemetry-blink" />
+            <span>foundation.buyback_window · status feed</span>
+            <span className="ml-auto text-amber-300/85">CLOSED</span>
+          </div>
+          <div className="grid lg:grid-cols-2 gap-px bg-white/[0.06]">
             {[
-              { lbl: "Casual",  d: 180, r: 0.10 },
-              { lbl: "Reguler", d: 365, r: 0.18 },
-              { lbl: "Power",   d: 600, r: 0.28 },
-            ].map((p) => (
-              <button key={p.lbl} data-testid={`sim-preset-${p.lbl.toLowerCase()}`}
-                      onClick={() => { setDays(p.d); setDripDaily(p.r); }}
-                      className="text-[11px] uppercase tracking-[0.2em] font-mono-term py-2 rounded-lg border border-white/[0.08] text-white/65 hover:border-[#00ff88]/40 hover:text-white transition">
-                {p.lbl}
-              </button>
+              ["window_status",   "CLOSED",                       "amber"],
+              ["eligibility",     "100 TGC required",             "white"],
+              ["current_program", "up to $300 USDT",              "cyan"],
+              ["risk_review",     "required",                     "white"],
+              ["regional_check",  "subject to jurisdiction",      "white"],
+              ["treasury_state",  "policy-based liquidity",       "violet"],
+              ["fraud_screen",    "automated + manual",           "white"],
+              ["payout_form",     "manual · case-by-case",        "amber"],
+            ].map(([k, v, tone]) => (
+              <div key={k} className="bg-black px-5 py-4 flex items-baseline justify-between gap-4">
+                <span className="font-mono uppercase tracking-[0.25em] text-[10px] text-white/45">{k}</span>
+                <span className={`font-mono font-bold uppercase tracking-[0.2em] text-[12px] tabular-nums ${
+                  tone === "amber"  ? "text-amber-300" :
+                  tone === "cyan"   ? "text-[#00d9ff]" :
+                  tone === "violet" ? "text-[#6c7bff]" : "text-white"
+                }`}>{v}</span>
+              </div>
             ))}
           </div>
-        </div>
-
-        <div className="rounded-3xl border border-[#00ff88]/25 bg-gradient-to-br from-[#00ff88]/[0.06] to-[#00d9ff]/[0.03] p-7" data-testid="simulator-output">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] text-[#00ff88]/80 font-mono-term">
-            <TrendingUp className="w-3 h-3" /> projected contribution receipt
+          <div className="px-5 py-3 border-t border-white/[0.08] font-mono text-[10px] text-white/40 uppercase tracking-[0.25em]">
+            // subject to treasury availability · verification · risk review · regional eligibility
           </div>
-          <motion.div key={totalTgc.toFixed(2)}
-                      initial={{ opacity: 0.55, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25 }}
-                      className="font-mono-cyber font-black text-5xl sm:text-6xl tracking-tighter mt-4"
-                      data-testid="sim-total-tgc">
-            <span className="bg-gradient-to-r from-[#00ff88] to-[#00d9ff] bg-clip-text text-transparent">
-              {totalTgc.toLocaleString(undefined, { minimumFractionDigits: 5, maximumFractionDigits: 5 })}
-            </span>
-            <span className="text-white/45 text-2xl font-mono-term ml-2">$TGC</span>
-          </motion.div>
-
-          <p className="text-[11px] text-amber-300/75 leading-relaxed mt-4 font-mono-term">
-            // contribution receipt only · no market price · no listing guarantee
-            <br/>// real distribution = drip × verified compute × uptime
-          </p>
-
-          <button onClick={handleShare} data-testid="sim-share-btn"
-                  className="mt-6 w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-[#00d9ff]/40 bg-[#00d9ff]/10 hover:bg-[#00d9ff]/20 text-[#00d9ff] font-mono-cyber font-bold text-sm tracking-wide transition">
-            <Share2 className="w-4 h-4" />
-            {copied ? "link copied · paste anywhere" : "Share my projection"}
-          </button>
         </div>
       </div>
     </section>
   );
 }
 
-function SliderRow({ label, sublabel, value, min, max, step, display, color, onChange, testId }) {
+/* ============================================================ */
+/*  6. Milestone Roadmap — vertical timeline                    */
+/* ============================================================ */
+function RoadmapTimeline() {
+  const phases = [
+    { k: "01", t: "VERIFIED NODE GROWTH",        s: "Edge node fleet grows. Contribution ledger expands.",        state: "active" },
+    { k: "02", t: "SNAPSHOT READINESS REVIEW",   s: "Ledger considered for sealing at 1M verified nodes.",         state: "pending" },
+    { k: "03", t: "INDEPENDENT REVIEW / AUDIT",  s: "Tier-1 firm audit of contracts, ledger and treasury.",        state: "pending" },
+    { k: "04", t: "COMMUNITY GOVERNANCE",        s: "DAO contracts deployed. Multi-sig handover.",                 state: "pending" },
+    { k: "05", t: "MAINNET CANDIDATE",           s: "Conditional on all readiness gates being satisfied.",         state: "pending" },
+  ];
   return (
-    <div data-testid={testId}>
-      <div className="flex items-baseline justify-between mb-2">
-        <div>
-          <div className="font-mono-cyber font-bold text-sm text-white/90">{label}</div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-white/35 font-mono-term mt-0.5">{sublabel}</div>
+    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="roadmap-timeline">
+      <div className="max-w-[1400px] mx-auto">
+        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00d9ff]/85 mb-6">
+          // protocol.milestone_roadmap
         </div>
-        <div className="font-mono-cyber font-black text-2xl tabular-nums" style={{ color }}>{display}</div>
+        <h2 className="font-display text-white max-w-[920px]"
+            style={{ fontSize: "clamp(38px, 5vw, 76px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+          Milestones, not dates.
+        </h2>
+
+        <div className="mt-14 relative pl-10 border-l border-white/[0.08]">
+          {phases.map((p, i) => {
+            const active = p.state === "active";
+            return (
+              <motion.div key={p.k}
+                          initial={{ opacity: 0, x: -10 }} whileInView={{ opacity: 1, x: 0 }}
+                          viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.08 }}
+                          className="relative pb-14 last:pb-0">
+                {/* node */}
+                <div className={`absolute -left-[46px] top-1 w-5 h-5 ${active ? "bg-[#00ff88]" : "bg-black border border-white/20"}`}
+                     style={active ? { boxShadow: "0 0 18px 2px rgba(0,255,136,0.7)" } : {}} />
+                <div className="font-mono uppercase tracking-[0.35em] text-[10px] text-[#00d9ff]/55">{p.k}</div>
+                <div className={`mt-2 font-display font-bold text-[28px] ${active ? "text-[#00ff88]" : "text-white"}`}
+                     style={{ letterSpacing:"-0.02em" }}>{p.t}</div>
+                <p className="mt-2 text-white/55 leading-relaxed max-w-xl">{p.s}</p>
+                <div className="mt-3 font-mono uppercase tracking-[0.3em] text-[10px]"
+                     style={{ color: active ? "#00ff88" : "rgba(255,255,255,0.3)" }}>
+                  {active ? "IN PROGRESS" : "PENDING · conditional"}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
-      <input type="range" min={min} max={max} step={step} value={value}
-             onChange={(e) => onChange(parseFloat(e.target.value))}
-             data-testid={`${testId}-input`}
-             className="grid-slider w-full"
-             style={{ accentColor: color }} />
-    </div>
+    </section>
+  );
+}
+
+/* ============================================================ */
+/*  7. Risk Clarity — monochrome legal                          */
+/* ============================================================ */
+function RiskClarity() {
+  const clauses = [
+    "TGC is not currently a cryptocurrency.",
+    "TGC is a pre-mainnet contribution receipt.",
+    "Future market value of TGC is not guaranteed.",
+    "Buyback windows are conditional and may be closed at any time.",
+    "Mainnet candidacy is conditional on community, legal, technical and ecosystem readiness.",
+    "No guaranteed exchange listing.",
+    "No guaranteed token price.",
+    "Subject to verification, treasury availability, risk review and regional eligibility.",
+  ];
+  return (
+    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="risk-clarity">
+      <div className="max-w-[1400px] mx-auto">
+        <div className="flex items-center gap-3 font-mono uppercase tracking-[0.4em] text-[10px] text-amber-300 mb-6">
+          <AlertTriangle className="w-3 h-3" /> // risk.clarity.note
+        </div>
+        <h2 className="font-display text-white"
+            style={{ fontSize: "clamp(32px, 4vw, 56px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+          Read this section before participating.
+        </h2>
+        <div className="mt-10 grid md:grid-cols-2 gap-px bg-white/[0.06]">
+          {clauses.map((c, i) => (
+            <div key={i} className="bg-black px-5 py-5 font-mono text-[12px] uppercase tracking-[0.18em] text-white/60 leading-relaxed">
+              <span className="text-amber-300/75 mr-2">{(i+1).toString().padStart(2,"0")}.</span>
+              {c}
+            </div>
+          ))}
+        </div>
+        <p className="mt-8 font-mono uppercase tracking-[0.3em] text-[10px] text-white/35 max-w-2xl">
+          // this document is informational only.
+          <br/>// it is not financial advice, an offering, or a securities solicitation.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function FooterStrip() {
+  return (
+    <footer className="border-t border-white/[0.06] px-6 lg:px-10 py-10 text-[11px] font-mono uppercase tracking-[0.3em] text-white/30">
+      <div className="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-3">
+        <span>// tgc.protocol · pre-mainnet contribution phase</span>
+        <Link to="/" className="hover:text-white">return to overview <ChevronRight className="inline w-3 h-3" /></Link>
+      </div>
+    </footer>
   );
 }

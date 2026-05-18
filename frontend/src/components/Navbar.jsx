@@ -14,6 +14,12 @@ export default function Navbar() {
   const loc = useLocation();
   const [apkOpen, setApkOpen] = useState(false);
 
+  // vNext — public marketing surfaces (Landing, Token) ship their own
+  // bespoke navbar baked into the page. Hide the legacy global navbar there.
+  if (loc.pathname === "/" || loc.pathname === "/token" || loc.pathname === "/launch") {
+    return null;
+  }
+
   const linkCls = (path) =>
     `text-[13px] font-medium font-sans-saas transition-colors ${
       loc.pathname === path ? "text-white" : "text-white/55 hover:text-white"
