@@ -75,6 +75,194 @@ body::after {
 }
 
 /* ============================================================ */
+/* v1.6.0 — IMMERSIVE AUTHORITY SURFACE                          */
+/* Design tokens, card roles and motion vocabulary used by every */
+/* public/dashboard/B2B/admin/APK surface.  Pure additive layer  */
+/* — does not override existing classes, only extends them.      */
+/* ============================================================ */
+:root {
+    --grid-black-0: #030506;
+    --grid-black-1: #050608;
+    --grid-black-2: #06090d;
+    --grid-black-3: #0a0e14;
+    --grid-matrix: #00ff88;
+    --grid-matrix-2: #00f58c;
+    --grid-cyan: #00d9ff;
+    --grid-cyan-2: #1be7ff;
+    --grid-violet: #6c7bff;
+    --grid-amber: #fbbf24;
+    --grid-white: #f5f7fa;
+    --grid-muted: #9aa4b2;
+    --grid-line: rgba(245,247,250,0.06);
+    --grid-line-strong: rgba(0,217,255,0.18);
+}
+
+/* Deeper, more cinematic background — replaces flat grid-bg radials */
+.grid-immersive-bg {
+    background:
+        radial-gradient(1600px 800px at 12% -10%, rgba(0,255,136,0.07), transparent 55%),
+        radial-gradient(1200px 600px at 88% 8%, rgba(0,217,255,0.06), transparent 65%),
+        radial-gradient(1000px 1000px at 50% 115%, rgba(108,123,255,0.045), transparent 70%),
+        linear-gradient(180deg, var(--grid-black-1) 0%, var(--grid-black-0) 100%);
+    position: relative;
+}
+.grid-immersive-bg::before {
+    content: "";
+    position: absolute; inset: 0; pointer-events: none;
+    background-image:
+        linear-gradient(rgba(0,217,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,217,255,0.05) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: radial-gradient(ellipse at 50% 30%, black 30%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse at 50% 30%, black 30%, transparent 80%);
+}
+
+/* ---- Card system roles ------------------------------------ */
+.glass-panel {
+    background:
+        linear-gradient(180deg, rgba(10,14,20,0.65) 0%, rgba(5,6,8,0.85) 100%);
+    border: 1px solid var(--grid-line);
+    border-radius: 1.25rem;
+    backdrop-filter: blur(16px) saturate(120%);
+    -webkit-backdrop-filter: blur(16px) saturate(120%);
+    position: relative;
+    overflow: hidden;
+}
+.glass-panel::before {
+    content: "";
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, rgba(0,217,255,0.04) 0%, transparent 18%);
+}
+.card-metric {
+    composes: glass-panel;
+    padding: 1.5rem;
+}
+.card-terminal {
+    background: rgba(3,5,6,0.72);
+    border: 1px solid rgba(0,217,255,0.14);
+    border-radius: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    box-shadow: inset 0 0 0 1px rgba(0,255,136,0.04);
+}
+.card-policy {
+    background: linear-gradient(180deg, rgba(108,123,255,0.06), rgba(5,6,8,0.85));
+    border: 1px solid rgba(108,123,255,0.22);
+    border-radius: 1.25rem;
+}
+.card-deployment {
+    background: linear-gradient(135deg, rgba(0,255,136,0.04) 0%, rgba(0,217,255,0.03) 100%);
+    border: 1px solid rgba(0,255,136,0.22);
+    border-radius: 1.25rem;
+    box-shadow: 0 0 40px -8px rgba(0,255,136,0.18);
+}
+.card-risk {
+    background: rgba(251,191,36,0.04);
+    border: 1px solid rgba(251,191,36,0.25);
+    border-radius: 1rem;
+}
+.card-progress {
+    background: linear-gradient(180deg, rgba(0,255,136,0.05), rgba(5,6,8,0.85));
+    border: 1px solid rgba(0,255,136,0.22);
+    border-radius: 1.25rem;
+}
+.card-command {
+    background: rgba(6,9,13,0.88);
+    border: 1px solid rgba(0,217,255,0.18);
+    border-radius: 1rem;
+    box-shadow: 0 0 60px -16px rgba(0,217,255,0.25);
+}
+
+/* Edge glow — applied to hero CTA, primary buttons, etc */
+.edge-glow-matrix {
+    box-shadow:
+        0 0 0 1px rgba(0,255,136,0.4),
+        0 0 32px -4px rgba(0,255,136,0.5),
+        inset 0 0 24px -8px rgba(0,255,136,0.25);
+}
+.edge-glow-cyan {
+    box-shadow:
+        0 0 0 1px rgba(0,217,255,0.4),
+        0 0 32px -4px rgba(0,217,255,0.5),
+        inset 0 0 24px -8px rgba(0,217,255,0.25);
+}
+
+/* Terminal micro label — used for all section eyebrows */
+.eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.4em;
+    color: var(--grid-cyan);
+    opacity: 0.85;
+}
+.eyebrow-matrix { color: var(--grid-matrix); }
+.eyebrow-violet { color: var(--grid-violet); }
+.eyebrow-amber  { color: var(--grid-amber); }
+
+/* ---- Motion vocabulary ------------------------------------ */
+@keyframes grid-fade-rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes grid-glow-pulse {
+    0%, 100% { box-shadow: 0 0 24px -8px rgba(0,255,136,0.4); }
+    50%      { box-shadow: 0 0 40px -4px rgba(0,255,136,0.7); }
+}
+@keyframes grid-telemetry-blink {
+    0%, 100% { opacity: 0.45; }
+    50%      { opacity: 1; }
+}
+@keyframes grid-sweep {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+.motion-fade-rise { animation: grid-fade-rise 0.65s cubic-bezier(0.16,1,0.3,1) both; }
+.motion-glow-pulse { animation: grid-glow-pulse 2.4s ease-in-out infinite; }
+.motion-telemetry-blink { animation: grid-telemetry-blink 1.6s ease-in-out infinite; }
+.motion-delay-100 { animation-delay: 100ms; }
+.motion-delay-200 { animation-delay: 200ms; }
+.motion-delay-300 { animation-delay: 300ms; }
+.motion-delay-400 { animation-delay: 400ms; }
+.motion-delay-500 { animation-delay: 500ms; }
+
+/* Animated progress sweep — for any neon bar */
+.progress-sweep {
+    position: relative; overflow: hidden;
+}
+.progress-sweep::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+    animation: grid-sweep 2.6s ease-in-out infinite;
+}
+
+/* Smooth count-up base — adds tabular nums + subtle weight */
+.num-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+}
+
+/* ---- Premium status pills --------------------------------- */
+.status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.3em;
+    text-transform: uppercase;
+    border: 1px solid currentColor;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(8px);
+}
+.status-pill .dot {
+    width: 6px; height: 6px; border-radius: 999px;
+    background: currentColor;
+    box-shadow: 0 0 8px currentColor;
+    animation: grid-telemetry-blink 1.6s ease-in-out infinite;
+}
+
+
+/* ============================================================ */
 /* GLOBAL CYBER-CYAN OVERRIDE (v1.3.6)                           */
 /* All gold/grid utility classes redefined to cyber tokens so    */
 /* every page (Landing, Dashboard, CustomerPortal, Mobile,       */

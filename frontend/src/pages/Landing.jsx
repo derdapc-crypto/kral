@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -10,6 +10,15 @@ import {
 } from "lucide-react";
 import QRCode from "qrcode";
 import { api } from "../lib/api";
+
+// vNext — Three.js globe disabled in dev due to R3F+React 19 source-tracking
+// regression ("x-line-number" runtime overlay).  The SVG ComputeCoreVisual
+// already delivers a premium topology feel; we keep the lazy import wiring
+// behind a feature flag so we can flip it back on once R3F v9 patches React
+// 19's __source prop intercept.
+const ENABLE_THREEJS_GLOBE = false;
+// eslint-disable-next-line no-unused-vars
+const LiveGlobe3D = lazy(() => import("../components/LiveGlobe3D"));
 
 /* ----------------------------- helpers ----------------------------- */
 function useReveal() {
@@ -96,6 +105,31 @@ function Hero({ stats, apk }) {
   const [flashShares, setFlashShares] = useState(false);
   const prevNodes = useRef(null);
   const prevShares = useRef(null);
+  // Lazy-load the 3D globe only on viewports wide enough to benefit from it.
+  const [enable3D, setEnable3D] = useState(false);
+  // vNext — fetch real scarcity for the hero stat strip
+  const [scarcity, setScarcity] = useState(null);
+
+  useEffect(() => {
+    const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const r = await fetch(`${BACKEND}/api/network/scarcity-progress`);
+        const d = await r.json();
+        if (!cancelled) setScarcity(d);
+      } catch { /* */ }
+    };
+    load();
+    const t = setInterval(load, 20000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+
+  useEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const wide   = window.matchMedia("(min-width: 1024px)").matches;
+    if (!reduce && wide && ENABLE_THREEJS_GLOBE) setEnable3D(true);
+  }, []);
 
   useEffect(() => {
     if (!stats) return;
@@ -120,76 +154,135 @@ function Hero({ stats, apk }) {
     }
   }, [stats]);
 
+  const verified = scarcity?.verified_active_nodes ?? 0;
+  const target   = scarcity?.target_active_nodes ?? 1_000_000;
+  const pct      = scarcity?.progress_pct ?? 0;
+
   return (
-    <section className="relative pt-20 pb-28 md:pt-28 md:pb-36 px-6 sm:px-10 overflow-hidden" data-testid="hero">
-      <div className="max-w-7xl mx-auto grid lg:grid-cols-[1.15fr_1fr] gap-12 lg:gap-16 items-center">
+    <section className="relative pt-20 pb-28 md:pt-28 md:pb-36 px-6 sm:px-10 overflow-hidden grid-immersive-bg" data-testid="hero">
+      <div className="max-w-7xl mx-auto grid lg:grid-cols-[1.05fr_1fr] gap-12 lg:gap-20 items-center relative z-10">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
+          {/* terminal eyebrow */}
+          <div className="flex items-center gap-3 mb-6">
+            <span className="eyebrow eyebrow-matrix">// distributed_compute</span>
+            <span className="h-px flex-1 bg-gradient-to-r from-[#00ff88]/40 to-transparent max-w-[140px]" />
+          </div>
+
+          {/* status pills — premium */}
           <div className="flex flex-wrap gap-2 mb-7">
             <HeroStatusPill tone={apk == null ? "info" : apk?.native_lib_embedded ? "ok" : "warn"} testId="hero-status-pill">
-              {apk == null ? "Loading status…" :
+              {apk == null ? "Booting telemetry…" :
                apk?.native_lib_embedded ? `Native Engine v${apk.version} Ready` : "Native Engine Pending"}
             </HeroStatusPill>
-            <HeroStatusPill tone={stats == null ? "info" : stats?.payout_wallet_verified ? "ok" : "warn"}>
-              {stats == null ? "Checking wallet…" :
-               stats?.payout_wallet_verified ? "Payout Wallet Verified" : "Payout Wallet Pending"}
+            <HeroStatusPill tone={verified > 0 ? "ok" : "info"} flash={flashNodes} testId="pill-active-nodes">
+              {verified > 0
+                ? `${verified.toLocaleString()} Verified Edge Node${verified === 1 ? "" : "s"}`
+                : "Awaiting first verified cohort"}
             </HeroStatusPill>
-            <HeroStatusPill tone={stats == null ? "info" : stats?.mining_devices > 0 ? "ok" : "info"}
-                            flash={flashNodes} testId="pill-active-nodes">
-              {stats == null ? "Checking network…" :
-               stats?.mining_devices > 0
-                ? `${stats.mining_devices} Active Compute Node${stats.mining_devices === 1 ? "" : "s"}`
-                : "Awaiting first verified output"}
+            <HeroStatusPill tone="info">
+              Pre-Mainnet · Milestone-Driven
             </HeroStatusPill>
-            {(stats?.accepted_shares_total ?? 0) > 0 && (
-              <HeroStatusPill tone="gold" flash={flashShares} testId="pill-verified-outputs">
-                {stats.accepted_shares_total} Verified Output{stats.accepted_shares_total === 1 ? "" : "s"}
-              </HeroStatusPill>
-            )}
           </div>
-          <h1 className="font-grotesk font-bold leading-[1.02] text-white"
-              style={{ fontSize: "clamp(40px, 6vw, 72px)", letterSpacing: "-0.025em" }}>
-            Turn idle smartphones into a&nbsp;
+
+          {/* cinematic headline */}
+          <h1 className="font-display leading-[0.98] text-white"
+              style={{ fontSize: "clamp(42px, 6.5vw, 80px)", letterSpacing: "-0.035em", fontWeight: 800 }}>
+            Idle devices.<br/>
             <span style={{
-              background: "linear-gradient(90deg, #00ffe1 0%, #00d4ff 50%, #00ff88 100%)",
+              background: "linear-gradient(90deg, #00ff88 0%, #1be7ff 55%, #6c7bff 100%)",
               WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
               backgroundClip: "text",
-            }}>verified compute network.</span>
+            }}>Verified compute.</span><br/>
+            <span className="text-white/70">Global scale.</span>
           </h1>
-          <p className="mt-7 text-[17px] leading-relaxed text-white/70 max-w-2xl font-sans-saas">
-            THE GRID connects Android devices into a distributed compute layer
-            for AI preprocessing, document workloads and verified micro-tasks.
-            Devices opt in, run only under safe conditions, and contributors
-            earn from verified compute output.
+
+          <p className="mt-7 text-[17px] leading-relaxed text-white/65 max-w-xl font-sans-saas">
+            THE GRID, sıradan akıllı telefonları doğrulanmış bir distributed compute katmanına dönüştürür.
+            Her katkı bir <span className="text-[#00ff88]">compute-time receipt</span> olarak kaydedilir —
+            zamana değil, doğrulanmış ağ büyümesine bağlı bir pre-mainnet protokolü.
           </p>
+
+          {/* premium CTA row */}
           <div className="mt-9 flex flex-wrap gap-3">
-            <a href={apk?.download_url || "/grid-worker-v1.3.8.apk"}
-               className="landing-cta-primary inline-flex items-center gap-2"
+            <a href={apk?.download_url || "/grid-worker-v1.5.8.apk"}
+               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-mono-cyber font-black text-sm tracking-widest uppercase
+                          bg-[#00ff88] text-black edge-glow-matrix transition-transform hover:scale-[1.02]"
                data-testid="hero-cta-download">
-              <Download className="w-4 h-4" /> Download Android Node
+              <Download className="w-4 h-4" /> Deploy Node Client
             </a>
-            <a href="#network" className="landing-cta-secondary inline-flex items-center gap-2"
+            <a href="#network"
+               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-mono-cyber font-bold text-sm tracking-widest uppercase
+                          border border-[#00d9ff]/30 text-[#00d9ff] bg-[#00d9ff]/[0.04] hover:bg-[#00d9ff]/10 transition"
                data-testid="hero-cta-network">
-              <Activity className="w-4 h-4" /> View Live Network
+              <Activity className="w-4 h-4" /> Live Topology
             </a>
-            <Link to="/register?role=customer" className="landing-cta-secondary inline-flex items-center gap-2"
+            <Link to="/register?role=customer"
+                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-mono-cyber font-bold text-sm tracking-widest uppercase
+                             border border-white/15 text-white/75 hover:border-white/40 hover:text-white transition"
                   data-testid="hero-cta-portal">
-              <Briefcase className="w-4 h-4" /> Open Customer Portal
+              <Briefcase className="w-4 h-4" /> Enterprise Compute
             </Link>
           </div>
-          <div className="mt-6 text-[12px] text-white/40 font-mono-tech">
-            {apk?.version
-              ? `APK · v${apk.version} · ${(apk.size_bytes / 1024 / 1024).toFixed(2)} MB · signed v2+v3 · arm64-v8a`
-              : "APK metadata loading…"}
+
+          {/* live telemetry strip */}
+          <div className="mt-10 grid grid-cols-3 gap-3 max-w-2xl" data-testid="hero-telemetry-strip">
+            <HeroTelemetry label="Verified Nodes"  value={verified.toLocaleString()}                   tone="matrix" />
+            <HeroTelemetry label="Network Target"  value={target.toLocaleString()}                     tone="cyan" />
+            <HeroTelemetry label="Phase"           value={(scarcity?.phase || "growth").toUpperCase()} tone="violet" />
+          </div>
+          <div className="mt-3 text-[11px] text-white/35 font-mono-tech">
+            // {pct.toFixed(4)}% of 1M target · subject to community, legal, technical and ecosystem conditions
           </div>
         </motion.div>
 
+        {/* Globe / topology canvas */}
         <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.9, delay: 0.1 }}
+                    transition={{ duration: 1.0, delay: 0.15 }}
                     className="relative grid place-items-center">
-          <ComputeCoreVisual />
+          <div className="relative w-full max-w-[520px] aspect-square">
+            <div className="absolute inset-0 rounded-full"
+                 style={{
+                   background:
+                     "radial-gradient(circle at 50% 50%, rgba(0,217,255,0.18) 0%, rgba(108,123,255,0.06) 40%, transparent 70%)",
+                 }} />
+            {enable3D ? (
+              <Suspense fallback={<ComputeCoreVisual />}>
+                <LiveGlobe3D className="absolute inset-0" />
+              </Suspense>
+            ) : (
+              <ComputeCoreVisual />
+            )}
+            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/65 border border-[#00d9ff]/25
+                            text-[10px] font-mono tracking-[0.3em] uppercase text-[#00d9ff]">
+              live topology · verified data only
+            </div>
+          </div>
         </motion.div>
       </div>
     </section>
+  );
+}
+
+function HeroTelemetry({ label, value, tone }) {
+  const color = tone === "matrix" ? "#00ff88" : tone === "cyan" ? "#00d9ff" : "#6c7bff";
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-black/40 px-3 py-2.5">
+      <div className="text-[9px] uppercase tracking-[0.3em] font-mono-term text-white/45">{label}</div>
+      <div className="font-display font-black text-lg num-display mt-0.5" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+function DeploySpec({ k, v, tone }) {
+  const color = tone === "matrix" ? "#00ff88"
+              : tone === "cyan"   ? "#00d9ff"
+              : tone === "amber"  ? "#fbbf24"
+              : "#f5f7fa";
+  return (
+    <div className="flex items-baseline justify-between px-3 py-2 rounded-lg bg-black/40 border border-white/[0.05]">
+      <span className="text-white/40 uppercase tracking-[0.2em] text-[9px]">{k}</span>
+      <span className="font-mono-cyber font-bold tabular-nums" style={{ color }}>{v}</span>
+    </div>
   );
 }
 
@@ -910,51 +1003,69 @@ function EarningsExplorer({ stats, apk }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
           <LandingScarcityCard />
 
-          {/* QR code download card */}
-          <div className="cyber-card rounded-3xl p-7 relative overflow-hidden" data-testid="qr-download-card">
-            <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-[#00ffe1]/8 blur-3xl" />
+          {/* APK Deployment Module — premium console framing */}
+          <div className="card-deployment p-7 relative overflow-hidden motion-fade-rise" data-testid="apk-deployment-module">
+            <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-[#00ff88]/10 blur-3xl" />
             <div className="relative">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term mb-2">
-                <QrCode className="w-3 h-3" /> / scan_to_install
+              <div className="flex items-center gap-3 mb-3">
+                <span className="eyebrow eyebrow-matrix">// deploy_node_client</span>
+                <span className="h-px flex-1 bg-gradient-to-r from-[#00ff88]/40 to-transparent" />
+                <span className="status-pill" style={{ color: "#00ff88" }}>
+                  <span className="dot" /> verified build
+                </span>
               </div>
-              <h3 className="font-mono-cyber text-2xl font-black">
-                APK <span className="cyan-text">QR ile yükle</span>
+
+              <h3 className="font-display font-black text-3xl tracking-tight">
+                Mobile Edge Node <span className="text-[#00ff88]">Installer</span>
               </h3>
-              <p className="text-white/55 text-sm mt-2">
-                Android telefonun kamerasıyla aşağıdaki kareyi tara, APK indir, kur ve <span className="matrix-text">ENGAGE NODE</span>'a bas.
+              <p className="text-white/55 text-sm mt-2 leading-relaxed max-w-md">
+                Verified APK distribution channel. Native compute engine bundled.
+                Cryptographically signed (v2 + v3) build.
               </p>
 
-              <div className="mt-6 flex items-center gap-6 flex-wrap">
+              {/* spec strip */}
+              <div className="mt-6 grid grid-cols-2 gap-2 text-[11px] font-mono-term"
+                   data-testid="apk-spec-strip">
+                <DeploySpec k="version"        v={`v${apk?.version || "—"}`} tone="matrix" />
+                <DeploySpec k="package size"   v={`${((apk?.size_bytes || 0)/1024).toFixed(0)} KB`} />
+                <DeploySpec k="min android"    v={apk?.min_android || "7.0"} />
+                <DeploySpec k="abi"            v={(apk?.abi && apk.abi[0]) || "arm64-v8a"} />
+                <DeploySpec k="native engine"  v={apk?.native_lib_embedded ? "EMBEDDED" : "PENDING"} tone={apk?.native_lib_embedded ? "matrix" : "amber"} />
+                <DeploySpec k="signed"         v="v2 + v3" tone="cyan" />
+              </div>
+
+              <div className="mt-6 flex items-center gap-5 flex-wrap">
                 {qrSrc ? (
-                  <div className="relative p-3 rounded-2xl bg-black border border-[#00ffe1]/40 shadow-[0_0_60px_rgba(0,255,225,0.15)]">
+                  <div className="relative p-3 rounded-2xl bg-black border border-[#00ff88]/35 edge-glow-matrix">
                     <img src={qrSrc} alt="APK QR Code"
-                         className="w-44 h-44 rounded-lg" data-testid="apk-qr-image" />
-                    <div className="absolute -top-2 -right-2 cyber-pill matrix-pill text-[9px]">
-                      v{apk?.version || "1.5.2"}
+                         className="w-40 h-40 rounded-lg" data-testid="apk-qr-image" />
+                    <div className="absolute -top-2 -right-2 status-pill" style={{ color: "#00ff88" }}>
+                      <span className="dot" /> v{apk?.version || "—"}
                     </div>
                   </div>
                 ) : (
-                  <div className="w-44 h-44 rounded-2xl bg-black/60 border border-[#00ffe1]/20 grid place-items-center">
+                  <div className="w-40 h-40 rounded-2xl bg-black/60 border border-[#00d9ff]/20 grid place-items-center">
                     <QrCode className="w-10 h-10 text-white/30" />
                   </div>
                 )}
-                <div className="flex-1 min-w-[180px] space-y-2">
+                <div className="flex-1 min-w-[180px] space-y-3">
                   <a href={apkUrl} download
                      data-testid="qr-direct-download"
-                     className="block px-5 py-3 rounded-2xl bg-gradient-to-r from-[#00ffe1] to-[#00d4ff] text-black font-mono-cyber font-black text-sm tracking-[0.2em] uppercase text-center">
+                     className="block px-5 py-3.5 rounded-xl bg-[#00ff88] text-black font-mono-cyber font-black text-sm tracking-[0.25em] uppercase text-center edge-glow-matrix transition-transform hover:scale-[1.02]">
                     <Download className="inline w-3.5 h-3.5 mr-1.5 -mt-0.5" />
-                    Direkt İndir
+                    Direct Download
                   </a>
-                  <div className="text-[10px] text-white/40 leading-relaxed">
-                    Boyut: <span className="cyan-text">{((apk?.size_bytes || 386203)/1024).toFixed(0)} KB</span><br/>
-                    Min Android: <span className="cyan-text">{apk?.min_android || "7.0"}</span><br/>
-                    Native Engine: <span className="matrix-text">{apk?.native_lib_embedded ? "EMBEDDED ✓" : "—"}</span>
+                  <div className="text-[10px] text-white/45 font-mono-term leading-relaxed">
+                    SHA-256<br/>
+                    <span className="text-[#00d9ff] break-all">
+                      {(apk?.sha256 || "").slice(0, 32)}…
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-5 text-[10px] text-white/40 font-mono-term break-all" data-testid="qr-apk-url">
-                {apkUrl}
+              <div className="mt-5 text-[10px] text-white/35 font-mono-term break-all" data-testid="qr-apk-url">
+                // {apkUrl}
               </div>
             </div>
           </div>
