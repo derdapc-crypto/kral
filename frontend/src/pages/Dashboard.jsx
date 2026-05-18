@@ -163,9 +163,10 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        {/* Stats — cloud-compute terminology only. v1.5.5: TGC balance with
+        {/* Stats — cloud-compute terminology only. v1.5.4: TGC balance with
              5-decimal precision (crypto-style ticking) instead of $USDT
-             estimate, since redemption is locked until mainnet (Q3 2027). */}
+             estimate, since redemption is gated by the Foundation Buyback
+             Program (milestone-driven, not date-driven). */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
           <StatCard label="Reward Balance"      value={`${(wallet?.tgc_balance ?? 0).toFixed(5)} TGC`}
                     testId="stat-balance" tone="ok" />
@@ -196,7 +197,7 @@ export default function Dashboard() {
             <div className="mt-7 flex gap-3">
               <input
                 placeholder={wallet?.redemption_locked
-                  ? "Token launch için cüzdan adresini şimdi kaydet (örn. BSC 0x… veya TRC-20 T…)"
+                  ? "Foundation Buyback Window için cüzdan adresini şimdi kaydet (örn. BSC 0x… veya TRC-20 T…)"
                   : "Linked payout address (e.g. TRC-20 TXYZ…)"}
                 value={withdrawAddr}
                 onChange={(e) => setWithdrawAddr(e.target.value)}
@@ -211,18 +212,20 @@ export default function Dashboard() {
                     ? "bg-[#00ff88] text-black shadow-[0_0_30px_rgba(0,255,136,0.45)] hover:shadow-[0_0_50px_rgba(0,255,136,0.7)]"
                     : "bg-white/5 text-white/30 cursor-not-allowed"
                 }`}>
-                {wallet?.redemption_locked ? "🔒 Pre-Mainnet · Locked" : "Request Payout"}
+                {wallet?.redemption_locked ? "Pre-Mainnet · Buyback Closed" : "Request Payout"}
               </button>
             </div>
             {wallet?.redemption_locked && (
               <div className="mt-3 rounded-xl border border-amber-400/25 bg-amber-500/[0.04] px-4 py-3"
                    data-testid="dashboard-mainnet-banner">
                 <div className="text-[10px] uppercase tracking-[0.3em] text-amber-300/85 font-mono-term mb-1">
-                  {wallet?.token_launch_label || "TGC Mainnet · Token Launch Q3 2026"}
+                  FOUNDATION · BUYBACK PROGRAM
                 </div>
                 <div className="text-[12px] text-white/70 leading-relaxed">
-                  Bugün biriktirdiğin her TGC, mainnet launch günü canlı <span className="text-amber-300 font-semibold">$TGC</span> token'a
-                  <span className="text-amber-300 font-semibold"> 1:1 airdrop</span> edilecek. Cüzdan adresini şimdi kaydet — snapshot bilgisi token launch öncesi e-posta ile bildirilecek.
+                  100 TGC eşiğine ulaşan contributor'lar, Foundation Buyback Window
+                  açıldığında bakiyelerini USDT karşılığı geri alım programına sunabilir.
+                  Program; dönemsel bütçe, doğrulama, risk kontrolü ve treasury likiditesine
+                  bağlıdır — garanti değildir. Cüzdan adresini şimdi kaydet.
                 </div>
               </div>
             )}

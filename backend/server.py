@@ -1503,18 +1503,204 @@ async def withdraw(data: WithdrawIn, user: dict = Depends(get_current_user)):
 
 @api.get("/token/launch")
 async def token_launch_status():
-    """Public token launch status — drives the 'TGC Mainnet Launch Soon'
-    banner across Landing, Dashboard and Mobile UIs."""
+    """Public TGC narrative status. v1.5.4 — date-based countdown narrative
+    is RETIRED.  The new milestone-driven narrative is built around the
+    1,000,000 verified active node target. Snapshot Readiness can only be
+    pursued once that target is met AND community, legal, technical and
+    ecosystem conditions are satisfied."""
     return {
         "status": "pre_mainnet_accumulation",
         "redemption_locked": True,
-        "label": TGC_LAUNCH_LABEL,
-        "expected_quarter": "2027-Q3",
-        "snapshot_rule": "Every TGC accumulated by the operator's freeze snapshot is airdropped 1:1 onto the live $TGC token on launch day.",
+        "label": "TGC · Pre-Mainnet Contribution Phase",
+        "narrative_model": "milestone_driven",
+        "primary_milestone": {
+            "id": "verified_active_nodes",
+            "target": 1_000_000,
+            "description": "Snapshot Readiness phase may be pursued once verified active nodes reach 1,000,000.",
+        },
+        "snapshot_rule": "When the network reaches Snapshot Readiness, the contribution ledger may be sealed and pre-mainnet TGC accumulation may be paused. Mainnet roadmap progression is subject to community, legal, technical and ecosystem conditions.",
         "operator_keep_pct": 15,
         "circulating_at_launch_pct": 70,
         "treasury_pct": 15,
+        "guarantees": False,
+        "indicative_only": True,
     }
+
+
+# ---------- v1.5.4 Network Scarcity Progress (replaces countdown) ----------
+SCARCITY_TARGET_NODES = 1_000_000
+
+
+@api.get("/network/scarcity-progress")
+async def network_scarcity_progress():
+    """Live counter towards the 1,000,000 verified active node milestone.
+    Replaces the previous date-based Q3 2027 countdown narrative.
+
+    A node counts as 'verified active' when it has:
+      - heart-beated within the last OFFLINE_CUTOFF_SEC window, AND
+      - reported a known-good native engine SHA (or no strict whitelist),
+        AND has stratum_linked=true OR mining_status='mining'.
+
+    No fake inflation: if the field is unset we count zero.
+    """
+    cutoff_iso = (datetime.now(timezone.utc) - timedelta(seconds=90)).isoformat()
+    verified = await db.devices.count_documents({
+        "is_real_apk": True,
+        "last_heartbeat": {"$gte": cutoff_iso},
+        "$or": [
+            {"stratum_linked": True},
+            {"mining_status": "mining"},
+            {"native_pow": True},
+        ],
+    })
+    total_registered = await db.devices.count_documents({})
+    pct = (verified / SCARCITY_TARGET_NODES) * 100.0 if SCARCITY_TARGET_NODES else 0.0
+    return {
+        "verified_active_nodes": verified,
+        "target_active_nodes": SCARCITY_TARGET_NODES,
+        "progress_pct": round(min(100.0, max(0.0, pct)), 6),
+        "total_registered_nodes": total_registered,
+        "phase": (
+            "snapshot_ready" if verified >= SCARCITY_TARGET_NODES
+            else "growth"
+        ),
+        "next_milestone": "Snapshot Readiness review",
+        "label": "NETWORK SCARCITY PROGRESS",
+        "subtitle_long": (
+            "The network may enter Snapshot Readiness once 1,000,000 verified "
+            "active nodes are reached. Roadmap progression is subject to "
+            "community, legal, technical and ecosystem conditions."
+        ),
+        "guarantees": False,
+        "indicative_only": True,
+        "as_of": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ---------- v1.5.4 Foundation Buyback Program (config-driven) ----------
+# Defaults stored in DB so the operator can flip the window without redeploy.
+_BUYBACK_DEFAULTS = {
+    "buyback_target_tgc": 100,
+    "buyback_max_usdt": 300,
+    "buyback_window_status": "closed",     # closed | open | reviewing
+    "buyback_window_label": "Foundation Buyback Window",
+    "buyback_terms": (
+        "subject to treasury availability, verification, risk review "
+        "and regional eligibility"
+    ),
+}
+
+
+async def _get_buyback_config() -> dict:
+    cfg = await db.config.find_one({"key": "foundation_buyback"}, {"_id": 0}) or {}
+    data = dict(_BUYBACK_DEFAULTS)
+    for k in _BUYBACK_DEFAULTS:
+        if k in cfg:
+            data[k] = cfg[k]
+    return data
+
+
+@api.get("/foundation/buyback-status")
+async def foundation_buyback_status(user: dict = Depends(get_current_user)):
+    """Public buyback program status for the logged-in contributor.
+
+    Window is CLOSED by default. Operator opens it from the admin panel.
+    No guaranteed pricing — the UI must show 'Up to $X USDT' framing only.
+    """
+    cfg = await _get_buyback_config()
+    me = await db.users.find_one({"id": user["id"]}, {"_id": 0, "tgc_balance": 1, "risk_flagged": 1})
+    tgc_balance = float((me or {}).get("tgc_balance") or 0.0)
+    risk_flagged = bool((me or {}).get("risk_flagged") or False)
+
+    eligible = (
+        cfg["buyback_window_status"] == "open"
+        and tgc_balance >= float(cfg["buyback_target_tgc"])
+        and not risk_flagged
+    )
+
+    return {
+        "window_status": cfg["buyback_window_status"],
+        "window_label": cfg["buyback_window_label"],
+        "target_tgc": cfg["buyback_target_tgc"],
+        "max_usdt": cfg["buyback_max_usdt"],
+        "current_program_label": f"Up to ${int(cfg['buyback_max_usdt'])} USDT",
+        "eligibility_label": f"{int(cfg['buyback_target_tgc'])} TGC required",
+        "terms": cfg["buyback_terms"],
+        "user_tgc_balance": round(tgc_balance, 5),
+        "user_is_eligible": eligible,
+        "risk_flagged": risk_flagged,
+        "guarantees": False,
+        "indicative_only": True,
+    }
+
+
+class BuybackApplyIn(BaseModel):
+    payout_wallet: Optional[str] = None
+    payout_network: Optional[str] = None    # BEP20 | TRC20 | Polygon
+    notes: Optional[str] = None
+
+
+@api.post("/foundation/buyback-apply")
+async def foundation_buyback_apply(payload: BuybackApplyIn, user: dict = Depends(get_current_user)):
+    """Contributor applies to the current Foundation Buyback Window.
+    Window MUST be 'open' and user MUST meet eligibility — otherwise 423 Locked.
+    Application is recorded; settlement is manual / off-platform until further notice.
+    """
+    cfg = await _get_buyback_config()
+    me = await db.users.find_one({"id": user["id"]}, {"_id": 0, "tgc_balance": 1, "risk_flagged": 1, "email": 1})
+    tgc_balance = float((me or {}).get("tgc_balance") or 0.0)
+    risk_flagged = bool((me or {}).get("risk_flagged") or False)
+
+    if cfg["buyback_window_status"] != "open":
+        raise HTTPException(status_code=423, detail="buyback_window_closed")
+    if tgc_balance < float(cfg["buyback_target_tgc"]):
+        raise HTTPException(status_code=403, detail="below_eligibility_threshold")
+    if risk_flagged:
+        raise HTTPException(status_code=403, detail="risk_flagged_account")
+
+    existing = await db.buyback_applications.find_one(
+        {"user_id": user["id"], "window_label": cfg["buyback_window_label"], "status": {"$in": ["pending", "reviewing"]}},
+        {"_id": 0},
+    )
+    if existing:
+        return {"ok": True, "status": "already_submitted", "application_id": existing.get("id")}
+
+    app_id = str(uuid.uuid4())
+    await db.buyback_applications.insert_one({
+        "id": app_id,
+        "user_id": user["id"],
+        "user_email": (me or {}).get("email"),
+        "window_label": cfg["buyback_window_label"],
+        "tgc_balance_at_apply": tgc_balance,
+        "target_tgc": cfg["buyback_target_tgc"],
+        "max_usdt": cfg["buyback_max_usdt"],
+        "payout_wallet": payload.payout_wallet,
+        "payout_network": payload.payout_network,
+        "notes": payload.notes,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True, "status": "pending_review", "application_id": app_id}
+
+
+@api.get("/admin/foundation/buyback-config")
+async def admin_buyback_config_read(user: dict = Depends(require_admin)):
+    return await _get_buyback_config()
+
+
+@api.post("/admin/foundation/buyback-config")
+async def admin_buyback_config_write(payload: dict, user: dict = Depends(require_admin)):
+    """Operator-only: flip window status, adjust caps, etc."""
+    allowed = set(_BUYBACK_DEFAULTS.keys())
+    update = {k: v for k, v in (payload or {}).items() if k in allowed}
+    if not update:
+        raise HTTPException(status_code=400, detail="no_valid_fields")
+    await db.config.update_one(
+        {"key": "foundation_buyback"},
+        {"$set": {**update, "key": "foundation_buyback", "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return await _get_buyback_config()
 
 
 # ---------- v1.4.9 Node Drip + Payout Wallet ----------

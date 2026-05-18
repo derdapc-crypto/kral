@@ -899,63 +899,16 @@ function EarningsExplorer({ stats, apk }) {
           </h2>
           <p className="mt-5 text-white/55 max-w-2xl text-base leading-relaxed">
             Telefonun şarjdayken THE GRID şebekesine bağlanır ve doğrulanmış cloud compute
-            işleri tamamlar. Her iş bir <span className="cyan-text font-semibold">TGC</span> kredisi
-            kazandırır. Mainnet token launch'ında (<span className="matrix-text font-semibold">Q3 2027</span>)
-            biriken her TGC, canlı <span className="matrix-text font-semibold">$TGC token</span>'a
-            <span className="matrix-text font-semibold"> 1:1 airdrop</span> edilecek.
-            Erken katılan kazanır — <span className="cyan-text font-semibold">snapshot tarihi yaklaşıyor</span>.
+            işleri tamamlar. Her iş bir <span className="cyan-text font-semibold">TGC contribution receipt</span> kazandırır.
+            Ağ <span className="matrix-text font-semibold">1,000,000 doğrulanmış aktif cihaza</span> ulaştığında,
+            pre-mainnet katkı dönemi Snapshot Readiness incelemesine girebilir.
+            Erken katılan, contribution defteri daha kalabalıkken katılır.
           </p>
         </div>
 
-        {/* Earnings table — per device tier @ current network multiplier */}
+        {/* Network Scarcity Progress (replaces earnings table v1.5.4) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
-          <div className="cyber-card rounded-3xl p-7" data-testid="earnings-table-card">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
-                  device_class · daily_earnings
-                </div>
-                <h3 className="font-mono-cyber text-2xl font-black mt-1">
-                  Cihazına göre kazanç
-                </h3>
-              </div>
-              <span className="cyber-pill matrix-pill text-[10px]" data-testid="net-mult-pill">
-                ×{netMult.toFixed(1)} bonus
-              </span>
-            </div>
-            <div className="space-y-2.5">
-              {earningsTable.map((r) => (
-                <div key={r.tier}
-                     data-testid={`earn-row-${r.tier}`}
-                     className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-black/45 border border-[#00ffe1]/12 hover:border-[#00ffe1]/30 transition">
-                  <div className={`w-9 h-9 rounded-xl grid place-items-center text-[10px] uppercase tracking-widest font-mono-cyber font-black ${
-                    r.tier === "core" ? "bg-yellow-400/15 text-yellow-300 border border-yellow-400/30" :
-                    r.tier === "flagship" ? "bg-[#00ff88]/15 matrix-text border border-[#00ff88]/30" :
-                    r.tier === "mid" ? "bg-[#00ffe1]/15 cyan-text border border-[#00ffe1]/30" :
-                    "bg-white/5 text-white/55 border border-white/10"
-                  }`}>
-                    {r.tier.slice(0, 2)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs text-white truncate">{r.tier_label}</div>
-                    <div className="text-[10px] text-white/40 mt-0.5 font-mono-term">
-                      {r.daily_tgc.toFixed(2)} TGC/gün · {r.ticket_days} günde 1 Drop Ticket
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-mono-cyber font-black text-lg matrix-text">
-                      {r.monthly_tgc.toFixed(1)}
-                    </div>
-                    <div className="text-[9px] uppercase tracking-widest text-white/35">TGC / ay</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 text-[10px] text-white/40 leading-relaxed">
-              <span className="cyan-text">{">"}</span> Hesaplama: telefonun 24/7 engaged + şu anki ağ büyüklüğü
-              (<span className="cyan-text">{netSize}</span> aktif düğüm · ×{netMult.toFixed(1)} bonus). Gerçekçi 12h kullanımda yarısı kadardır.
-            </div>
-          </div>
+          <LandingScarcityCard />
 
           {/* QR code download card */}
           <div className="cyber-card rounded-3xl p-7 relative overflow-hidden" data-testid="qr-download-card">
@@ -1089,10 +1042,11 @@ function EarningsExplorer({ stats, apk }) {
             </div>
             <div className="p-4 rounded-2xl bg-black/45 border border-white/10" data-testid="economy-explain-3">
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
-                <Wallet className="w-3 h-3" /> 1:1 Mainnet Airdrop
+                <Wallet className="w-3 h-3" /> Foundation Buyback
               </div>
               <div className="text-xs text-white/65 mt-2 leading-relaxed">
-                Q3 2027 mainnet'te biriken her TGC, canlı $TGC token'a 1:1 dağıtılır. Detaylar <Link to="/token" className="cyan-text underline">/token</Link> sayfasında.
+                100 TGC eşiğine ulaşan contributor'lar, Foundation Buyback Window açıldığında bakiyelerini USDT karşılığı geri alım programına sunabilir.
+                Program şartlara tabidir. Detaylar <Link to="/token" className="cyan-text underline">/token</Link>.
               </div>
             </div>
           </div>
@@ -1211,5 +1165,64 @@ export default function Landing() {
       <DualCTA apk={apk} />
       <Footer apk={apk} />
     </main>
+  );
+}
+
+// v1.5.4 — Landing-side Network Scarcity Progress card (replaces earnings table)
+function LandingScarcityCard() {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    const url = (process.env.REACT_APP_BACKEND_URL || "") + "/api/network/scarcity-progress";
+    fetch(url).then(r => r.json()).then(setData).catch(() => {});
+  }, []);
+  const verified = data?.verified_active_nodes ?? 0;
+  const target   = data?.target_active_nodes ?? 1_000_000;
+  const pct      = data?.progress_pct ?? 0;
+  return (
+    <div className="cyber-card rounded-3xl p-7" data-testid="landing-scarcity-card">
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.3em] cyan-text font-mono-term">
+            / network_scarcity_progress
+          </div>
+          <h3 className="font-mono-cyber text-2xl font-black mt-1">
+            <span className="matrix-text">1,000,000</span> Active Nodes
+          </h3>
+        </div>
+        <span className="cyber-pill matrix-pill text-[10px]">
+          live · real data
+        </span>
+      </div>
+
+      <div className="font-mono-cyber font-black text-5xl tabular-nums tracking-tighter">
+        <span className="matrix-text" data-testid="landing-scarcity-count">{verified.toLocaleString()}</span>
+        <span className="text-white/40 text-xl font-mono-term ml-2">/ {target.toLocaleString()}</span>
+      </div>
+
+      <div className="h-2 rounded-full bg-white/[0.05] overflow-hidden border border-white/[0.04] mt-5"
+           data-testid="landing-scarcity-bar">
+        <div className="h-full rounded-full transition-all duration-700"
+             style={{
+               width: `${Math.max(0.15, pct)}%`,
+               background: "linear-gradient(90deg, #00ff88, #00ffe1)",
+               boxShadow: "0 0 24px rgba(0,255,136,0.4)",
+             }} />
+      </div>
+
+      <div className="flex items-baseline justify-between mt-3">
+        <div className="text-[10px] text-white/45 font-mono-term">
+          // verified active nodes · no fake inflation
+        </div>
+        <div className="font-mono-cyber font-black text-base matrix-text" data-testid="landing-scarcity-pct">
+          {pct.toFixed(4)}%
+        </div>
+      </div>
+
+      <p className="text-[11px] text-amber-300/80 font-mono-term mt-5 leading-relaxed">
+        // 1,000,000 doğrulanmış aktif cihaza ulaşıldığında ağ Snapshot Readiness
+        incelemesine girebilir. Roadmap topluluk, hukuki, teknik ve ekosistem
+        koşullarına bağlıdır.
+      </p>
+    </div>
   );
 }

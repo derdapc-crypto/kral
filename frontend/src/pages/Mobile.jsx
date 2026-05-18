@@ -413,7 +413,7 @@ export default function Mobile() {
                     {fmtTGC(tgcBalance)} <span className="text-white/55 text-sm">TGC</span>
                   </div>
                   <div className="text-[10px] text-white/45 mt-0.5">
-                Pre-mainnet · 1:1 airdrop on $TGC token launch (Q3 2027) · Lifetime {fmtTGC(lifetimeTGC)} TGC
+                Pre-mainnet · contribution receipt · Lifetime {fmtTGC(lifetimeTGC)} TGC
                   </div>
                 </div>
                 <div className="text-right">
@@ -538,12 +538,12 @@ export default function Mobile() {
                 }`}>
                 {canWithdraw ? (
                   <span className="inline-flex items-center gap-2">
-                    🔒 Pre-Mainnet · Q3 2027 <ArrowUpRight className="w-3.5 h-3.5" />
+                    Apply for Buyback <ArrowUpRight className="w-3.5 h-3.5" />
                   </span>
-                ) : `Payout unlocks at ${PAYOUT_THRESHOLD_TGC} TGC`}
+                ) : `Buyback eligibility unlocks at ${PAYOUT_THRESHOLD_TGC} TGC`}
               </button>
               <div className="text-[10px] text-white/35 mt-2 leading-relaxed">
-                TGC converts to USDT payout after threshold, verification and available reward pool checks.
+                Foundation Buyback Program is conditional on treasury availability, verification and regional eligibility.
               </div>
             </div>
 
@@ -698,20 +698,21 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
 
   return (
     <div className="mt-6 space-y-3" data-testid="rewards-tab-content">
-      {/* v1.5.1 — Pre-mainnet token launch banner */}
+      {/* v1.5.4 — Foundation Buyback / pre-mainnet narrative banner */}
       {wallet?.redemption_locked && (
         <div className="rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-500/10 to-orange-500/5 p-4"
              data-testid="rewards-mainnet-banner">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] uppercase tracking-[0.3em] font-mono-term text-amber-300/90">
-              {wallet?.token_launch_label || "TGC Mainnet · Token Launch Q3 2026"}
+              FOUNDATION · BUYBACK PROGRAM
             </span>
             <span className="ml-auto text-[9px] uppercase tracking-[0.25em] text-amber-200/60 font-mono-term">PRE-MAINNET · ACCUMULATING</span>
           </div>
           <div className="text-[12px] text-white/75 leading-relaxed">
-            Bugün biriktirdiğin her TGC, mainnet launch günü canlı <span className="text-amber-300 font-semibold">$TGC</span> token'a
-            <span className="text-amber-300 font-semibold"> 1:1 airdrop</span> edilecek. USDT çekim, snapshot tarihinde
-            biriken bakiyene göre token olarak açılacak. Ne kadar erken katılırsan o kadar büyük pay.
+            100 TGC eşiğine ulaşan contributor'lar, Foundation Buyback Window
+            açıldığında bakiyelerini USDT karşılığı geri alım programına sunabilir.
+            Program; dönemsel bütçe, doğrulama, risk kontrolü ve treasury
+            likiditesine bağlıdır — <span className="text-amber-300">garanti değildir</span>.
           </div>
         </div>
       )}
@@ -720,12 +721,12 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
       <div className="rounded-2xl bg-black/40 border border-white/10 p-5" data-testid="rewards-balance-card">
         <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">TGC Balance</div>
         <div className="mt-1 font-mono-cyber font-black text-4xl cyan-text" data-testid="rewards-tgc-balance">
-          {tgcBalance.toFixed(2)} <span className="text-white/55 text-sm">TGC</span>
+          {tgcBalance.toFixed(5)} <span className="text-white/55 text-sm">TGC</span>
         </div>
         <div className="text-[11px] text-white/45 mt-1">
           {wallet?.redemption_locked
-            ? `Pre-mainnet · 1:1 airdrop on launch · Lifetime ${lifetimeTGC.toFixed(2)} TGC`
-            : `Estimated Value ≈ $${(tgcBalance * TGC_TO_USDT).toFixed(2)} USDT · Lifetime ${lifetimeTGC.toFixed(2)} TGC`}
+            ? `Pre-mainnet · contribution receipt · Lifetime ${lifetimeTGC.toFixed(5)} TGC`
+            : `Estimated Value ≈ $${(tgcBalance * TGC_TO_USDT).toFixed(2)} USDT · Lifetime ${lifetimeTGC.toFixed(5)} TGC`}
         </div>
       </div>
 
