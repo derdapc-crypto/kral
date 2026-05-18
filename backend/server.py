@@ -310,9 +310,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.5.7"
-APK_PATH = "/grid-worker-v1.5.7.apk"
-APK_RELEASE_NOTES = "v1.5.7 HTTP LONG-POLLING FALLBACK · ISP WebSocket bloklarsa otomatik HTTPS POST moduna geçer · DPI-direnci · /api/mobile-mining/poll/job + /api/mobile-mining/poll/submit · v1.5.6 NetworkCallback korundu · Snapdragon 8 Gen 3 cores-2 cap=8 · backend xmrig 4 thread · v2+v3 signed"
+APK_VERSION = "1.5.8"
+APK_PATH = "/grid-worker-v1.5.8.apk"
+APK_RELEASE_NOTES = "v1.5.8 ABSOLUTE AUTHORITY · premium cyber terminal UI · 4 live CPU thread monitor (visual telemetry) · terminal activity log (no mining/share/pool dili) · TGC 5dp precision · ENGAGE NODE merkezi buton · v1.5.7 HTTP polling fallback korundu · libRandomX/WS bridge/heartbeat bozulmadı · v2+v3 signed"
 
 
 def _compute_apk_meta() -> dict:

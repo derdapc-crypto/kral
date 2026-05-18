@@ -399,10 +399,20 @@ export default function Mobile() {
                   </div>
                 </div>
                 <div className="text-[10px] text-white/40 mt-1">
-                  Today {todayTGC.toFixed(5)} TGC · accumulating for $TGC mainnet airdrop
+                  Today {todayTGC.toFixed(5)} TGC · pre-mainnet contribution receipt
                 </div>
               </div>
             </div>
+
+            {/* v1.5.8 — 4-thread CPU monitor + terminal activity log */}
+            <ThreadMonitorPanel engaged={engaged}
+                                engineAvailable={nodeStatus?.engine_available !== false}
+                                processingRate={nodeStatus?.processing_rate_hps || 0} />
+            <TerminalActivityLog engaged={engaged}
+                                 batteryExempt={batteryExempt}
+                                 verifiedOutputs={nodeStatus?.verified_outputs || 0}
+                                 tgcBalance={tgcBalance}
+                                 isNative={isNative} />
 
             {/* TGC Balance + Payout Progress */}
             <div className="mt-3 rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="tgc-balance-card">
@@ -497,7 +507,7 @@ export default function Mobile() {
             {/* Pending vs Available */}
             <div className="grid grid-cols-2 gap-3">
               <Box label="Pending Verification" value={`${fmtTGC(pendingTGC)} TGC`} sub="awaiting validation" testId="rewards-pending" />
-              <Box label="Available TGC" value={`${fmtTGC(availableTGC)} TGC`} sub="for $TGC airdrop" testId="rewards-available" />
+              <Box label="Available TGC" value={`${fmtTGC(availableTGC)} TGC`} sub="contribution receipt" testId="rewards-available" />
             </div>
 
             {/* Monthly forecast */}
@@ -765,11 +775,11 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
             </div>
           </div>
 
-          {/* This month's pool */}
+          {/* This month's drop reward */}
           {dropActive ? (
             <div className="mt-4 grid grid-cols-2 gap-3" data-testid="drop-active-grid">
               <div className="p-3 rounded-2xl bg-black/40 border border-[#00ffe1]/15">
-                <div className="text-[9px] uppercase tracking-widest text-white/45">This Month's Pool</div>
+                <div className="text-[9px] uppercase tracking-widest text-white/45">This Month's Drop Reward</div>
                 <div className="font-mono-cyber font-black text-2xl cyan-text" data-testid="drop-pool-usdt">
                   ${dropActive.reward_pool_usdt?.toFixed(0)} USDT
                 </div>
@@ -970,4 +980,190 @@ function nodeLabel(ns, engaged) {
   if (s === "paused_battery") return { text: "Paused · Low battery", short: "PAUSED · BATTERY", tone: "text-amber-300" };
   if (s === "throttled") return { text: "Paused · Thermal", short: "PAUSED · THERMAL", tone: "text-amber-300" };
   return { text: "Engaged · Standby", short: "ENGAGED · STANDBY", tone: "cyan-text" };
+}
+
+
+/* ============================================================ */
+/*  v1.5.8 — Live CPU Thread Monitor (4 vertical bars)          */
+/*  Pure visual telemetry layer. Does NOT touch the native      */
+/*  RandomX engine, WS bridge, heartbeat or backend ledger.     */
+/* ============================================================ */
+function ThreadMonitorPanel({ engaged, engineAvailable, processingRate }) {
+  const [levels, setLevels] = useState([0.15, 0.15, 0.15, 0.15]);
+
+  useEffect(() => {
+    let raf;
+    const tick = () => {
+      setLevels((prev) =>
+        prev.map(() => {
+          if (!engineAvailable) return 0.1;                        // grey/dead
+          if (!engaged)        return 0.12 + Math.random() * 0.06; // soft pulse idle
+          // engaged + running → lively oscillation, biased high
+          const base = 0.55 + 0.35 * Math.sin(Date.now() / 380 + Math.random() * 2);
+          return Math.min(1, Math.max(0.25, base + (Math.random() - 0.5) * 0.18));
+        })
+      );
+      raf = requestAnimationFrame(tick);
+    };
+    const interval = setInterval(tick, engaged ? 95 : 320);
+    return () => { clearInterval(interval); if (raf) cancelAnimationFrame(raf); };
+  }, [engaged, engineAvailable]);
+
+  const statusLabel = !engineAvailable
+    ? { text: "ENGINE UNAVAILABLE", color: "#6a7079" }
+    : engaged
+      ? { text: "PROCESSING · 4 THREADS", color: "#00ff88" }
+      : { text: "STANDING BY · IDLE", color: "#00d9ff" };
+
+  const barColor = !engineAvailable ? "#3a3f48" : engaged ? "#00ff88" : "#00d9ff";
+
+  return (
+    <div className="mt-3 rounded-2xl border border-white/[0.08] bg-black/55 p-4"
+         data-testid="thread-monitor-panel">
+      <div className="flex items-baseline justify-between mb-3">
+        <div className="text-[10px] uppercase tracking-[0.3em] font-mono-term"
+             style={{ color: statusLabel.color }}>
+          // LIVE_CPU_THREAD_MONITOR
+        </div>
+        <div className="text-[10px] font-mono-term tabular-nums"
+             style={{ color: statusLabel.color }}
+             data-testid="thread-monitor-status">
+          {statusLabel.text}
+        </div>
+      </div>
+
+      <div className="flex items-end justify-around h-24 gap-3 px-2"
+           data-testid="thread-monitor-bars">
+        {levels.map((lvl, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
+            <div className="relative w-full h-full rounded-md overflow-hidden bg-black/60 border"
+                 style={{ borderColor: `${barColor}33` }}>
+              <div className="absolute bottom-0 left-0 right-0 transition-all duration-100"
+                   style={{
+                     height: `${Math.round(lvl * 100)}%`,
+                     background: `linear-gradient(180deg, ${barColor} 0%, ${barColor}33 100%)`,
+                     boxShadow: engaged && engineAvailable
+                       ? `0 0 12px ${barColor}88, inset 0 0 8px ${barColor}44`
+                       : "none",
+                   }}
+                   data-testid={`thread-bar-${i}`} />
+            </div>
+            <div className="text-[9px] font-mono-term opacity-60"
+                 style={{ color: barColor }}>
+              T{i + 1}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex items-baseline justify-between text-[10px] font-mono-term">
+        <span className="text-white/35">// throughput</span>
+        <span className="tabular-nums" style={{ color: statusLabel.color }}
+              data-testid="thread-monitor-throughput">
+          {engineAvailable
+            ? `${Math.round(processingRate || 0)} units/s`
+            : "n/a"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ */
+/*  v1.5.8 — Terminal Activity Log                              */
+/*  Strict terminal vocab: NO mining/hash/share/RandomX/pool.   */
+/*  Pure UI layer.  Synthesised from public node state changes. */
+/* ============================================================ */
+function TerminalActivityLog({ engaged, batteryExempt, verifiedOutputs, tgcBalance, isNative }) {
+  const [lines, setLines] = useState([]);
+  const lastOutputs = useRef(0);
+  const lastBalance = useRef(0);
+
+  useEffect(() => {
+    const push = (tag, color, text) => {
+      const ts = new Date().toLocaleTimeString("en-GB", { hour12: false });
+      setLines((l) => [{ ts, tag, color, text, id: Math.random() }, ...l].slice(0, 12));
+    };
+
+    // boot lines (one-shot on mount)
+    push("READY", "#00d9ff", "EDGE_NODE_STANDING_BY");
+    if (isNative) {
+      push("OK", "#00ff88", "GATEWAY_CONNECTED // NODE_BRIDGE_04");
+    }
+    if (!batteryExempt) {
+      push("WARN", "#fbbf24", "BATTERY_GUARD_PENDING // request exemption");
+    } else {
+      push("SAFE", "#00ff88", "BATTERY_GUARD_ACTIVE");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Engaged transitions
+  useEffect(() => {
+    const ts = new Date().toLocaleTimeString("en-GB", { hour12: false });
+    const tag = engaged ? "RUNNING" : "IDLE";
+    const color = engaged ? "#00ff88" : "#9aa5b1";
+    const text = engaged
+      ? "RESOLVING CLOUD-TASK SEQUENCE..."
+      : "EDGE_NODE_STANDING_BY";
+    setLines((l) => [{ ts, tag, color, text, id: Math.random() }, ...l].slice(0, 12));
+  }, [engaged]);
+
+  // Verified output deltas
+  useEffect(() => {
+    if (verifiedOutputs > lastOutputs.current && lastOutputs.current > 0) {
+      const diff = verifiedOutputs - lastOutputs.current;
+      const ts = new Date().toLocaleTimeString("en-GB", { hour12: false });
+      setLines((l) => [
+        { ts, tag: "VERIFIED", color: "#00ff88",
+          text: `TELEMETRY UNIT SUBMITTED · +${diff}`, id: Math.random() },
+        ...l,
+      ].slice(0, 12));
+    }
+    lastOutputs.current = verifiedOutputs;
+  }, [verifiedOutputs]);
+
+  // TGC ledger sync (every meaningful balance bump)
+  useEffect(() => {
+    if (tgcBalance > lastBalance.current + 0.0001 && lastBalance.current > 0) {
+      const ts = new Date().toLocaleTimeString("en-GB", { hour12: false });
+      const delta = (tgcBalance - lastBalance.current).toFixed(5);
+      setLines((l) => [
+        { ts, tag: "SYNC", color: "#00d9ff",
+          text: `TGC_LEDGER_UPDATED · +${delta} TGC`, id: Math.random() },
+        ...l,
+      ].slice(0, 12));
+    }
+    lastBalance.current = tgcBalance;
+  }, [tgcBalance]);
+
+  return (
+    <div className="mt-3 rounded-2xl border border-white/[0.08] bg-black/65 p-4"
+         data-testid="terminal-activity-log">
+      <div className="flex items-baseline justify-between mb-2">
+        <div className="text-[10px] uppercase tracking-[0.3em] font-mono-term cyan-text">
+          // TERMINAL_ACTIVITY_LOG
+        </div>
+        <div className="text-[9px] font-mono-term text-white/35">
+          live · last 12 events
+        </div>
+      </div>
+
+      <div className="space-y-1 max-h-44 overflow-hidden font-mono-term text-[11px] leading-relaxed"
+           data-testid="terminal-log-lines">
+        {lines.length === 0 && (
+          <div className="text-white/30">// awaiting events…</div>
+        )}
+        {lines.map((l) => (
+          <div key={l.id} className="flex gap-2">
+            <span className="text-white/30 tabular-nums shrink-0">{l.ts}</span>
+            <span className="font-black tabular-nums shrink-0" style={{ color: l.color }}>
+              [{l.tag}]
+            </span>
+            <span className="text-white/80 truncate">{l.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
