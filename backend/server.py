@@ -115,6 +115,8 @@ client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
 app = FastAPI(title="THE GRID API")
+# v1.6.3 build fingerprint — 2026-02-19T23:30Z — force orchestrator to allocate
+# a fresh deployment job slot (avoids stuck deploy phase from previous d84vgu3).
 
 
 # v1.6.3 — Kubernetes/Emergent health probes (must respond <1s, no DB calls)
