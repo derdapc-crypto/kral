@@ -45,6 +45,7 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 # Earnings model: $ per compute-second (TRC20 USDT equivalent)
 USDT_PER_COMPUTE_SEC = 0.0005  # tiny but real per-task
 WITHDRAW_THRESHOLD = 5.0
+OFFLINE_CUTOFF_SEC = 90  # device considered offline if last_heartbeat older than this
 
 # ---------- THE GRID PRESTIGE ECONOMY (TGC - TheGrid Coin) ----------
 # v1.4.9 economy: 1000 TGC = $10 USDT (1 TGC = $0.01)
