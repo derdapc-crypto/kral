@@ -65,6 +65,26 @@ Build a real, working, phone-based distributed compute network that:
 - `POST /api/mobile-mining/poll/submit`    — share submission fallback
 - `GET /api/admin/mobile-mining/diagnostics`
 
+## v1.6.2 "Daily Grid Calibration + Public Ledger Counter" — Feb 2026 ✅
+- **Daily Grid Calibration**: cyber "node sync reactor" dial (NOT a wheel of
+  fortune). Segmented rotating protocol ring + neon beacon + pulsing node core.
+  States: idle → syncing → complete → locked (with live UTC countdown).
+- Backend: weighted server-side reward (8 tiers, 0.00010 TGC @ 35% → 1.00000 TGC
+  @ 0.2%), strict same-day idempotency via unique `(user_id, date_key)` index,
+  eligibility = not banned + not risk_flagged + 24h heartbeat.
+- New collection `daily_calibrations` + `tgc_ledger` row `kind='daily_calibration_bonus'`.
+- **Public TGC Counter**: real aggregations from `tgc_ledger` — `total_tgc_issued`,
+  `total_tgc_burned`, `circulating_tgc`, plus per-kind breakdown (compute,
+  calibration, drops, buyback burn). NO hardcoded values.
+- Premium monospace count-up animation, used on Landing (hero strip + scarcity
+  console mega), Token (slot scarcity), Dashboard, Admin Ledger tab.
+
+### New Endpoints (v1.6.2)
+- `GET  /api/daily-calibration/status` (eligibility + last claim)
+- `POST /api/daily-calibration/claim`  (server-side weighted random, idempotent)
+- `GET  /api/stats/public`             (ledger totals only)
+- `GET  /api/network/scarcity-progress` (now ALSO includes ledger totals)
+
 ## v1.6.1 "Desktop Scale Normalization" — Feb 2026 ✅
 - Container max-width 1400 → **1240**, padding `lg:px-10` → `lg:px-8`
 - Section vertical padding `py-28/py-32` → **`py-20`** across all landing/token sections

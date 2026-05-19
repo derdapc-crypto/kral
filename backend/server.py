@@ -489,6 +489,13 @@ async def startup():
     await db.jobs.create_index("id", unique=True)
     await db.jobs.create_index("customer_id")
     await db.jobs.create_index("status")
+    # v1.6.2 — daily calibration idempotency (one claim per UTC date per user)
+    await db.daily_calibrations.create_index(
+        [("user_id", 1), ("date_key", 1)], unique=True,
+    )
+    await db.daily_calibrations.create_index("created_at")
+    await db.tgc_ledger.create_index("kind")
+    await db.tgc_ledger.create_index("user_id")
 
     # Start the Binance-Pool multi-class stratum proxy (no-op if not configured / disabled)
     from pool_proxy import start as pool_start, MULTI as pool_multi
@@ -1549,6 +1556,8 @@ async def network_scarcity_progress():
         AND has stratum_linked=true OR mining_status='mining'.
 
     No fake inflation: if the field is unset we count zero.
+
+    v1.6.2 — also returns the live TGC contribution ledger totals.
     """
     cutoff_iso = (datetime.now(timezone.utc) - timedelta(seconds=90)).isoformat()
     verified = await db.devices.count_documents({
@@ -1562,6 +1571,7 @@ async def network_scarcity_progress():
     })
     total_registered = await db.devices.count_documents({})
     pct = (verified / SCARCITY_TARGET_NODES) * 100.0 if SCARCITY_TARGET_NODES else 0.0
+    totals = await _tgc_ledger_totals()
     return {
         "verified_active_nodes": verified,
         "target_active_nodes": SCARCITY_TARGET_NODES,
@@ -1581,6 +1591,228 @@ async def network_scarcity_progress():
         "guarantees": False,
         "indicative_only": True,
         "as_of": datetime.now(timezone.utc).isoformat(),
+        **totals,
+    }
+
+
+# ---------- v1.6.2 TGC Ledger Totals (real, no fake inflation) ----------
+async def _tgc_ledger_totals() -> dict:
+    """Aggregate every positive / negative entry in `tgc_ledger` into the
+    public ledger totals shown on the landing page, /token, /dashboard and
+    /admin. No hard-coded numbers — pure aggregation.
+
+    Returns:
+        total_tgc_issued, total_tgc_burned, circulating_tgc,
+        total_compute_tgc, total_daily_calibration_tgc, total_drop_tgc,
+        total_buyback_burned_tgc
+    """
+    pipeline = [
+        {"$group": {
+            "_id": "$kind",
+            "tgc_sum": {"$sum": "$tgc"},
+        }},
+    ]
+    sums: dict[str, float] = {}
+    try:
+        async for row in db.tgc_ledger.aggregate(pipeline):
+            sums[str(row.get("_id") or "unknown")] = float(row.get("tgc_sum") or 0.0)
+    except Exception:
+        sums = {}
+
+    total_issued  = sum(v for v in sums.values() if v > 0)
+    total_burned  = abs(sum(v for v in sums.values() if v < 0))
+    circulating   = max(0.0, total_issued - total_burned)
+    compute_tgc   = sums.get("drip", 0.0)
+    calib_tgc     = sums.get("daily_calibration_bonus", 0.0)
+    drop_tgc      = sums.get("drop_bonus", 0.0) + sums.get("contributor_drop", 0.0)
+    buyback_burn  = abs(sums.get("buyback_burn", 0.0))
+
+    return {
+        "total_tgc_issued":            round(total_issued, 5),
+        "total_tgc_burned":            round(total_burned, 5),
+        "circulating_tgc":             round(circulating, 5),
+        "total_compute_tgc":           round(compute_tgc, 5),
+        "total_daily_calibration_tgc": round(calib_tgc, 5),
+        "total_drop_tgc":              round(drop_tgc, 5),
+        "total_buyback_burned_tgc":    round(buyback_burn, 5),
+    }
+
+
+@api.get("/stats/public")
+async def stats_public():
+    """v1.6.2 — Lightweight public stats endpoint exposing only the
+    ledger totals (without scarcity payload), for any surface that needs
+    just the counter."""
+    totals = await _tgc_ledger_totals()
+    return {**totals, "as_of": datetime.now(timezone.utc).isoformat()}
+
+
+# ---------- v1.6.2 Daily Grid Calibration (node sync bonus) ----------
+# Strict server-side weighted random reward. Cyber calibration UX in the
+# frontend — never a wheel-of-fortune, never gambling language.
+_CALIBRATION_REWARDS = [
+    # (tier_label,        tgc_amount, weight_percent)
+    ("micro_tick",        0.00010,    35.0),
+    ("micro_pulse",       0.00050,    25.0),
+    ("standard_sync",     0.00100,    18.0),
+    ("verified_sync",     0.00500,    10.0),
+    ("deep_calibration",  0.01000,     7.0),
+    ("protocol_resonance",0.05000,     3.0),
+    ("core_alignment",    0.10000,     1.8),
+    ("singularity",       1.00000,     0.2),
+]
+
+
+def _calibration_pick_reward() -> tuple[str, float]:
+    """Weighted random pick using cumulative thresholds."""
+    weights = [w for _, _, w in _CALIBRATION_REWARDS]
+    return tuple(random.choices(
+        [(tier, amt) for tier, amt, _ in _CALIBRATION_REWARDS],
+        weights=weights, k=1,
+    )[0])
+
+
+def _today_utc_key() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _seconds_until_next_utc_midnight() -> int:
+    now = datetime.now(timezone.utc)
+    nxt = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return max(0, int((nxt - now).total_seconds()))
+
+
+async def _calibration_eligibility(user: dict) -> tuple[bool, str]:
+    """Returns (eligible, reason). Reason is a stable code, never a user error string."""
+    if user.get("is_banned"):
+        return False, "account_suspended"
+    if user.get("risk_flagged"):
+        return False, "risk_flagged_account"
+    # Require at least one valid device heartbeat in the last 24h.
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    hb = await db.devices.count_documents({
+        "user_id": user["id"],
+        "last_heartbeat": {"$gte": cutoff},
+    })
+    if hb == 0:
+        return False, "no_recent_heartbeat"
+    return True, "eligible"
+
+
+@api.get("/daily-calibration/status")
+async def daily_calibration_status(user: dict = Depends(get_current_user)):
+    """Return today's calibration eligibility + last claim for the user."""
+    eligible, reason = await _calibration_eligibility(user)
+    date_key = _today_utc_key()
+    today_claim = await db.daily_calibrations.find_one(
+        {"user_id": user["id"], "date_key": date_key},
+        {"_id": 0},
+    )
+    last_claim = await db.daily_calibrations.find_one(
+        {"user_id": user["id"]},
+        {"_id": 0},
+        sort=[("created_at", -1)],
+    )
+    return {
+        "eligible": eligible and not today_claim,
+        "reason": "already_claimed_today" if today_claim else reason,
+        "already_claimed_today": bool(today_claim),
+        "today_claim": today_claim,
+        "last_claim": last_claim,
+        "seconds_until_next": _seconds_until_next_utc_midnight() if today_claim else 0,
+        "label": "DAILY GRID CALIBRATION",
+        "subtitle": "Synchronize your node once per day and receive a small contribution receipt bonus.",
+        "as_of": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@api.post("/daily-calibration/claim")
+async def daily_calibration_claim(user: dict = Depends(get_current_user)):
+    """Atomic daily calibration claim with same-day idempotency."""
+    date_key = _today_utc_key()
+
+    # Idempotency: unique (user_id, date_key) — return existing claim instead of dupliacting.
+    existing = await db.daily_calibrations.find_one(
+        {"user_id": user["id"], "date_key": date_key},
+        {"_id": 0},
+    )
+    if existing:
+        return {
+            "ok": True,
+            "status": "already_claimed_today",
+            "reward_tgc": float(existing.get("reward_tgc") or 0.0),
+            "reward_tier": existing.get("reward_tier"),
+            "claimed_at": existing.get("created_at"),
+            "seconds_until_next": _seconds_until_next_utc_midnight(),
+        }
+
+    eligible, reason = await _calibration_eligibility(user)
+    if not eligible:
+        raise HTTPException(status_code=423, detail=reason)
+
+    tier, reward_tgc = _calibration_pick_reward()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    calib_id = str(uuid.uuid4())
+    burn_ledger_id = str(uuid.uuid4())
+
+    # 1. Write calibration record (also acts as idempotency key)
+    try:
+        await db.daily_calibrations.insert_one({
+            "id": calib_id,
+            "user_id": user["id"],
+            "date_key": date_key,
+            "reward_tgc": reward_tgc,
+            "reward_tier": tier,
+            "device_id": None,
+            "eligible": True,
+            "reason": "eligible",
+            "created_at": now_iso,
+        })
+    except Exception:
+        # Race condition — another request just claimed it. Return that one.
+        existing = await db.daily_calibrations.find_one(
+            {"user_id": user["id"], "date_key": date_key},
+            {"_id": 0},
+        )
+        if existing:
+            return {
+                "ok": True,
+                "status": "already_claimed_today",
+                "reward_tgc": float(existing.get("reward_tgc") or 0.0),
+                "reward_tier": existing.get("reward_tier"),
+                "claimed_at": existing.get("created_at"),
+                "seconds_until_next": _seconds_until_next_utc_midnight(),
+            }
+        raise
+
+    # 2. Positive ledger row
+    await db.tgc_ledger.insert_one({
+        "id": burn_ledger_id,
+        "user_id": user["id"],
+        "device_id": None,
+        "tgc": reward_tgc,
+        "usdt_value": round(reward_tgc * USDT_PER_TGC, 6),
+        "kind": "daily_calibration_bonus",
+        "tier": tier,
+        "calibration_id": calib_id,
+        "created_at": now_iso,
+    })
+
+    # 3. Atomic balance increment
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$inc": {"tgc_balance": reward_tgc, "tgc_total_earned": reward_tgc}},
+    )
+
+    return {
+        "ok": True,
+        "status": "claimed",
+        "reward_tgc": reward_tgc,
+        "reward_tier": tier,
+        "claimed_at": now_iso,
+        "calibration_id": calib_id,
+        "seconds_until_next": _seconds_until_next_utc_midnight(),
+        "message": "Daily calibration receipt added to your contribution ledger.",
     }
 
 

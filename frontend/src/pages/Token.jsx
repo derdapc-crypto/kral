@@ -15,6 +15,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Cpu, ArrowRight, ChevronRight, ShieldCheck, AlertTriangle } from "lucide-react";
 import NetworkTopology from "../components/NetworkTopology";
+import TotalTgcCounter from "../components/TotalTgcCounter";
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -187,6 +188,18 @@ function SlotScarcity({ scarcity }) {
             Each lit cell represents a verified active edge node.
             The protocol never inflates supply ahead of real network growth.
           </p>
+          <div className="mt-7 border-t border-white/[0.06] pt-5 max-w-[420px]">
+            <TotalTgcCounter
+              variant="default"
+              value={scarcity?.total_tgc_issued || 0}
+              subValues={{
+                circulating: scarcity?.circulating_tgc || 0,
+                burned:      scarcity?.total_tgc_burned || 0,
+              }}
+              tone="cyan"
+              testId="token-total-tgc-counter"
+            />
+          </div>
         </div>
         {/* slot grid */}
         <div className="grid grid-cols-20 gap-[3px] p-3 border border-white/[0.06] bg-black/40"

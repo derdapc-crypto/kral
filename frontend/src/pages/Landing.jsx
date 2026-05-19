@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import QRCode from "qrcode";
 import NetworkTopology from "../components/NetworkTopology";
+import TotalTgcCounter from "../components/TotalTgcCounter";
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -228,7 +229,7 @@ function Hero({ scarcity, apk }) {
           {/* tiny telemetry foot */}
           <div className="mt-10 grid grid-cols-3 gap-px bg-white/[0.06] max-w-[480px]" data-testid="hero-telemetry-strip">
             <FootMetric label="VERIFIED NODES"  value={verified.toLocaleString()} tone="matrix" />
-            <FootMetric label="NETWORK TARGET"  value="1,000,000"                tone="cyan" />
+            <FootMetric label="TGC RECEIPTS"    value={Number(scarcity?.total_tgc_issued || 0).toLocaleString(undefined,{minimumFractionDigits:5,maximumFractionDigits:5})} tone="cyan" />
             <FootMetric label="PHASE"           value={phase}                     tone="violet" />
           </div>
         </motion.div>
@@ -483,6 +484,19 @@ function ScarcityConsole({ scarcity }) {
               <br/>technical and ecosystem conditions
             </p>
           </div>
+        </div>
+
+        {/* v1.6.2 — total TGC receipts ledger counter */}
+        <div className="mb-10 border-t border-white/[0.06] pt-7">
+          <TotalTgcCounter
+            variant="mega"
+            value={scarcity?.total_tgc_issued || 0}
+            subValues={{
+              circulating: scarcity?.circulating_tgc || 0,
+              burned:      scarcity?.total_tgc_burned || 0,
+            }}
+            testId="landing-total-tgc-counter"
+          />
         </div>
 
         {/* neon progress bar */}

@@ -60,21 +60,24 @@ export default function Admin() {
   const [autoMining, setAutoMining] = useState(true);
   const [hashrate, setHashrate] = useState({ series: [], total_hashrate_hps: 0, total_tasks: 0 });
   const [buybacks, setBuybacks] = useState([]);
+  const [ledgerTotals, setLedgerTotals] = useState(null);
   const [msg, setMsg] = useState("");
 
   const load = async () => {
     try {
-      const [d, u, p, f, s, j, l, am, hr, bb] = await Promise.all([
+      const [d, u, p, f, s, j, l, am, hr, bb, pub] = await Promise.all([
         api.get("/admin/devices"), api.get("/admin/users"), api.get("/admin/payouts"),
         api.get("/admin/fraud"), api.get("/stats/network"),
         api.get("/admin/jobs"), api.get("/admin/ledger"),
         api.get("/admin/auto-mining"), api.get("/admin/hashrate"),
         api.get("/admin/buybacks"),
+        api.get("/stats/public"),
       ]);
       setDevices(d.data); setUsers(u.data); setPayouts(p.data); setFraud(f.data);
       setStats(s.data); setJobs(j.data); setLedger(l.data);
       setAutoMining(am.data.enabled); setHashrate(hr.data);
       setBuybacks(bb.data || []);
+      setLedgerTotals(pub.data);
     } catch (e) { setMsg(formatApiError(e)); }
   };
 
@@ -395,7 +398,43 @@ export default function Admin() {
         )}
 
         {tab === "ledger" && ledger && (
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="space-y-6">
+            {/* v1.6.2 — Public TGC Ledger Health (real aggregations) */}
+            <div className="rounded-3xl glass-strong p-8 border border-[#00ff88]/[0.18]" data-testid="admin-ledger-health">
+              <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-[#00ff88]/85 mb-3">
+                // tgc_ledger_health · network_wide_aggregations
+              </div>
+              <TotalTgcCounter
+                variant="mega"
+                value={ledgerTotals?.total_tgc_issued || 0}
+                subValues={{
+                  circulating: ledgerTotals?.circulating_tgc || 0,
+                  burned:      ledgerTotals?.total_tgc_burned || 0,
+                }}
+                tone="matrix"
+                testId="admin-total-tgc-counter"
+              />
+              <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-px bg-white/[0.06]">
+                {[
+                  ["compute_drip",         ledgerTotals?.total_compute_tgc,           "matrix"],
+                  ["daily_calibration",    ledgerTotals?.total_daily_calibration_tgc, "cyan"],
+                  ["contributor_drops",    ledgerTotals?.total_drop_tgc,              "violet"],
+                  ["buyback_burned",       ledgerTotals?.total_buyback_burned_tgc,    "amber"],
+                ].map(([k, v, tone]) => {
+                  const color = tone === "matrix" ? "#00ff88" : tone === "cyan" ? "#00d9ff" : tone === "violet" ? "#6c7bff" : "#fbbf24";
+                  return (
+                    <div key={k} className="bg-black px-4 py-3.5">
+                      <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">{k}</div>
+                      <div className="font-mono font-bold text-[15px] mt-1 tabular-nums" style={{ color }}>
+                        {Number(v || 0).toFixed(5)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
             <div className="rounded-3xl glass-strong p-8 relative overflow-hidden">
               <div className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-[#D4AF37]/15 blur-3xl" />
               <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 relative">Customer Revenue</div>
@@ -428,6 +467,7 @@ export default function Admin() {
                   <div className="mt-2 text-xl font-mono-num text-green-400">{ledger.worker_paid_usdt.toFixed(4)}</div>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         )}

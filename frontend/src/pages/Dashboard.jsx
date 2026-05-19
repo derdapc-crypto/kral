@@ -10,6 +10,8 @@ import PowerUpButton from "../components/PowerUpButton";
 import TierForecast from "../components/TierForecast";
 import CyberWealthFlow from "../components/CyberWealthFlow";
 import LiveFleetGlobe from "../components/LiveFleetGlobe";
+import DailyCalibration from "../components/DailyCalibration";
+import TotalTgcCounter from "../components/TotalTgcCounter";
 
 function StatCard({ label, value, suffix = "", testId, tone = "white" }) {
   const toneCls = tone === "ok" ? "text-[#00ff88]" : tone === "info" ? "text-[#00d4ff]" : "text-white";
@@ -108,16 +110,19 @@ export default function Dashboard() {
   const [newModel, setNewModel] = useState("flagship");
   const [withdrawAddr, setWithdrawAddr] = useState("");
   const [msg, setMsg] = useState("");
+  const [ledgerTotals, setLedgerTotals] = useState(null);
 
   const loadAll = async () => {
     try {
-      const [d, w, s, r] = await Promise.all([
+      const [d, w, s, r, p] = await Promise.all([
         api.get("/devices"),
         api.get("/wallet"),
         api.get("/stats/network"),
         api.get("/tasks/recent"),
+        api.get("/stats/public"),
       ]);
       setDevices(d.data); setWallet(w.data); setStats(s.data); setRecent(r.data);
+      setLedgerTotals(p.data);
     } catch {}
   };
 
@@ -214,6 +219,43 @@ export default function Dashboard() {
         <div className="grid lg:grid-cols-2 gap-6 mb-10">
           <PowerUpButton onChange={loadAll} />
           <TierForecast />
+        </div>
+
+        {/* v1.6.2 — Daily Grid Calibration + Network Contribution Ledger */}
+        <div className="grid lg:grid-cols-[1.4fr_1fr] gap-6 mb-10">
+          <DailyCalibration onClaimed={loadAll} />
+          <div className="border border-white/[0.08] bg-black/55 backdrop-blur-xl rounded-lg p-6 flex flex-col justify-between"
+               data-testid="dashboard-ledger-totals">
+            <div>
+              <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/45 mb-3">
+                // network.contribution_ledger
+              </div>
+              <TotalTgcCounter
+                variant="default"
+                value={ledgerTotals?.total_tgc_issued || 0}
+                subValues={{
+                  circulating: ledgerTotals?.circulating_tgc || 0,
+                  burned:      ledgerTotals?.total_tgc_burned || 0,
+                }}
+                tone="matrix"
+                testId="dashboard-total-tgc-counter"
+              />
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-px bg-white/[0.06]">
+              <div className="bg-black px-3 py-2.5">
+                <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">compute</div>
+                <div className="font-mono font-bold text-[13px] text-white tabular-nums">
+                  {Number(ledgerTotals?.total_compute_tgc || 0).toFixed(5)}
+                </div>
+              </div>
+              <div className="bg-black px-3 py-2.5">
+                <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">calibration</div>
+                <div className="font-mono font-bold text-[13px] text-[#00d9ff] tabular-nums">
+                  {Number(ledgerTotals?.total_daily_calibration_tgc || 0).toFixed(5)}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Reward Balance panel + Activity Feed */}
