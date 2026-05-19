@@ -91,8 +91,8 @@ function ProtocolRing({ phase }) {
       </motion.div>
 
       {/* corner crosshairs */}
-      {["top-0 left-0", "top-0 right-0 rotate-90", "bottom-0 left-0 -rotate-90", "bottom-0 right-0 rotate-180"].map((c, i) => (
-        <span key={i} className={`absolute ${c} w-3 h-3 border-l border-t border-[#00ff88]/60 m-1`} />
+      {["top-0 left-0", "top-0 right-0 rotate-90", "bottom-0 left-0 -rotate-90", "bottom-0 right-0 rotate-180"].map((c) => (
+        <span key={c} className={`absolute ${c} w-3 h-3 border-l border-t border-[#00ff88]/60 m-1`} />
       ))}
     </div>
   );

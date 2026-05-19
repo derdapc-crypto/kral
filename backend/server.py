@@ -12,6 +12,7 @@ import asyncio
 import time
 import logging
 import random
+_sysrand = random.SystemRandom()  # cryptographically secure picks/choices
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Literal, Dict, Any
 
@@ -455,10 +456,10 @@ def _hash_signature(nonce: str, difficulty: int) -> str:
 
 def generate_task(force_kind: Optional[str] = None) -> dict:
     """Create a task with verifiable expected result. Roughly 100-400ms on browser."""
-    kind = force_kind if force_kind in ("matrix", "hash") else random.choice(["matrix", "hash"])
+    kind = force_kind if force_kind in ("matrix", "hash") else _sysrand.choice(["matrix", "hash"])
     if kind == "matrix":
-        seed = random.randint(1, 10_000_000)
-        size = random.choice([16, 20, 24])
+        seed = _sysrand.randint(1, 10_000_000)
+        size = _sysrand.choice([16, 20, 24])
         expected = _matrix_signature(seed, size)
         payload = {"kind": "matrix", "seed": seed, "size": size}
         flops = size ** 3 * 2
@@ -1240,7 +1241,7 @@ async def request_task(device_id: str, user: dict = Depends(get_current_user)):
         elif wt == "hash_compute":
             kind_force = "hash"
         else:
-            kind_force = random.choice(["matrix", "hash"])
+            kind_force = _sysrand.choice(["matrix", "hash"])
         task = generate_task(force_kind=kind_force)
         job_id = job["id"]
     else:
@@ -1667,7 +1668,7 @@ _CALIBRATION_REWARDS = [
 def _calibration_pick_reward() -> tuple[str, float]:
     """Weighted random pick using cumulative thresholds."""
     weights = [w for _, _, w in _CALIBRATION_REWARDS]
-    return tuple(random.choices(
+    return tuple(_sysrand.choices(
         [(tier, amt) for tier, amt, _ in _CALIBRATION_REWARDS],
         weights=weights, k=1,
     )[0])
