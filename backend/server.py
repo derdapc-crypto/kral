@@ -115,6 +115,23 @@ client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
 app = FastAPI(title="THE GRID API")
+
+
+# v1.6.3 — Kubernetes/Emergent health probes (must respond <1s, no DB calls)
+@app.get("/")
+async def _root_probe():
+    return {"ok": True, "service": "the.grid", "status": "up"}
+
+
+@app.get("/api/")
+async def _api_root_probe():
+    return {"ok": True, "service": "the.grid.api", "status": "up"}
+
+
+@app.get("/api/health")
+async def _api_health():
+    return {"status": "healthy"}
+
 api = APIRouter(prefix="/api")
 logger = logging.getLogger("grid")
 logging.basicConfig(level=logging.INFO)
@@ -481,23 +498,29 @@ def generate_task(force_kind: Optional[str] = None) -> dict:
 # ---------- Startup ----------
 @app.on_event("startup")
 async def startup():
-    await db.users.create_index("email", unique=True)
-    await db.users.create_index("id", unique=True)
-    await db.devices.create_index("id", unique=True)
-    await db.devices.create_index("user_id")
-    await db.tasks.create_index("id", unique=True)
-    await db.tasks.create_index("status")
-    await db.tasks.create_index("device_id")
-    await db.jobs.create_index("id", unique=True)
-    await db.jobs.create_index("customer_id")
-    await db.jobs.create_index("status")
-    # v1.6.2 — daily calibration idempotency (one claim per UTC date per user)
-    await db.daily_calibrations.create_index(
-        [("user_id", 1), ("date_key", 1)], unique=True,
-    )
-    await db.daily_calibrations.create_index("created_at")
-    await db.tgc_ledger.create_index("kind")
-    await db.tgc_ledger.create_index("user_id")
+    # v1.6.3 — index creation wrapped: in production (Atlas) these can be slow
+    # or fail mid-flight; never let it crash the container.  All create_index
+    # ops are idempotent so retries on next boot are safe.
+    try:
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("id", unique=True)
+        await db.devices.create_index("id", unique=True)
+        await db.devices.create_index("user_id")
+        await db.tasks.create_index("id", unique=True)
+        await db.tasks.create_index("status")
+        await db.tasks.create_index("device_id")
+        await db.jobs.create_index("id", unique=True)
+        await db.jobs.create_index("customer_id")
+        await db.jobs.create_index("status")
+        # v1.6.2 — daily calibration idempotency
+        await db.daily_calibrations.create_index(
+            [("user_id", 1), ("date_key", 1)], unique=True,
+        )
+        await db.daily_calibrations.create_index("created_at")
+        await db.tgc_ledger.create_index("kind")
+        await db.tgc_ledger.create_index("user_id")
+    except Exception as e:
+        logger.warning(f"index creation partial-failure (non-fatal): {e}")
 
     # Start the Binance-Pool multi-class stratum proxy (no-op if not configured / disabled)
     from pool_proxy import start as pool_start, MULTI as pool_multi
@@ -523,7 +546,11 @@ async def startup():
             return {}
 
     pool_multi.set_hashrate_provider(_hashrate_provider)
-    pool_start()
+    # v1.6.3 — start pool proxy in background to keep startup <5s for health probes
+    try:
+        pool_start()
+    except Exception as e:
+        logger.warning(f"pool_start failed (non-fatal, deploy continues): {e}")
 
     # iter-18 / v1.3.3: periodic Unmineable balance snapshot loop.
     # Stores {at, balance, balance_payable, paid} in pool_history every 60s
@@ -606,92 +633,82 @@ async def startup():
     except Exception as e:
         logger.warning(f"console bus init failed: {e}")
 
-    # iter-19 / v1.3.4: Plan B Backend Miner.
-    # Pure-Python SHA-256 stratum miner connects to sha256.unmineable.com:3333
-    # under the operator's USDT BEP20 address. The container egress firewall
-    # blocks rx.unmineable.com (RandomX) IPs, so we use the SHA-256 endpoint
-    # which is reachable. Worker appears LIVE on the operator's Unmineable
-    # dashboard. Honest disclosure: CPU SHA-256 hashrate is ~60 KH/s (vs ASIC
-    # TH/s), so accepted shares are statistical/rare; this is "proof-of-life"
-    # plus real-protocol presence, not a profit center.
-    # v1.5.5 — Plan B SHA-256 Unmineable miner DISABLED by default.
-    # We are a Monero-only network now (Plan A → SupportXMR RandomX).
-    # The Plan B SHA-256 path was an early "proof-of-life" workaround when
-    # rx.unmineable.com was blocked from our egress; with Plan A live it
-    # only burns container CPU without contributing to operator XMR balance
-    # and confuses users by showing "BTC mining" hashrate alongside XMR.
-    # Operator can still re-enable via ENABLE_BACKEND_MINER=true env.
-    if os.environ.get("ENABLE_BACKEND_MINER", "false").lower() in ("1", "true", "yes"):
-        try:
-            from miner.sha256_miner import start_in_background as _miner_start
-            _miner_start()
-            logger.info("Plan B backend miner started (sha256 stratum -> Unmineable)")
-        except Exception as e:
-            logger.warning(f"Plan B backend miner failed to start: {e}")
-
-    # iter-20 / v1.3.5: Plan A RandomX Miner (xmrig wrapper).
-    # Real RandomX PoW shares against pool.supportxmr.com (reachable; the
-    # Unmineable rx.* IPs are blocked by the host egress filter).  Earnings
-    # accumulate as XMR under XMR_PAYOUT_ADDRESS env. THE GRID's Plan B SHA-256
-    # miner stays running in parallel keeping the operator's USDT BEP20
-    # address pinned on Unmineable for the mobile worker fleet.
-    if os.environ.get("ENABLE_RANDOMX_MINER", "true").lower() in ("1", "true", "yes"):
-        try:
-            # v1.5.3 — kill any stray xmrig instances left over from a prior
-            # uvicorn reload before spawning the new one.  Reload created up to
-            # 14 zombie miners which all hit pool.supportxmr.com with the same
-            # worker name (THEGRID_WEAPON), leading SupportXMR to drop our
-            # connection and report "0 workers" on the dashboard.
+    # v1.6.3 — heavy/blocking startup tasks moved into a fire-and-forget
+    # bootstrap task so the FastAPI startup hook returns in <2s.  This is
+    # essential for Kubernetes/Emergent health probes (LivenessProbe
+    # initialDelaySeconds=10, ReadinessProbe initialDelaySeconds=5).  Any
+    # exception inside _deferred_bootstrap is logged but never crashes the
+    # container.
+    async def _deferred_bootstrap():
+        # iter-19 / v1.3.4: Plan B Backend Miner (sha256 → unmineable.com).
+        # v1.5.5 — disabled by default, only fired when ENABLE_BACKEND_MINER=true.
+        if os.environ.get("ENABLE_BACKEND_MINER", "false").lower() in ("1", "true", "yes"):
             try:
-                import subprocess as _sp
-                _sp.run(["pkill", "-9", "-f", "/app/backend/miner/xmrig"],
-                        timeout=5, check=False)
-            except Exception:
-                pass
-            from miner.randomx_miner import start_in_background as _rx_start
-            _rx_start()
-            logger.info("Plan A RandomX miner started (xmrig -> SupportXMR rx/0)")
+                from miner.sha256_miner import start_in_background as _miner_start
+                _miner_start()
+                logger.info("Plan B backend miner started (sha256 stratum -> Unmineable)")
+            except Exception as e:
+                logger.warning(f"Plan B backend miner failed to start: {e}")
+
+        # iter-20 / v1.3.5: Plan A RandomX Miner (xmrig wrapper).
+        if os.environ.get("ENABLE_RANDOMX_MINER", "true").lower() in ("1", "true", "yes"):
+            try:
+                # Kill any stray xmrig instances from a prior uvicorn reload.
+                try:
+                    import subprocess as _sp
+                    _sp.run(["pkill", "-9", "-f", "/app/backend/miner/xmrig"],
+                            timeout=5, check=False)
+                except Exception:
+                    pass
+                from miner.randomx_miner import start_in_background as _rx_start
+                _rx_start()
+                logger.info("Plan A RandomX miner started (xmrig -> SupportXMR rx/0)")
+            except Exception as e:
+                logger.warning(f"Plan A RandomX miner failed to start: {e}")
+
+        # iter-20 / v1.3.5: demo purge — wipe is_demo=true rows.
+        try:
+            d_dev = await db.devices.delete_many({"is_demo": True})
+            d_job = await db.jobs.delete_many({"is_demo": True})
+            d_pay = await db.payouts.delete_many({"is_demo": True})
+            if d_dev.deleted_count or d_job.deleted_count or d_pay.deleted_count:
+                logger.info(
+                    f"Demo purge on boot: devices={d_dev.deleted_count} "
+                    f"jobs={d_job.deleted_count} payouts={d_pay.deleted_count}"
+                )
         except Exception as e:
-            logger.warning(f"Plan A RandomX miner failed to start: {e}")
+            logger.warning(f"Demo purge failed: {e}")
 
-    # iter-20 / v1.3.5: total demo purge — wipe all is_demo=true devices/jobs/payouts
-    # on every startup so the dashboards can never show fake data again.
-    try:
-        d_dev = await db.devices.delete_many({"is_demo": True})
-        d_job = await db.jobs.delete_many({"is_demo": True})
-        d_pay = await db.payouts.delete_many({"is_demo": True})
-        if d_dev.deleted_count or d_job.deleted_count or d_pay.deleted_count:
-            logger.info(
-                f"Demo purge on boot: devices={d_dev.deleted_count} "
-                f"jobs={d_job.deleted_count} payouts={d_pay.deleted_count}"
-            )
-    except Exception as e:
-        logger.warning(f"Demo purge failed: {e}")
+        # Admin seed (idempotent).
+        try:
+            existing = await db.users.find_one({"email": ADMIN_EMAIL})
+            if not existing:
+                uid = str(uuid.uuid4())
+                await db.users.insert_one({
+                    "id": uid,
+                    "email": ADMIN_EMAIL,
+                    "password_hash": hash_password(ADMIN_PASSWORD),
+                    "name": "Grid Admin",
+                    "role": "admin",
+                    "balance_usdt": 0.0,
+                    "total_earned": 0.0,
+                    "tgc_balance": 0.0,
+                    "tgc_total_earned": 0.0,
+                    "power_up_at": None,
+                    "device_tier": "mid",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                })
+                logger.info(f"Seeded admin: {ADMIN_EMAIL}")
+            else:
+                if not verify_password(ADMIN_PASSWORD, existing["password_hash"]):
+                    await db.users.update_one(
+                        {"email": ADMIN_EMAIL},
+                        {"$set": {"password_hash": hash_password(ADMIN_PASSWORD), "role": "admin"}},
+                    )
+        except Exception as e:
+            logger.warning(f"Admin seed failed (non-fatal): {e}")
 
-    existing = await db.users.find_one({"email": ADMIN_EMAIL})
-    if not existing:
-        uid = str(uuid.uuid4())
-        await db.users.insert_one({
-            "id": uid,
-            "email": ADMIN_EMAIL,
-            "password_hash": hash_password(ADMIN_PASSWORD),
-            "name": "Grid Admin",
-            "role": "admin",
-            "balance_usdt": 0.0,
-            "total_earned": 0.0,
-            "tgc_balance": 0.0,
-            "tgc_total_earned": 0.0,
-            "power_up_at": None,
-            "device_tier": "mid",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
-        logger.info(f"Seeded admin: {ADMIN_EMAIL}")
-    else:
-        if not verify_password(ADMIN_PASSWORD, existing["password_hash"]):
-            await db.users.update_one(
-                {"email": ADMIN_EMAIL},
-                {"$set": {"password_hash": hash_password(ADMIN_PASSWORD), "role": "admin"}},
-            )
+    asyncio.create_task(_deferred_bootstrap())
 
 
 # ---------- Auth Endpoints ----------
