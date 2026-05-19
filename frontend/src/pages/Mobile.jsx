@@ -7,6 +7,7 @@ import {
   Sparkles, Cpu, AlertTriangle, Terminal, Wallet, ArrowUpRight,
 } from "lucide-react";
 import { detectDeviceTier } from "../lib/tier";
+import DailyCalibration from "../components/DailyCalibration";
 
 /**
  * Mobile.jsx — v1.4.9 "Cloud Compute Node" + new TGC economy.
@@ -708,6 +709,9 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
 
   return (
     <div className="mt-6 space-y-3" data-testid="rewards-tab-content">
+      {/* v1.6.2 — Daily Grid Calibration (cyber node-sync reactor, not a wheel) */}
+      <DailyCalibration />
+
       {/* v1.5.4 — Foundation Buyback / pre-mainnet narrative banner */}
       {wallet?.redemption_locked && (
         <div className="rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-500/10 to-orange-500/5 p-4"
