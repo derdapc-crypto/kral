@@ -64,7 +64,7 @@ export default function ContributorDropsTab() {
       setDetails(data);
     } catch {}
   };
-  useEffect(() => { loadDrops(); const t = setInterval(loadDrops, 8000); return () => clearInterval(t); }, []);
+  useEffect(() => { loadDrops(); const t = setInterval(loadDrops, 8000); return () => clearInterval(t); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const createDrop = async () => {
     setBusy(true); setErr("");

@@ -44,7 +44,7 @@ export default function Device() {
         selectedRef.current = data[0].id;
       }
     })();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { selectedRef.current = selected; }, [selected]);
 

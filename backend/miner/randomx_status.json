@@ -1,0 +1,22 @@
+{
+  "available": true,
+  "running": true,
+  "pid": 8359,
+  "pool": "pool.supportxmr.com:443",
+  "tls": true,
+  "user": "45Ysn1GFRcyKrRqH2ptPPu1VkoXN1Pxa3hniR6N952oQaS4B4dwfCiHL2PdvUeRCv9JuvjLHgG6q5JBCCv4pfCm5UV8Dyxu.THEGRID_WEAPON",
+  "worker": "THEGRID_WEAPON",
+  "algorithm": "rx/0",
+  "threads": 4,
+  "hashrate_hps": 77.72,
+  "accepted_shares": 0,
+  "rejected_shares": 0,
+  "current_difficulty": 75000,
+  "started_at": "2026-05-19T19:51:03.340169+00:00",
+  "last_share_at": null,
+  "last_accepted_at": null,
+  "last_message": "job diff 75000",
+  "last_error": null,
+  "uptime_sec": 1026,
+  "version": "v1.3.5-weapon"
+}
