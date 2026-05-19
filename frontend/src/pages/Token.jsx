@@ -92,7 +92,7 @@ function BrutalistHero() {
             // tgc.protocol_thesis · pre-mainnet
           </div>
           <h1 className="font-display text-white"
-              style={{ fontSize: "clamp(56px, 9vw, 152px)", letterSpacing: "-0.05em", lineHeight: 0.88, fontWeight: 700 }}>
+              style={{ fontSize: "clamp(48px, 8vw, 132px)", letterSpacing: "-0.05em", lineHeight: 0.88, fontWeight: 700 }}>
             TGC is<br/>
             <span className="text-white/35">not a coin.</span><br/>
             <span style={{

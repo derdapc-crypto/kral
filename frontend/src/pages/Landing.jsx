@@ -183,9 +183,9 @@ function Hero({ scarcity, apk }) {
             </span>
           </div>
 
-          <h1 className="font-display text-white"
+          <h1 className="font-display text-white break-words"
               style={{
-                fontSize: "clamp(56px, 8.4vw, 124px)",
+                fontSize: "clamp(48px, 7.2vw, 108px)",
                 lineHeight: "0.92",
                 letterSpacing: "-0.045em",
                 fontWeight: 600,
@@ -462,7 +462,7 @@ function ScarcityConsole({ scarcity }) {
             </div>
             <div className="font-display tabular-nums leading-none"
                  style={{
-                   fontSize: "clamp(80px, 13vw, 200px)",
+                   fontSize: "clamp(72px, 11vw, 160px)",
                    letterSpacing: "-0.06em", fontWeight: 700,
                    background: "linear-gradient(180deg, #00ff88 0%, #00d9ff 100%)",
                    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
@@ -815,8 +815,8 @@ function FinalCTA({ apk }) {
         <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88] mb-8">
           // initialize.computation
         </div>
-        <h2 className="font-display text-white"
-            style={{ fontSize: "clamp(48px, 8vw, 128px)", letterSpacing: "-0.045em", fontWeight: 600, lineHeight: 0.92 }}>
+        <h2 className="font-display text-white break-words"
+            style={{ fontSize: "clamp(42px, 7vw, 112px)", letterSpacing: "-0.045em", fontWeight: 600, lineHeight: 0.92 }}>
           Join the<br/>
           <span style={{
             background: "linear-gradient(96deg, #00ff88, #00d9ff)",

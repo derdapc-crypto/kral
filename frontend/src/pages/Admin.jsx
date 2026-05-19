@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, Users, Briefcase, FileText, Cpu, Thermometer, Battery, Wifi, BatteryCharging, X, Check, Zap, Power, Coins, Terminal } from "lucide-react";
+import { Shield, AlertTriangle, CheckCircle2, CircleDollarSign, Radio, Globe2, Users, Briefcase, FileText, Cpu, Thermometer, Battery, Wifi, BatteryCharging, X, Check, Zap, Power, Coins, Terminal, Ban, RotateCcw, Gift } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Area, AreaChart } from "recharts";
 import RealAndroidDevices from "../components/RealAndroidDevices";
 import BootSequence from "../components/BootSequence";
@@ -59,19 +59,22 @@ export default function Admin() {
   const [ledger, setLedger] = useState(null);
   const [autoMining, setAutoMining] = useState(true);
   const [hashrate, setHashrate] = useState({ series: [], total_hashrate_hps: 0, total_tasks: 0 });
+  const [buybacks, setBuybacks] = useState([]);
   const [msg, setMsg] = useState("");
 
   const load = async () => {
     try {
-      const [d, u, p, f, s, j, l, am, hr] = await Promise.all([
+      const [d, u, p, f, s, j, l, am, hr, bb] = await Promise.all([
         api.get("/admin/devices"), api.get("/admin/users"), api.get("/admin/payouts"),
         api.get("/admin/fraud"), api.get("/stats/network"),
         api.get("/admin/jobs"), api.get("/admin/ledger"),
         api.get("/admin/auto-mining"), api.get("/admin/hashrate"),
+        api.get("/admin/buybacks"),
       ]);
       setDevices(d.data); setUsers(u.data); setPayouts(p.data); setFraud(f.data);
       setStats(s.data); setJobs(j.data); setLedger(l.data);
       setAutoMining(am.data.enabled); setHashrate(hr.data);
+      setBuybacks(bb.data || []);
     } catch (e) { setMsg(formatApiError(e)); }
   };
 
@@ -96,6 +99,25 @@ export default function Admin() {
   const unflag = async (id) => { await api.post(`/admin/devices/${id}/unflag`); load(); };
   const approveJob = async (id) => { await api.post(`/admin/jobs/${id}/approve`); load(); };
   const rejectJob = async (id) => { await api.post(`/admin/jobs/${id}/reject`); load(); };
+  const banUser = async (id, email) => {
+    if (!window.confirm(`Suspend ${email}?\nThe account will no longer be able to log in or submit verified output.`)) return;
+    try { await api.post(`/admin/users/${id}/ban`); load(); }
+    catch (e) { setMsg(formatApiError(e)); }
+  };
+  const unbanUser = async (id) => {
+    try { await api.post(`/admin/users/${id}/unban`); load(); }
+    catch (e) { setMsg(formatApiError(e)); }
+  };
+  const approveBuyback = async (id, tgc) => {
+    if (!window.confirm(`Approve buyback?\n${Number(tgc || 0).toFixed(2)} TGC will be PERMANENTLY burned from the contributor's ledger.`)) return;
+    try { await api.post(`/admin/buybacks/${id}/approve`); load(); }
+    catch (e) { setMsg(formatApiError(e)); }
+  };
+  const rejectBuyback = async (id) => {
+    if (!window.confirm("Reject this buyback application? No TGC will be deducted.")) return;
+    try { await api.post(`/admin/buybacks/${id}/reject`); load(); }
+    catch (e) { setMsg(formatApiError(e)); }
+  };
 
   // Map dots — deterministic pseudo locations based on device id
   const mapDots = useMemo(() => {
@@ -107,6 +129,7 @@ export default function Admin() {
   }, [devices]);
 
   const pendingJobs = jobs.filter(j => j.status === "pending").length;
+  const pendingBuybacks = buybacks.filter(b => b.status === "pending").length;
 
   return (
     <BootSequence>
@@ -162,6 +185,11 @@ export default function Admin() {
             <Tab active={tab === "payouts"} onClick={() => setTab("payouts")} testId="admin-tab-payouts">Payouts</Tab>
             <Tab active={tab === "fraud"} onClick={() => setTab("fraud")} testId="admin-tab-fraud">Fraud Shield</Tab>
             <Tab active={tab === "users"} onClick={() => setTab("users")} testId="admin-tab-users">Users</Tab>
+            <Tab active={tab === "buybacks"} onClick={() => setTab("buybacks")} testId="admin-tab-buybacks">
+              <span className="inline-flex items-center gap-1.5"><Gift className="w-3 h-3" /> Buybacks
+                {pendingBuybacks > 0 && <span className="ml-1 inline-block px-1.5 py-0 rounded-full bg-[#39ff14]/30 text-[#39ff14] text-[9px] font-bold">{pendingBuybacks}</span>}
+              </span>
+            </Tab>
             <Tab active={tab === "drops"} onClick={() => setTab("drops")} testId="admin-tab-drops">Contributor Drops</Tab>
           </div>
         </div>
@@ -466,24 +494,128 @@ export default function Admin() {
 
         {tab === "users" && (
           <div className="rounded-3xl glass p-6 overflow-auto">
-            <table className="w-full text-sm" data-testid="admin-users-table">
+            <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
+              <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/45 flex items-center gap-2">
+                <Users className="w-3.5 h-3.5 text-[#00ff88]" /> contributor_ledger · {users.length} accounts
+              </div>
+              <div className="text-[10px] uppercase tracking-[0.25em] text-white/40 font-mono">
+                {users.filter(u => u.is_banned).length} suspended
+              </div>
+            </div>
+            <table className="w-full text-sm min-w-[820px]" data-testid="admin-users-table">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-[0.25em] text-white/40 border-b border-white/5">
-                  <th className="py-3">Name</th><th>Email</th><th>Role</th><th>Balance</th><th>Total Earned</th>
+                  <th className="py-3">Name</th><th>Email</th><th>Role</th>
+                  <th className="text-right">TGC Balance</th>
+                  <th className="text-right">USDT Balance</th>
+                  <th>Status</th><th></th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <tr key={u.id} className="border-b border-white/5">
-                    <td className="py-3">{u.name}{u.company ? <span className="text-white/40 text-[10px] block">{u.company}</span> : null}</td>
-                    <td className="text-white/60 text-xs">{u.email}</td>
-                    <td><span className={`text-[10px] uppercase tracking-widest ${u.role === "admin" ? "text-[#F2C94C]" : u.role === "customer" ? "text-purple-300" : "text-white/60"}`}>{u.role}</span></td>
-                    <td className="font-mono-num">{(u.balance_usdt || 0).toFixed(4)}</td>
-                    <td className="font-mono-num">{(u.total_earned || 0).toFixed(4)}</td>
+                  <tr key={u.id} className={`border-b border-white/5 ${u.is_banned ? "bg-red-500/[0.04]" : ""}`} data-testid={`admin-user-row-${u.id}`}>
+                    <td className="py-3">
+                      <div className="text-white">{u.name}</div>
+                      {u.company ? <span className="text-white/40 text-[10px] block">{u.company}</span> : null}
+                    </td>
+                    <td className="text-white/60 text-xs font-mono">{u.email}</td>
+                    <td>
+                      <span className={`text-[10px] uppercase tracking-widest ${u.role === "admin" ? "text-[#F2C94C]" : u.role === "customer" ? "text-purple-300" : "text-white/60"}`}>{u.role || "user"}</span>
+                    </td>
+                    <td className="text-right font-mono-num text-[#00ff88]" data-testid={`user-tgc-${u.id}`}>{(u.tgc_balance || 0).toFixed(4)}</td>
+                    <td className="text-right font-mono-num text-white/80">{(u.balance_usdt || 0).toFixed(4)}</td>
+                    <td>
+                      {u.is_banned
+                        ? <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full border border-red-400/40 text-red-400 inline-flex items-center gap-1"><Ban className="w-3 h-3" /> suspended</span>
+                        : <span className="text-[10px] uppercase tracking-widest text-[#00ff88]">active</span>}
+                    </td>
+                    <td className="text-right">
+                      {u.role === "admin" ? (
+                        <span className="text-[10px] uppercase tracking-widest text-white/30">—</span>
+                      ) : u.is_banned ? (
+                        <button onClick={() => unbanUser(u.id)} data-testid={`unban-${u.id}`}
+                          className="inline-flex items-center gap-1.5 text-[10px] tracking-widest uppercase px-3 py-1.5 rounded-full border border-[#00ff88]/40 text-[#00ff88] hover:bg-[#00ff88]/10 transition">
+                          <RotateCcw className="w-3 h-3" /> reinstate
+                        </button>
+                      ) : (
+                        <button onClick={() => banUser(u.id, u.email)} data-testid={`ban-${u.id}`}
+                          className="inline-flex items-center gap-1.5 text-[10px] tracking-widest uppercase px-3 py-1.5 rounded-full border border-red-400/40 text-red-400 hover:bg-red-400/10 transition">
+                          <Ban className="w-3 h-3" /> suspend
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
+                {users.length === 0 && <tr><td colSpan={7} className="text-center py-10 text-white/40">No contributors registered.</td></tr>}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {tab === "buybacks" && (
+          <div className="rounded-3xl glass p-6">
+            <div className="flex items-center gap-3 mb-6 flex-wrap">
+              <Gift className="w-6 h-6 text-[#00ff88]" />
+              <div className="flex-1 min-w-[240px]">
+                <div className="font-display text-xl font-bold">Foundation · Buyback Approvals</div>
+                <div className="text-sm text-white/50">Approving an application <span className="text-red-400">permanently burns</span> the contributor's eligibility TGC. Settlement is off-platform.</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Pending</div>
+                <div className="text-2xl font-mono-num text-[#00ff88]" data-testid="buyback-pending-count">{pendingBuybacks}</div>
+              </div>
+            </div>
+            <div className="space-y-3" data-testid="admin-buyback-list">
+              {buybacks.length === 0 && <div className="text-center py-12 text-white/40 text-sm">No buyback applications yet.</div>}
+              {buybacks.map((b) => {
+                const isPending = b.status === "pending" || b.status === "reviewing";
+                const statusColor = b.status === "approved" ? "text-[#00ff88] border-[#00ff88]/40"
+                  : b.status === "rejected" ? "text-red-400 border-red-400/40"
+                  : "text-yellow-300 border-yellow-300/40";
+                return (
+                  <div key={b.id} className="p-5 rounded-2xl bg-black/40 border border-white/10" data-testid={`buyback-${b.id}`}>
+                    <div className="flex flex-wrap justify-between gap-3">
+                      <div className="flex-1 min-w-[260px]">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <div className="font-display font-bold text-base text-white">{b.user_email || b.user_id?.slice(0, 8)}</div>
+                          <span className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full border ${statusColor}`}>{b.status}</span>
+                          <span className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{b.window_label}</span>
+                        </div>
+                        <div className="mt-1 text-xs text-white/50 flex items-center gap-3 flex-wrap font-mono">
+                          <span>{b.payout_network || "—"}</span>
+                          <span className="text-white/30">·</span>
+                          <span className="text-white/40 truncate max-w-[280px]">{b.payout_wallet || "no wallet"}</span>
+                          {b.notes ? <><span className="text-white/30">·</span><span className="italic">"{b.notes}"</span></> : null}
+                        </div>
+                        <div className="mt-1 text-[10px] text-white/35 font-mono">
+                          submitted {b.created_at?.slice(0, 19).replace("T", " ")}
+                          {b.approved_at ? ` · approved ${b.approved_at.slice(0, 19).replace("T", " ")}` : ""}
+                          {b.rejected_at ? ` · rejected ${b.rejected_at.slice(0, 19).replace("T", " ")}` : ""}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">TGC at apply</div>
+                        <div className="font-mono-num text-[#00ff88] text-lg">{Number(b.tgc_balance_at_apply || 0).toFixed(2)}</div>
+                        <div className="text-[10px] text-white/40">burn on approve: <span className="text-red-300">−{Number(b.target_tgc || 0).toFixed(0)} TGC</span></div>
+                        {b.burned_tgc ? <div className="text-[10px] text-red-300 mt-1">burned: {Number(b.burned_tgc).toFixed(2)} TGC</div> : null}
+                      </div>
+                    </div>
+                    {isPending && (
+                      <div className="mt-4 flex gap-2">
+                        <button onClick={() => approveBuyback(b.id, b.target_tgc)} data-testid={`buyback-approve-${b.id}`}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#00ff88] to-[#00d9ff] text-black font-semibold text-xs">
+                          <Check className="w-3.5 h-3.5" /> Approve &amp; Burn TGC
+                        </button>
+                        <button onClick={() => rejectBuyback(b.id)} data-testid={`buyback-reject-${b.id}`}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-red-400/30 text-red-400 text-xs hover:bg-red-400/10">
+                          <X className="w-3.5 h-3.5" /> Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

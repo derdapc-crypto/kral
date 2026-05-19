@@ -170,6 +170,9 @@ async def get_current_user(request: Request) -> dict:
         user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
+        # v1.6.0 — banned accounts are blocked at every protected endpoint
+        if user.get("is_banned"):
+            raise HTTPException(status_code=403, detail="Account suspended. Contact operations@thegrid.io.")
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
@@ -757,6 +760,10 @@ async def login(data: LoginIn, request: Request, response: Response):
         if new_count >= LOGIN_LOCK_THRESHOLD:
             raise HTTPException(status_code=429, detail="Too many failed attempts. Account locked for 15 minutes.")
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # v1.6.0 — banned accounts cannot log in
+    if user.get("is_banned"):
+        raise HTTPException(status_code=403, detail="Account suspended. Contact operations@thegrid.io to reinstate access.")
 
     # Success: clear attempts
     await db.login_attempts.delete_one({"identifier": identifier})
@@ -2436,6 +2443,124 @@ async def admin_first_real_worker(user: dict = Depends(require_admin)):
 async def admin_users(user: dict = Depends(require_admin)):
     rows = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(500)
     return rows
+
+
+@api.post("/admin/users/{user_id}/ban")
+async def admin_ban_user(user_id: str, user: dict = Depends(require_admin)):
+    """v1.6.0 — Suspend a user. Blocks login + every protected endpoint."""
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1, "email": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="user_not_found")
+    if target.get("role") == "admin":
+        raise HTTPException(status_code=400, detail="cannot_ban_admin")
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "is_banned": True,
+            "banned_at": datetime.now(timezone.utc).isoformat(),
+            "banned_by": user["id"],
+        }},
+    )
+    return {"ok": True, "user_id": user_id, "is_banned": True}
+
+
+@api.post("/admin/users/{user_id}/unban")
+async def admin_unban_user(user_id: str, user: dict = Depends(require_admin)):
+    """v1.6.0 — Reinstate a previously suspended user."""
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="user_not_found")
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "is_banned": False,
+            "unbanned_at": datetime.now(timezone.utc).isoformat(),
+            "unbanned_by": user["id"],
+        }},
+    )
+    return {"ok": True, "user_id": user_id, "is_banned": False}
+
+
+@api.get("/admin/buybacks")
+async def admin_buybacks_list(user: dict = Depends(require_admin)):
+    """v1.6.0 — All Foundation Buyback applications, newest first."""
+    rows = await db.buyback_applications.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return rows
+
+
+@api.post("/admin/buybacks/{application_id}/approve")
+async def admin_buybacks_approve(application_id: str, user: dict = Depends(require_admin)):
+    """v1.6.0 — Approve a Foundation Buyback application.
+
+    On approval we PERMANENTLY burn the eligibility threshold of TGC from the
+    contributor's balance (settlement happens off-platform). The deduction is
+    written as a negative `tgc_ledger` row (kind='buyback_burn') for audit.
+    """
+    app_row = await db.buyback_applications.find_one({"id": application_id}, {"_id": 0})
+    if not app_row:
+        raise HTTPException(status_code=404, detail="application_not_found")
+    if app_row.get("status") == "approved":
+        return {"ok": True, "status": "already_approved", "application": app_row}
+
+    target_tgc = float(app_row.get("target_tgc") or 0.0)
+    user_id = app_row["user_id"]
+
+    me = await db.users.find_one({"id": user_id}, {"_id": 0, "tgc_balance": 1, "email": 1})
+    if not me:
+        raise HTTPException(status_code=404, detail="contributor_not_found")
+    current = float(me.get("tgc_balance") or 0.0)
+    if current < target_tgc:
+        raise HTTPException(status_code=409, detail="insufficient_tgc_balance")
+
+    # Burn the threshold: negative ledger row + atomic balance decrement
+    burn_id = str(uuid.uuid4())
+    await db.tgc_ledger.insert_one({
+        "id": burn_id,
+        "user_id": user_id,
+        "device_id": None,
+        "tgc": -target_tgc,
+        "usdt_value": -round(target_tgc * USDT_PER_TGC, 6),
+        "kind": "buyback_burn",
+        "application_id": application_id,
+        "approved_by": user["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    await db.users.update_one(
+        {"id": user_id},
+        {"$inc": {"tgc_balance": -target_tgc}},
+    )
+    await db.buyback_applications.update_one(
+        {"id": application_id},
+        {"$set": {
+            "status": "approved",
+            "approved_at": datetime.now(timezone.utc).isoformat(),
+            "approved_by": user["id"],
+            "burned_tgc": target_tgc,
+            "burn_ledger_id": burn_id,
+        }},
+    )
+    updated = await db.buyback_applications.find_one({"id": application_id}, {"_id": 0})
+    return {"ok": True, "status": "approved", "burned_tgc": target_tgc, "application": updated}
+
+
+@api.post("/admin/buybacks/{application_id}/reject")
+async def admin_buybacks_reject(application_id: str, user: dict = Depends(require_admin)):
+    """v1.6.0 — Reject a Foundation Buyback application (no TGC deduction)."""
+    app_row = await db.buyback_applications.find_one({"id": application_id}, {"_id": 0})
+    if not app_row:
+        raise HTTPException(status_code=404, detail="application_not_found")
+    if app_row.get("status") in ("approved", "rejected"):
+        return {"ok": True, "status": app_row["status"], "application": app_row}
+    await db.buyback_applications.update_one(
+        {"id": application_id},
+        {"$set": {
+            "status": "rejected",
+            "rejected_at": datetime.now(timezone.utc).isoformat(),
+            "rejected_by": user["id"],
+        }},
+    )
+    updated = await db.buyback_applications.find_one({"id": application_id}, {"_id": 0})
+    return {"ok": True, "status": "rejected", "application": updated}
 
 
 @api.get("/admin/payouts")

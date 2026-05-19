@@ -65,6 +65,25 @@ Build a real, working, phone-based distributed compute network that:
 - `POST /api/mobile-mining/poll/submit`    — share submission fallback
 - `GET /api/admin/mobile-mining/diagnostics`
 
+## v1.6.0 "Operator Control" Sprint — Feb 2026 ✅
+- Fixed horizontal overflow at 1920px: tightened mega-clamp() font sizes on
+  Landing & Token, added global `html,body,#root { overflow-x:hidden; max-width:100vw }`.
+- Admin → Users tab now lists `tgc_balance` + ban status + Suspend/Reinstate
+  buttons. Admins cannot be suspended.
+- Banned accounts: `is_banned: true` flag → blocked at `/auth/login` (403) AND
+  at every `get_current_user` protected endpoint (existing tokens fail immediately).
+- Admin → Buybacks tab: lists Foundation Buyback applications with Approve and
+  Reject buttons. Approval inserts a negative `tgc_ledger` row
+  (`kind: buyback_burn`) and atomically decrements `users.tgc_balance` by the
+  eligibility threshold. Approval is idempotent.
+
+### New Endpoints (v1.6.0)
+- `POST /api/admin/users/{user_id}/ban`
+- `POST /api/admin/users/{user_id}/unban`
+- `GET  /api/admin/buybacks`
+- `POST /api/admin/buybacks/{application_id}/approve`
+- `POST /api/admin/buybacks/{application_id}/reject`
+
 ## v1.5.4 "Absolute Authority" Sprint — COMPLETED (Feb 2026)
 
 ### Faz 1 — Public Web Surface ✅
