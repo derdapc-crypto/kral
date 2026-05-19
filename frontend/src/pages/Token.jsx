@@ -67,14 +67,14 @@ function SharedBg() {
 function TokenNav() {
   return (
     <header className="border-b border-white/[0.06] bg-black/55 backdrop-blur-xl sticky top-0 z-30" data-testid="token-nav">
-      <div className="max-w-[1400px] mx-auto px-6 lg:px-10 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-md border border-[#00ff88]/40 grid place-items-center bg-black">
-            <Cpu className="w-4 h-4 text-[#00ff88]" />
+      <div className="max-w-[1240px] mx-auto px-6 lg:px-8 h-14 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-md border border-[#00ff88]/40 grid place-items-center bg-black">
+            <Cpu className="w-3.5 h-3.5 text-[#00ff88]" />
           </div>
-          <div className="font-mono uppercase tracking-[0.3em] text-[12px]">the.grid <span className="text-white/40">/ tgc.protocol</span></div>
+          <div className="font-mono uppercase tracking-[0.3em] text-[11px]">the.grid <span className="text-white/40">/ tgc.protocol</span></div>
         </Link>
-        <Link to="/" className="font-mono uppercase tracking-[0.3em] text-[11px] text-white/55 hover:text-white">← back to overview</Link>
+        <Link to="/" className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/55 hover:text-white">← back to overview</Link>
       </div>
     </header>
   );
@@ -85,14 +85,14 @@ function TokenNav() {
 /* ============================================================ */
 function BrutalistHero() {
   return (
-    <section className="relative min-h-[78vh] flex items-center px-6 lg:px-10 py-32" data-testid="token-hero">
-      <div className="max-w-[1400px] mx-auto w-full grid lg:grid-cols-[1.4fr_1fr] gap-10 items-center">
+    <section className="relative min-h-[86vh] flex items-center px-6 lg:px-8 pt-20 pb-16" data-testid="token-hero">
+      <div className="max-w-[1240px] mx-auto w-full grid lg:grid-cols-[1.3fr_1fr] gap-10 items-center">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88] mb-8">
+          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88] mb-6">
             // tgc.protocol_thesis · pre-mainnet
           </div>
           <h1 className="font-display text-white"
-              style={{ fontSize: "clamp(48px, 8vw, 132px)", letterSpacing: "-0.05em", lineHeight: 0.88, fontWeight: 700 }}>
+              style={{ fontSize: "clamp(40px, 6vw, 96px)", letterSpacing: "-0.05em", lineHeight: 0.9, fontWeight: 700 }}>
             TGC is<br/>
             <span className="text-white/35">not a coin.</span><br/>
             <span style={{
@@ -101,7 +101,7 @@ function BrutalistHero() {
             }}>It is a record</span><br/>
             <span className="text-white/65">of useful compute.</span>
           </h1>
-          <p className="mt-10 text-white/55 text-[16px] leading-relaxed max-w-[520px]">
+          <p className="mt-8 text-white/55 text-[14px] leading-relaxed max-w-[480px]">
             A pre-mainnet contribution receipt. Cryptographically sealed.
             Conditional on verified network growth. Subject to community, legal,
             technical and ecosystem readiness — never to a calendar.
@@ -109,7 +109,8 @@ function BrutalistHero() {
         </motion.div>
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.9, delay: 0.15 }}
-                    className="relative aspect-square w-full max-w-[520px] lg:max-w-none mx-auto border border-white/[0.08]">
+                    className="relative aspect-square w-full max-w-[420px] lg:max-w-[480px] mx-auto border border-white/[0.08]"
+                    style={{ maxHeight: "min(60vh, 480px)" }}>
           <NetworkTopology className="w-full h-full" />
         </motion.div>
       </div>
@@ -128,24 +129,24 @@ function ReceiptFlow() {
     { k: "04", t: "RECEIPT",       s: "Sealed into the immutable contribution ledger." },
   ];
   return (
-    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="receipt-flow">
-      <div className="max-w-[1400px] mx-auto">
-        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-6">
+    <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06]" data-testid="receipt-flow">
+      <div className="max-w-[1240px] mx-auto">
+        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-5">
           // compute_time_receipt.flow
         </div>
-        <h2 className="font-display text-white max-w-[920px]"
-            style={{ fontSize: "clamp(36px, 5vw, 76px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+        <h2 className="font-display text-white max-w-[820px]"
+            style={{ fontSize: "clamp(28px, 3.6vw, 56px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
           Four stages. <span className="text-white/55">One sealed receipt.</span>
         </h2>
-        <div className="mt-14 grid md:grid-cols-4 gap-px bg-white/[0.06]" data-testid="flow-steps">
+        <div className="mt-10 grid md:grid-cols-4 gap-px bg-white/[0.06]" data-testid="flow-steps">
           {steps.map((s, i) => (
             <motion.div key={s.k}
                         initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.1 }}
-                        className="relative bg-black p-7 group">
+                        className="relative bg-black p-5 group">
               <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#00d9ff]/55">{s.k}</div>
-              <div className="mt-5 font-display font-bold text-[24px] text-white" style={{ letterSpacing: "-0.02em" }}>{s.t}</div>
-              <p className="mt-3 text-[13px] text-white/55 leading-relaxed">{s.s}</p>
+              <div className="mt-4 font-display font-bold text-[20px] text-white" style={{ letterSpacing: "-0.02em" }}>{s.t}</div>
+              <p className="mt-2 text-[12px] text-white/55 leading-relaxed">{s.s}</p>
               {i < steps.length - 1 && (
                 <ArrowRight className="hidden md:block absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#00ff88]/55 z-10 bg-black p-0.5 rounded-full border border-white/[0.06]" />
               )}
@@ -166,23 +167,23 @@ function SlotScarcity({ scarcity }) {
   const taken    = verified;
   const slots    = Array.from({ length: 240 }, (_, i) => i);
   return (
-    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="slot-scarcity">
-      <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[0.95fr_1.05fr] gap-12">
+    <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06]" data-testid="slot-scarcity">
+      <div className="max-w-[1240px] mx-auto grid lg:grid-cols-[0.95fr_1.05fr] gap-10">
         <div>
-          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-amber-300/85 mb-6">
+          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-amber-300/85 mb-5">
             // network.scarcity
           </div>
           <h2 className="font-display text-white"
-              style={{ fontSize: "clamp(38px, 5vw, 76px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+              style={{ fontSize: "clamp(28px, 3.6vw, 56px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
             Slots are <span className="text-amber-300">finite</span>.<br/>
             Inflation is <span className="text-white/55">forbidden</span>.
           </h2>
-          <div className="mt-10 grid grid-cols-3 gap-px bg-white/[0.06] max-w-[480px]" data-testid="scarcity-stats">
+          <div className="mt-8 grid grid-cols-3 gap-px bg-white/[0.06] max-w-[420px]" data-testid="scarcity-stats">
             <StatCell k="VERIFIED"  v={verified.toLocaleString()} tone="matrix" />
             <StatCell k="TARGET"    v={target.toLocaleString()}    tone="cyan" />
             <StatCell k="REMAINING" v={(target - taken).toLocaleString()} tone="amber" />
           </div>
-          <p className="mt-8 text-white/55 max-w-[480px] leading-relaxed">
+          <p className="mt-6 text-white/55 max-w-[420px] leading-relaxed text-[13px]">
             Each lit cell represents a verified active edge node.
             The protocol never inflates supply ahead of real network growth.
           </p>
@@ -211,9 +212,9 @@ function SlotScarcity({ scarcity }) {
 function StatCell({ k, v, tone }) {
   const color = tone === "matrix" ? "#00ff88" : tone === "cyan" ? "#00d9ff" : tone === "amber" ? "#fbbf24" : "#f5f7fa";
   return (
-    <div className="bg-black px-4 py-3">
+    <div className="bg-black px-3 py-2.5">
       <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">{k}</div>
-      <div className="font-mono font-bold text-[18px] mt-1 tabular-nums" style={{ color }}>{v}</div>
+      <div className="font-mono font-bold text-[15px] mt-1 tabular-nums" style={{ color }}>{v}</div>
     </div>
   );
 }
@@ -232,21 +233,21 @@ function DripCurve() {
   });
   const path = "M " + pts.map(p => p.join(" ")).join(" L ");
   return (
-    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="drip-curve">
-      <div className="max-w-[1400px] mx-auto">
-        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#6c7bff] mb-6">
+    <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06]" data-testid="drip-curve">
+      <div className="max-w-[1240px] mx-auto">
+        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#6c7bff] mb-5">
           // radical.scarcity_curve
         </div>
-        <h2 className="font-display text-white max-w-[920px]"
-            style={{ fontSize: "clamp(36px, 5vw, 76px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+        <h2 className="font-display text-white max-w-[820px]"
+            style={{ fontSize: "clamp(28px, 3.6vw, 56px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
           Drip per node decays as the network grows.
         </h2>
-        <p className="mt-6 text-white/55 max-w-[640px]">
+        <p className="mt-5 text-white/55 max-w-[560px] text-[14px]">
           Per-device daily contribution is capped between
           <span className="text-white"> 0.05 – 0.30 TGC</span>. As the network expands, the curve
           tightens — radical scarcity by design.
         </p>
-        <div className="mt-12 border border-white/[0.08] p-6 bg-black/40">
+        <div className="mt-10 border border-white/[0.08] p-5 bg-black/40">
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
             {/* grid lines */}
             {[0.25, 0.5, 0.75].map((g) => (
@@ -289,17 +290,17 @@ function DripCurve() {
 /* ============================================================ */
 function BuybackTerminal() {
   return (
-    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="buyback-terminal">
-      <div className="max-w-[1400px] mx-auto">
-        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#6c7bff] mb-6">
+    <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06]" data-testid="buyback-terminal">
+      <div className="max-w-[1240px] mx-auto">
+        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#6c7bff] mb-5">
           // foundation.buyback_program
         </div>
-        <h2 className="font-display text-white max-w-[920px]"
-            style={{ fontSize: "clamp(38px, 5vw, 76px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+        <h2 className="font-display text-white max-w-[820px]"
+            style={{ fontSize: "clamp(28px, 3.6vw, 56px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
           A policy window. <span className="text-white/55">Not a price guarantee.</span>
         </h2>
 
-        <div className="mt-12 border border-white/[0.08] bg-black/70 backdrop-blur-xl">
+        <div className="mt-10 border border-white/[0.08] bg-black/70 backdrop-blur-xl">
           <div className="flex items-center gap-3 px-5 py-3 border-b border-white/[0.08] font-mono uppercase text-[10px] tracking-[0.3em] text-white/55">
             <span className="w-2 h-2 rounded-full bg-amber-300 motion-telemetry-blink" />
             <span>foundation.buyback_window · status feed</span>
@@ -347,17 +348,17 @@ function RoadmapTimeline() {
     { k: "05", t: "MAINNET CANDIDATE",           s: "Conditional on all readiness gates being satisfied.",         state: "pending" },
   ];
   return (
-    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="roadmap-timeline">
-      <div className="max-w-[1400px] mx-auto">
-        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00d9ff]/85 mb-6">
+    <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06]" data-testid="roadmap-timeline">
+      <div className="max-w-[1240px] mx-auto">
+        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00d9ff]/85 mb-5">
           // protocol.milestone_roadmap
         </div>
-        <h2 className="font-display text-white max-w-[920px]"
-            style={{ fontSize: "clamp(38px, 5vw, 76px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+        <h2 className="font-display text-white max-w-[820px]"
+            style={{ fontSize: "clamp(28px, 3.6vw, 56px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
           Milestones, not dates.
         </h2>
 
-        <div className="mt-14 relative pl-10 border-l border-white/[0.08]">
+        <div className="mt-10 relative pl-8 border-l border-white/[0.08]">
           {phases.map((p, i) => {
             const active = p.state === "active";
             return (
@@ -400,18 +401,18 @@ function RiskClarity() {
     "Subject to verification, treasury availability, risk review and regional eligibility.",
   ];
   return (
-    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="risk-clarity">
-      <div className="max-w-[1400px] mx-auto">
-        <div className="flex items-center gap-3 font-mono uppercase tracking-[0.4em] text-[10px] text-amber-300 mb-6">
+    <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06]" data-testid="risk-clarity">
+      <div className="max-w-[1240px] mx-auto">
+        <div className="flex items-center gap-3 font-mono uppercase tracking-[0.4em] text-[10px] text-amber-300 mb-5">
           <AlertTriangle className="w-3 h-3" /> // risk.clarity.note
         </div>
         <h2 className="font-display text-white"
-            style={{ fontSize: "clamp(32px, 4vw, 56px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
+            style={{ fontSize: "clamp(26px, 3vw, 44px)", letterSpacing:"-0.04em", lineHeight: 0.95, fontWeight: 600 }}>
           Read this section before participating.
         </h2>
-        <div className="mt-10 grid md:grid-cols-2 gap-px bg-white/[0.06]">
+        <div className="mt-8 grid md:grid-cols-2 gap-px bg-white/[0.06]">
           {clauses.map((c, i) => (
-            <div key={i} className="bg-black px-5 py-5 font-mono text-[12px] uppercase tracking-[0.18em] text-white/60 leading-relaxed">
+            <div key={i} className="bg-black px-4 py-4 font-mono text-[11px] uppercase tracking-[0.18em] text-white/60 leading-relaxed">
               <span className="text-amber-300/75 mr-2">{(i+1).toString().padStart(2,"0")}.</span>
               {c}
             </div>
@@ -428,8 +429,8 @@ function RiskClarity() {
 
 function FooterStrip() {
   return (
-    <footer className="border-t border-white/[0.06] px-6 lg:px-10 py-10 text-[11px] font-mono uppercase tracking-[0.3em] text-white/30">
-      <div className="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-3">
+    <footer className="border-t border-white/[0.06] px-6 lg:px-8 py-8 text-[10px] font-mono uppercase tracking-[0.3em] text-white/30">
+      <div className="max-w-[1240px] mx-auto flex flex-wrap items-center justify-between gap-3">
         <span>// tgc.protocol · pre-mainnet contribution phase</span>
         <Link to="/" className="hover:text-white">return to overview <ChevronRight className="inline w-3 h-3" /></Link>
       </div>

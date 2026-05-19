@@ -129,17 +129,17 @@ function NavBar({ apk }) {
   return (
     <header className="fixed top-0 inset-x-0 z-40 border-b border-white/[0.06] bg-black/55 backdrop-blur-xl"
             data-testid="nav-bar">
-      <div className="max-w-[1400px] mx-auto px-6 lg:px-10 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3" data-testid="nav-home">
-          <div className="w-8 h-8 rounded-md border border-[#00ff88]/40 grid place-items-center bg-black">
-            <Cpu className="w-4 h-4 text-[#00ff88]" />
+      <div className="max-w-[1240px] mx-auto px-6 lg:px-8 h-14 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2.5" data-testid="nav-home">
+          <div className="w-7 h-7 rounded-md border border-[#00ff88]/40 grid place-items-center bg-black">
+            <Cpu className="w-3.5 h-3.5 text-[#00ff88]" />
           </div>
-          <div className="font-mono uppercase tracking-[0.3em] text-[12px] text-white">the.grid</div>
-          <span className="hidden sm:inline-block text-[10px] uppercase tracking-[0.3em] text-white/35 border-l border-white/10 pl-3 ml-1">
+          <div className="font-mono uppercase tracking-[0.3em] text-[11px] text-white">the.grid</div>
+          <span className="hidden sm:inline-block text-[9px] uppercase tracking-[0.3em] text-white/35 border-l border-white/10 pl-2.5 ml-1">
             distributed compute · pre-mainnet
           </span>
         </Link>
-        <nav className="hidden md:flex items-center gap-7 text-[12px] uppercase tracking-[0.25em] text-white/65">
+        <nav className="hidden md:flex items-center gap-5 text-[11px] uppercase tracking-[0.25em] text-white/65">
           <a href="#network"  className="hover:text-white transition">network</a>
           <a href="#protocol" className="hover:text-white transition">protocol</a>
           <a href="#deploy"   className="hover:text-white transition">deploy</a>
@@ -147,11 +147,11 @@ function NavBar({ apk }) {
           <Link to="/customer"className="hover:text-white transition">enterprise</Link>
         </nav>
         <div className="flex items-center gap-2">
-          <Link to="/login" className="text-[12px] uppercase tracking-[0.25em] text-white/55 hover:text-white px-3 py-1.5"
+          <Link to="/login" className="text-[11px] uppercase tracking-[0.25em] text-white/55 hover:text-white px-2.5 py-1.5"
                 data-testid="nav-signin">sign in</Link>
           <a href={apk?.download_url || "#deploy"}
              data-testid="nav-deploy"
-             className="text-[11px] font-mono uppercase tracking-[0.3em] px-4 py-2 rounded-md bg-[#00ff88] text-black font-bold
+             className="text-[10px] font-mono uppercase tracking-[0.3em] px-3 py-1.5 rounded-md bg-[#00ff88] text-black font-bold
                         shadow-[0_0_24px_-4px_rgba(0,255,136,0.55)] hover:shadow-[0_0_36px_-4px_rgba(0,255,136,0.85)] transition">
             deploy node
           </a>
@@ -169,8 +169,8 @@ function Hero({ scarcity, apk }) {
   const phase    = (scarcity?.phase || "growth").toUpperCase();
 
   return (
-    <section className="relative min-h-screen flex items-center pt-24 pb-16 px-6 lg:px-10" data-testid="hero">
-      <div className="max-w-[1400px] mx-auto w-full grid lg:grid-cols-[1.05fr_0.95fr] gap-10 lg:gap-14 items-center">
+    <section className="relative min-h-[88vh] flex items-center pt-20 pb-12 px-6 lg:px-8" data-testid="hero">
+      <div className="max-w-[1240px] mx-auto w-full grid lg:grid-cols-[1.1fr_0.9fr] gap-8 lg:gap-12 items-center">
 
         {/* LEFT — Brutalist headline */}
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
@@ -185,8 +185,8 @@ function Hero({ scarcity, apk }) {
 
           <h1 className="font-display text-white break-words"
               style={{
-                fontSize: "clamp(48px, 7.2vw, 108px)",
-                lineHeight: "0.92",
+                fontSize: "clamp(38px, 5.6vw, 84px)",
+                lineHeight: "0.94",
                 letterSpacing: "-0.045em",
                 fontWeight: 600,
               }}>
@@ -199,7 +199,7 @@ function Hero({ scarcity, apk }) {
             <span className="text-white/65">Global&nbsp;scale.</span>
           </h1>
 
-          <p className="mt-10 text-[17px] leading-relaxed text-white/55 max-w-[540px]">
+          <p className="mt-7 text-[15px] leading-relaxed text-white/55 max-w-[500px]">
             THE GRID transforms ordinary phones into a verified distributed compute layer.
             Every cycle is recorded as a <span className="text-[#00ff88]">compute-time receipt</span> —
             a pre-mainnet protocol bound to <em className="not-italic text-white">verified network growth</em>,
@@ -207,26 +207,26 @@ function Hero({ scarcity, apk }) {
           </p>
 
           {/* CTA */}
-          <div className="mt-12 flex flex-wrap gap-3 items-center">
+          <div className="mt-8 flex flex-wrap gap-3 items-center">
             <a href={apk?.download_url || "#deploy"}
                data-testid="hero-cta-primary"
-               className="group inline-flex items-center gap-3 px-7 py-4 rounded-md bg-[#00ff88] text-black font-mono font-bold text-[12px] uppercase tracking-[0.35em]
-                          shadow-[0_0_60px_-12px_rgba(0,255,136,0.7)] hover:shadow-[0_0_80px_-12px_rgba(0,255,136,1)] transition-all">
+               className="group inline-flex items-center gap-3 px-5 py-3 rounded-md bg-[#00ff88] text-black font-mono font-bold text-[11px] uppercase tracking-[0.3em]
+                          shadow-[0_0_48px_-12px_rgba(0,255,136,0.7)] hover:shadow-[0_0_64px_-12px_rgba(0,255,136,1)] transition-all">
               <Download className="w-4 h-4" />
               deploy node client
               <ArrowRight className="w-4 h-4 -mr-1 group-hover:translate-x-1 transition-transform" />
             </a>
             <Link to="/token"
                   data-testid="hero-cta-protocol"
-                  className="inline-flex items-center gap-2 px-6 py-4 rounded-md border border-white/15 hover:border-white/40 text-white/85 hover:text-white
-                             font-mono text-[12px] uppercase tracking-[0.3em] transition-colors">
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-md border border-white/15 hover:border-white/40 text-white/85 hover:text-white
+                             font-mono text-[11px] uppercase tracking-[0.3em] transition-colors">
               read protocol
               <ArrowUpRight className="w-4 h-4" />
             </Link>
           </div>
 
           {/* tiny telemetry foot */}
-          <div className="mt-14 grid grid-cols-3 gap-px bg-white/[0.06] max-w-[520px]" data-testid="hero-telemetry-strip">
+          <div className="mt-10 grid grid-cols-3 gap-px bg-white/[0.06] max-w-[480px]" data-testid="hero-telemetry-strip">
             <FootMetric label="VERIFIED NODES"  value={verified.toLocaleString()} tone="matrix" />
             <FootMetric label="NETWORK TARGET"  value="1,000,000"                tone="cyan" />
             <FootMetric label="PHASE"           value={phase}                     tone="violet" />
@@ -236,14 +236,15 @@ function Hero({ scarcity, apk }) {
         {/* RIGHT — Topology centerpiece */}
         <motion.div initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-                    className="relative aspect-square w-full max-w-[640px] lg:max-w-none mx-auto self-stretch">
+                    className="relative aspect-square w-full max-w-[460px] lg:max-w-[520px] mx-auto"
+                    style={{ maxHeight: "min(64vh, 520px)" }}>
           {/* black bordered window */}
           <div className="absolute inset-0 border border-white/[0.08] rounded-lg bg-black/55 overflow-hidden">
             <NetworkTopology className="w-full h-full" />
           </div>
           {/* corner crosshair marks */}
           {["top-0 left-0", "top-0 right-0 rotate-90", "bottom-0 left-0 -rotate-90", "bottom-0 right-0 rotate-180"].map((c, i) => (
-            <span key={i} className={`absolute ${c} w-4 h-4 border-l border-t border-[#00ff88]/65 m-2`} />
+            <span key={i} className={`absolute ${c} w-3 h-3 border-l border-t border-[#00ff88]/65 m-2`} />
           ))}
         </motion.div>
       </div>
@@ -254,9 +255,9 @@ function Hero({ scarcity, apk }) {
 function FootMetric({ label, value, tone }) {
   const color = tone === "matrix" ? "#00ff88" : tone === "cyan" ? "#00d9ff" : "#6c7bff";
   return (
-    <div className="bg-black px-4 py-3" data-testid={`foot-${label.toLowerCase().replace(/\s/g,'-')}`}>
+    <div className="bg-black px-3 py-2.5" data-testid={`foot-${label.toLowerCase().replace(/\s/g,'-')}`}>
       <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">{label}</div>
-      <div className="font-mono font-bold text-[20px] mt-1 tabular-nums" style={{ color }}>{value}</div>
+      <div className="font-mono font-bold text-[16px] mt-1 tabular-nums" style={{ color }}>{value}</div>
     </div>
   );
 }
@@ -270,16 +271,16 @@ function LiveCommandPanel({ scarcity }) {
   const pct      = scarcity?.progress_pct ?? 0;
 
   return (
-    <section className="relative py-6 border-y border-white/[0.06] bg-black/80 backdrop-blur" id="network" data-testid="live-command-panel">
+    <section className="relative py-5 border-y border-white/[0.06] bg-black/80 backdrop-blur" id="network" data-testid="live-command-panel">
       {/* sweeping vertical beam */}
       <motion.div className="absolute top-0 bottom-0 w-px"
                   style={{ background: "linear-gradient(180deg, transparent, rgba(0,255,136,0.55), transparent)" }}
-                  animate={{ x: [0, 1400] }}
+                  animate={{ x: [0, 1240] }}
                   transition={{ duration: 9, repeat: Infinity, ease: "linear" }} />
-      <div className="max-w-[1400px] mx-auto px-6 lg:px-10">
-        <div className="flex items-center gap-3 mb-4">
+      <div className="max-w-[1240px] mx-auto px-6 lg:px-8">
+        <div className="flex items-center gap-3 mb-3">
           <span className="motion-telemetry-blink w-2 h-2 rounded-full bg-[#00ff88]" />
-          <span className="font-mono uppercase tracking-[0.4em] text-[10px] text-white/45">
+          <span className="font-mono uppercase tracking-[0.4em] text-[9px] text-white/45">
             // live.command.feed — verified telemetry only
           </span>
           <span className="ml-auto font-mono uppercase tracking-[0.25em] text-[10px] text-white/45 tabular-nums">
@@ -320,22 +321,22 @@ function RibbonCell({ label, value, tone }) {
 /* ============================================================ */
 function ManifestoSection() {
   return (
-    <section className="relative py-32 px-6 lg:px-10" id="protocol" data-testid="manifesto">
-      <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[1fr_1fr] gap-16 items-center">
+    <section className="relative py-20 px-6 lg:px-8" id="protocol" data-testid="manifesto">
+      <div className="max-w-[1240px] mx-auto grid lg:grid-cols-[1fr_1fr] gap-12 items-center">
         <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true, amount: 0.4 }}
                     transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-6">
+          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-5">
             // protocol.thesis
           </div>
           <h2 className="font-display text-white"
-              style={{ fontSize: "clamp(40px, 5vw, 76px)", lineHeight: 0.96, letterSpacing: "-0.04em", fontWeight: 600 }}>
+              style={{ fontSize: "clamp(30px, 3.6vw, 54px)", lineHeight: 0.96, letterSpacing: "-0.04em", fontWeight: 600 }}>
             Useful compute,<br/>
             <span style={{ background:"linear-gradient(96deg, #00ff88, #00d9ff)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
               recorded as contribution.
             </span>
           </h2>
-          <div className="mt-10 space-y-5 text-white/55 leading-relaxed text-[15px] max-w-xl">
+          <div className="mt-8 space-y-4 text-white/55 leading-relaxed text-[14px] max-w-xl">
             <p>$TGC is <span className="text-white">not a coin</span>. It is the cryptographic receipt of every verified compute cycle the network has consumed.</p>
             <p>Each edge node submits proof of useful work — small, signed, deterministic packets. The protocol seals them into an immutable contribution ledger.</p>
             <p>At <span className="text-[#00ff88]">1,000,000 verified active nodes</span>, the ledger may enter Snapshot Readiness. The roadmap is conditional, never automatic.</p>
@@ -412,24 +413,24 @@ function ScarcityConsole({ scarcity }) {
   const phases = ["GROWTH", "SNAPSHOT_REVIEW", "AUDIT", "GOVERNANCE", "MAINNET_CANDIDATE"];
 
   return (
-    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]"
+    <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06]"
              data-testid="scarcity-console">
-      <div className="max-w-[1400px] mx-auto">
+      <div className="max-w-[1240px] mx-auto">
         {/* console header */}
-        <div className="flex items-baseline justify-between flex-wrap gap-4 border-b border-white/[0.08] pb-5 mb-10">
+        <div className="flex items-baseline justify-between flex-wrap gap-4 border-b border-white/[0.08] pb-4 mb-8">
           <div>
             <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-2">
               // network.scarcity_progress
             </div>
             <h2 className="font-display text-white"
-                style={{ fontSize: "clamp(34px, 4vw, 60px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 1 }}>
+                style={{ fontSize: "clamp(28px, 3vw, 46px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 1 }}>
               The clock does not exist.<br/>
               <span className="text-white/55">Only the network does.</span>
             </h2>
           </div>
           <div className="text-right">
             <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/40">target</div>
-            <div className="font-display font-bold text-[40px] lg:text-[56px] tabular-nums text-[#00d9ff]" style={{ letterSpacing: "-0.04em" }}>
+            <div className="font-display font-bold text-[32px] lg:text-[44px] tabular-nums text-[#00d9ff]" style={{ letterSpacing: "-0.04em" }}>
               1,000,000
             </div>
           </div>
@@ -455,14 +456,14 @@ function ScarcityConsole({ scarcity }) {
         </div>
 
         {/* gigantic verified count */}
-        <div className="grid lg:grid-cols-[1.4fr_1fr] gap-10 items-end mb-8">
+        <div className="grid lg:grid-cols-[1.4fr_1fr] gap-8 items-end mb-6">
           <div>
-            <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/45 mb-3">
+            <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/45 mb-2">
               verified_active_nodes
             </div>
             <div className="font-display tabular-nums leading-none"
                  style={{
-                   fontSize: "clamp(72px, 11vw, 160px)",
+                   fontSize: "clamp(56px, 8vw, 112px)",
                    letterSpacing: "-0.06em", fontWeight: 700,
                    background: "linear-gradient(180deg, #00ff88 0%, #00d9ff 100%)",
                    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
@@ -471,7 +472,7 @@ function ScarcityConsole({ scarcity }) {
               {verified.toLocaleString()}
             </div>
           </div>
-          <div className="space-y-4 text-white/55 text-[14px] leading-relaxed">
+          <div className="space-y-3 text-white/55 text-[13px] leading-relaxed">
             <p>
               Pre-mainnet contribution accumulation is tied to <span className="text-white">real verified network growth</span>,
               not a calendar. When the count reaches <span className="text-[#00ff88]">1,000,000</span>, the ledger may enter
@@ -541,15 +542,15 @@ function DeploymentModule({ apk }) {
     : "";
 
   return (
-    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" id="deploy" data-testid="deploy-module">
-      <div className="max-w-[1400px] mx-auto">
-        <div className="flex items-end justify-between flex-wrap gap-4 mb-10">
+    <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06]" id="deploy" data-testid="deploy-module">
+      <div className="max-w-[1240px] mx-auto">
+        <div className="flex items-end justify-between flex-wrap gap-4 mb-8">
           <div>
             <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-3">
               // deploy_node_client.exec
             </div>
             <h2 className="font-display text-white"
-                style={{ fontSize: "clamp(34px, 4.2vw, 64px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 0.96 }}>
+                style={{ fontSize: "clamp(28px, 3.2vw, 48px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 0.96 }}>
               The installer is a <span className="text-[#00ff88]">verified binary</span>,<br/>
               not an app-store badge.
             </h2>
@@ -647,8 +648,8 @@ function SpecLine({ k, v, tone, mono }) {
 /* ============================================================ */
 function BuybackPolicyPanel() {
   return (
-    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06]" data-testid="buyback-panel">
-      <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[0.9fr_1.1fr] gap-12">
+    <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06]" data-testid="buyback-panel">
+      <div className="max-w-[1240px] mx-auto grid lg:grid-cols-[0.9fr_1.1fr] gap-10">
         <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true, amount: 0.3 }}
                     transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
@@ -656,10 +657,10 @@ function BuybackPolicyPanel() {
             // foundation.buyback_program
           </div>
           <h2 className="font-display text-white"
-              style={{ fontSize: "clamp(34px, 4vw, 64px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 0.95 }}>
+              style={{ fontSize: "clamp(28px, 3.2vw, 48px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 0.95 }}>
             A policy.<br/>Not a promise.
           </h2>
-          <p className="mt-8 text-white/55 leading-relaxed max-w-md">
+          <p className="mt-6 text-white/55 leading-relaxed max-w-md text-[14px]">
             Contributors who reach <span className="text-white">100 TGC</span> may apply to a Foundation Buyback
             Window when it is opened by the Ecosystem Treasury — subject to
             verification, regional eligibility and treasury liquidity.
@@ -702,15 +703,15 @@ function BuybackPolicyPanel() {
 /* ============================================================ */
 function B2BPreview() {
   return (
-    <section className="relative py-28 px-6 lg:px-10 border-t border-white/[0.06] overflow-hidden" data-testid="b2b-preview">
-      <div className="max-w-[1400px] mx-auto">
-        <div className="flex items-end justify-between flex-wrap gap-4 mb-10">
+    <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06] overflow-hidden" data-testid="b2b-preview">
+      <div className="max-w-[1240px] mx-auto">
+        <div className="flex items-end justify-between flex-wrap gap-4 mb-8">
           <div>
             <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00d9ff]/85 mb-3">
               // enterprise.compute_surface
             </div>
             <h2 className="font-display text-white"
-                style={{ fontSize: "clamp(34px, 4.2vw, 64px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 0.96 }}>
+                style={{ fontSize: "clamp(28px, 3.2vw, 48px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 0.96 }}>
               Compute throughput<br/>
               <span className="text-white/55">priced as infrastructure.</span>
             </h2>
@@ -796,7 +797,7 @@ function SparkBars() {
 /* ============================================================ */
 function FinalCTA({ apk }) {
   return (
-    <section className="relative min-h-[72vh] grid place-items-center px-6 lg:px-10 py-32 border-t border-white/[0.06]" data-testid="final-cta">
+    <section className="relative min-h-[60vh] grid place-items-center px-6 lg:px-8 py-24 border-t border-white/[0.06]" data-testid="final-cta">
       {/* heavy radial glow */}
       <div className="absolute inset-0 -z-0 pointer-events-none">
         <div className="absolute inset-0 bg-black" />
@@ -811,31 +812,31 @@ function FinalCTA({ apk }) {
       <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-                  className="relative text-center max-w-3xl">
-        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88] mb-8">
+                  className="relative text-center max-w-2xl">
+        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88] mb-6">
           // initialize.computation
         </div>
         <h2 className="font-display text-white break-words"
-            style={{ fontSize: "clamp(42px, 7vw, 112px)", letterSpacing: "-0.045em", fontWeight: 600, lineHeight: 0.92 }}>
+            style={{ fontSize: "clamp(34px, 5vw, 80px)", letterSpacing: "-0.045em", fontWeight: 600, lineHeight: 0.94 }}>
           Join the<br/>
           <span style={{
             background: "linear-gradient(96deg, #00ff88, #00d9ff)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           }}>verified&nbsp;compute&nbsp;layer.</span>
         </h2>
-        <p className="mt-8 text-white/55 text-[16px] max-w-xl mx-auto">
+        <p className="mt-6 text-white/55 text-[14px] max-w-lg mx-auto">
           One installer. One ENGAGE NODE. Your device becomes a verified edge node
           on a global, milestone-driven compute network.
         </p>
         <a href={apk?.download_url || "#deploy"}
            data-testid="final-cta-btn"
-           className="group mt-12 inline-flex items-center gap-4 px-10 py-5 rounded-md bg-[#00ff88] text-black font-mono font-bold text-[12px] uppercase tracking-[0.45em]
-                      shadow-[0_0_80px_-12px_rgba(0,255,136,0.9)] hover:shadow-[0_0_120px_-12px_rgba(0,255,136,1)] transition-all">
-          <Download className="w-5 h-5" />
+           className="group mt-9 inline-flex items-center gap-3 px-7 py-4 rounded-md bg-[#00ff88] text-black font-mono font-bold text-[11px] uppercase tracking-[0.4em]
+                      shadow-[0_0_60px_-12px_rgba(0,255,136,0.9)] hover:shadow-[0_0_90px_-12px_rgba(0,255,136,1)] transition-all">
+          <Download className="w-4 h-4" />
           deploy node client
-          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
         </a>
-        <div className="mt-6 font-mono uppercase tracking-[0.3em] text-[10px] text-white/30">
+        <div className="mt-5 font-mono uppercase tracking-[0.3em] text-[10px] text-white/30">
           // v{apk?.version || "—"} · arm64-v8a · signed v2+v3 · 60fps verified
         </div>
       </motion.div>
@@ -848,9 +849,9 @@ function FinalCTA({ apk }) {
 /* ============================================================ */
 function FooterStrip({ apk }) {
   return (
-    <footer className="border-t border-white/[0.06] px-6 lg:px-10 py-10 text-[11px] font-mono uppercase tracking-[0.3em] text-white/30"
+    <footer className="border-t border-white/[0.06] px-6 lg:px-8 py-8 text-[10px] font-mono uppercase tracking-[0.3em] text-white/30"
             data-testid="footer-strip">
-      <div className="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div className="max-w-[1240px] mx-auto flex flex-wrap items-center justify-between gap-3">
         <span>// the.grid · distributed compute · pre-mainnet</span>
         <span>v{apk?.version || "—"} · build verified · arm64-v8a</span>
         <span>tgc · contribution receipt · no price guarantee</span>

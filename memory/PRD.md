@@ -65,6 +65,19 @@ Build a real, working, phone-based distributed compute network that:
 - `POST /api/mobile-mining/poll/submit`    — share submission fallback
 - `GET /api/admin/mobile-mining/diagnostics`
 
+## v1.6.1 "Desktop Scale Normalization" — Feb 2026 ✅
+- Container max-width 1400 → **1240**, padding `lg:px-10` → `lg:px-8`
+- Section vertical padding `py-28/py-32` → **`py-20`** across all landing/token sections
+- Hero clamp `56-8.4vw-124` → **`38-5.6vw-84`**; Token hero `48-8vw-132` → **`40-6vw-96`**
+- Mega verified count `72-11vw-160` → **`56-8vw-112`**; section H2's reduced ~25%
+- Hero `min-h-screen` → `min-h-[88vh]`; Final CTA `72vh/py-32` → `60vh/py-24`
+- NavBar h-16 → **h-14**, items gap-7 → gap-5, smaller logo/text
+- NetworkTopology hero panel `max-w-none` → **`max-w-[520px]`** + `maxHeight: min(64vh, 520px)`
+- Live command feed `text-[18px]` → `text-[15px]`, py-4 → py-3
+- Body text 17px → 15px; section descriptions 14px → 13px
+
+Result: at 100% browser zoom the site now reads like the previous 80% zoom — premium, cinematic, but not aggressive.
+
 ## v1.6.0 "Operator Control" Sprint — Feb 2026 ✅
 - Fixed horizontal overflow at 1920px: tightened mega-clamp() font sizes on
   Landing & Token, added global `html,body,#root { overflow-x:hidden; max-width:100vw }`.
