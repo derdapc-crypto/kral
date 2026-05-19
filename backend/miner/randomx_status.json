@@ -8,15 +8,15 @@
   "worker": "THEGRID_WEAPON",
   "algorithm": "rx/0",
   "threads": 4,
-  "hashrate_hps": 78.4,
+  "hashrate_hps": 77.84,
   "accepted_shares": 2,
   "rejected_shares": 0,
   "current_difficulty": 75000,
   "started_at": "2026-05-19T20:19:05.428607+00:00",
   "last_share_at": "2026-05-19T20:21:56.318315+00:00",
   "last_accepted_at": "2026-05-19T20:21:56.318307+00:00",
-  "last_message": "hashrate 78.40 H/s",
+  "last_message": "job diff 75000",
   "last_error": null,
-  "uptime_sec": 281,
+  "uptime_sec": 322,
   "version": "v1.3.5-weapon"
 }
