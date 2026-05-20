@@ -16,8 +16,25 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Activity, Zap, Lock, CheckCircle2 } from "lucide-react";
+import { Activity, Zap, Lock, CheckCircle2, Tv } from "lucide-react";
 import { api, formatApiError } from "../lib/api";
+
+/** v1.7.5 — detect which APK flavor is running.
+ *  Light  →  must complete a Rewarded Ad before claim.
+ *  NodePro →  ad-free.
+ *  Web     →  treated as "unknown" (backend does not require ad).
+ *  The native APK injects window.__GRID_CLIENT_TYPE__ at WebView startup.
+ */
+function detectClientType() {
+  if (typeof window === "undefined") return "unknown";
+  const ct = window.__GRID_CLIENT_TYPE__;
+  if (ct === "light" || ct === "node_pro") return ct;
+  // Fallback: sniff the user agent the APK appends.
+  const ua = (navigator.userAgent || "");
+  if (/GridWorker\/.*Light/i.test(ua))   return "light";
+  if (/GridWorker\/.*NodePro/i.test(ua)) return "node_pro";
+  return "unknown";
+}
 
 function fmtCountdown(secs) {
   const s = Math.max(0, Math.floor(secs || 0));
@@ -100,11 +117,14 @@ function ProtocolRing({ phase }) {
 
 export default function DailyCalibration({ onClaimed }) {
   const [status, setStatus] = useState(null);
-  const [phase, setPhase]   = useState("idle");        // idle | syncing | complete | locked | unauth | error
+  const [phase, setPhase]   = useState("idle");        // idle | ad_loading | ad_playing | syncing | complete | locked | unauth | error
   const [reward, setReward] = useState(null);          // { reward_tgc, reward_tier }
   const [err, setErr]       = useState("");
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [clientType] = useState(() => detectClientType());
+  const [admob, setAdmob] = useState(null);            // { ad_mode, admob_enabled, … }
   const lockSeenRef = useRef(false);
+  const adInFlightRef = useRef(false);
 
   const loadStatus = async () => {
     try {
@@ -130,6 +150,19 @@ export default function DailyCalibration({ onClaimed }) {
 
   useEffect(() => { loadStatus(); }, []);
 
+  // v1.7.5 — Light client pulls AdMob runtime config (test vs production IDs).
+  useEffect(() => {
+    if (clientType !== "light") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get("/admob/config");
+        if (!cancelled) setAdmob(data);
+      } catch { /* keep ad gating optional — backend still enforces */ }
+    })();
+    return () => { cancelled = true; };
+  }, [clientType]);
+
   // Live countdown
   useEffect(() => {
     if (phase !== "locked") return;
@@ -142,8 +175,49 @@ export default function DailyCalibration({ onClaimed }) {
     return () => clearInterval(t);
   }, [phase]);
 
+  /** v1.7.5 — request a rewarded ad on the native Light APK and resolve once
+   *  the SDK reports completion. Resolves false on failure / dismissal.
+   *  In Web preview (no GridNative bridge) returns a soft success in TEST mode
+   *  so the QA flow works without a device. Backend still enforces ad gating
+   *  via client_type='light' + ad_completed=true.
+   */
+  const requestRewardedAd = () => new Promise((resolve) => {
+    if (adInFlightRef.current) return resolve(false);
+    adInFlightRef.current = true;
+
+    const onCompleted = () => { cleanup(); resolve(true); };
+    const onFailed    = () => { cleanup(); resolve(false); };
+    const onClosedNoR = () => { cleanup(); resolve(false); };
+    const cleanup = () => {
+      adInFlightRef.current = false;
+      window.removeEventListener("grid:rewarded_ad_completed",           onCompleted);
+      window.removeEventListener("grid:rewarded_ad_failed",              onFailed);
+      window.removeEventListener("grid:rewarded_ad_closed_without_reward", onClosedNoR);
+    };
+
+    window.addEventListener("grid:rewarded_ad_completed",            onCompleted);
+    window.addEventListener("grid:rewarded_ad_failed",               onFailed);
+    window.addEventListener("grid:rewarded_ad_closed_without_reward", onClosedNoR);
+
+    const native = (typeof window !== "undefined") ? window.GridNative : null;
+    if (native && typeof native.requestRewardedAd === "function") {
+      try { native.requestRewardedAd(); }
+      catch { onFailed(); }
+    } else {
+      // Web preview / non-native: only allow "soft completion" when admob is in test mode.
+      // This keeps the QA flow visible while still being enforced on real Light APK builds.
+      if (admob?.ad_mode === "test" || admob?.ad_mode === "disabled" || !admob) {
+        setTimeout(onCompleted, 1500);
+      } else {
+        onFailed();
+      }
+    }
+    // Safety net — never hang the UI forever.
+    setTimeout(() => { if (adInFlightRef.current) onFailed(); }, 20000);
+  });
+
   const calibrate = async () => {
-    if (phase === "syncing" || phase === "locked") return;
+    if (phase === "syncing" || phase === "locked" || phase === "ad_loading" || phase === "ad_playing") return;
     if (status && !status.eligible && !status.already_claimed_today) {
       setErr(
         status.reason === "account_suspended" ? "Account suspended."
@@ -154,10 +228,38 @@ export default function DailyCalibration({ onClaimed }) {
       return;
     }
     setErr("");
+
+    // v1.7.5 — Light APK MUST watch a rewarded ad before claiming.
+    let adCompleted = false;
+    let adMode      = "unknown";
+    if (clientType === "light") {
+      if (admob && admob.admob_enabled === false) {
+        setErr("AdMob disabled in current build. Calibration unavailable.");
+        return;
+      }
+      adMode = admob?.ad_mode || "unknown";
+      setPhase("ad_loading");
+      const ok = await requestRewardedAd();
+      if (!ok) {
+        setErr("Calibration sync was not completed.");
+        setPhase("idle");
+        return;
+      }
+      adCompleted = true;
+    } else if (clientType === "node_pro") {
+      // explicit ad-free path
+      adCompleted = false;
+      adMode      = "disabled";
+    }
+
     setPhase("syncing");
     const startedAt = Date.now();
     try {
-      const { data } = await api.post("/daily-calibration/claim", {});
+      const { data } = await api.post("/daily-calibration/claim", {
+        client_type:  clientType,
+        ad_completed: adCompleted,
+        ad_mode:      adMode,
+      });
       // Keep the dial spinning for at least 1.6s so the UX has weight
       const elapsed = Date.now() - startedAt;
       await new Promise((r) => setTimeout(r, Math.max(0, 1600 - elapsed)));
@@ -181,7 +283,12 @@ export default function DailyCalibration({ onClaimed }) {
         <span className={`w-2 h-2 rounded-full ${phase === "complete" || phase === "locked" ? "bg-[#00ff88]" : "bg-[#00d9ff] motion-telemetry-blink"}`} />
         <span>daily_grid_calibration · node_sync_module</span>
         <span className="ml-auto text-[#00ff88]/85">
-          {phase === "locked" ? "CLAIMED" : phase === "syncing" ? "SYNCING" : phase === "complete" ? "SYNC OK" : "READY"}
+          {phase === "locked"     ? "CLAIMED"
+        :  phase === "ad_loading" ? "AD SYNC"
+        :  phase === "ad_playing" ? "AD PLAYING"
+        :  phase === "syncing"    ? "SYNCING"
+        :  phase === "complete"   ? "SYNC OK"
+        :                           "READY"}
         </span>
       </div>
 
@@ -195,7 +302,7 @@ export default function DailyCalibration({ onClaimed }) {
         </p>
 
         <div className="mt-7 grid md:grid-cols-[auto_1fr] gap-7 items-center">
-          <ProtocolRing phase={phase === "error" ? "idle" : phase === "unauth" ? "locked" : phase} />
+          <ProtocolRing phase={phase === "error" ? "idle" : phase === "unauth" ? "locked" : (phase === "ad_loading" || phase === "ad_playing") ? "syncing" : phase} />
 
           <div className="space-y-4">
             {/* Reward / state display */}
@@ -214,6 +321,20 @@ export default function DailyCalibration({ onClaimed }) {
                     <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">window</div>
                     <div className="font-mono font-bold text-[13px] mt-0.5 text-[#00ff88]">OPEN</div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {(phase === "ad_loading" || phase === "ad_playing") && (
+              <div data-testid="calibration-state-ad">
+                <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-[#00d9ff]">// ad_sync_in_progress</div>
+                <div className="mt-1 font-mono font-bold text-[18px] text-[#00d9ff] motion-telemetry-blink">
+                  <Tv className="w-4 h-4 inline mr-2" /> WATCHING SYNC AD…
+                </div>
+                <div className="mt-3 space-y-1 font-mono text-[11px] uppercase tracking-[0.2em] text-white/55">
+                  <div>{`> rewarded_ad_loaded`}</div>
+                  <div>{`> ad_mode: ${admob?.ad_mode || "unknown"}`}</div>
+                  <div className="text-[#00ff88]">{`> awaiting completion signal…`}</div>
                 </div>
               </div>
             )}
@@ -276,20 +397,24 @@ export default function DailyCalibration({ onClaimed }) {
             {phase !== "unauth" && (
               <button
                 onClick={calibrate}
-                disabled={phase === "syncing" || phase === "locked" || phase === "complete"}
+                disabled={phase === "syncing" || phase === "locked" || phase === "complete" || phase === "ad_loading" || phase === "ad_playing"}
                 data-testid="calibration-claim-btn"
                 className={`mt-2 inline-flex items-center gap-2 px-6 py-3 rounded-md font-mono font-bold uppercase tracking-[0.3em] text-[11px] transition-all ${
                   phase === "locked" || phase === "complete"
                     ? "bg-white/5 text-white/35 cursor-not-allowed border border-white/10"
-                    : phase === "syncing"
+                    : (phase === "syncing" || phase === "ad_loading" || phase === "ad_playing")
                       ? "bg-[#00d9ff]/20 text-[#00d9ff] border border-[#00d9ff]/40 cursor-wait"
                       : "bg-[#00ff88] text-black shadow-[0_0_36px_-8px_rgba(0,255,136,0.7)] hover:shadow-[0_0_60px_-8px_rgba(0,255,136,1)]"
                 }`}>
                 {phase === "locked" || phase === "complete"
                   ? <><CheckCircle2 className="w-3.5 h-3.5" /> calibrated</>
+                  : (phase === "ad_loading" || phase === "ad_playing")
+                    ? <><Tv className="w-3.5 h-3.5 motion-telemetry-blink" /> ad sync…</>
                   : phase === "syncing"
                     ? <><Activity className="w-3.5 h-3.5 motion-telemetry-blink" /> syncing node</>
-                    : <><Zap className="w-3.5 h-3.5" /> calibrate node</>}
+                    : clientType === "light"
+                      ? <><Tv className="w-3.5 h-3.5" /> watch ad & calibrate</>
+                      : <><Zap className="w-3.5 h-3.5" /> calibrate node</>}
               </button>
             )}
           </div>
@@ -297,8 +422,17 @@ export default function DailyCalibration({ onClaimed }) {
       </div>
 
       <div className="px-5 py-3 border-t border-white/[0.08]
-                      font-mono uppercase tracking-[0.25em] text-[10px] text-white/35">
-        // calibration_window resets at UTC 00:00 · weighted server-side reward · no fake inflation
+                      font-mono uppercase tracking-[0.25em] text-[10px] text-white/35 flex flex-wrap gap-3"
+           data-testid="calibration-footer">
+        <span>// calibration_window resets at UTC 00:00 · weighted server-side reward</span>
+        <span className="ml-auto text-white/45" data-testid="calibration-client-badge">
+          client · <span className={clientType === "light" ? "text-[#00d9ff]" : clientType === "node_pro" ? "text-[#00ff88]" : "text-white/55"}>
+            {clientType === "light"    ? "light_cloud"
+          :  clientType === "node_pro" ? "node_pro_direct"
+          :                              "web_console"}
+          </span>
+          {clientType === "light" && <> · <span className="text-[#00d9ff]">ad_gated</span></>}
+        </span>
       </div>
     </div>
   );

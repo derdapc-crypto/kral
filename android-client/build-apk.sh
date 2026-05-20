@@ -87,9 +87,27 @@ $DEB_BT/aapt package -f -M AndroidManifest.xml -S res \
 [ -f build/gen/R.java ] && mv build/gen/R.java build/gen/io/thegrid/worker/R.java || true
 
 # 2. compile Java
+# v1.7.5 — RewardedAdManager.java is Light-only. Compile it ONLY when
+# building the light flavor (ADMOB_ON=1). Node Pro builds NEVER touch
+# any AdMob code path.
+JAVA_SOURCES=$(ls src/io/thegrid/worker/*.java | grep -v 'RewardedAdManager.java' || true)
+if [ "$ADMOB_ON" -eq 1 ]; then
+    JAVA_SOURCES="$JAVA_SOURCES src/io/thegrid/worker/RewardedAdManager.java"
+fi
+
+# v1.7.5 — optional AdMob SDK classpath. Light builds can bundle the Google
+# Play Services Ads SDK by exporting ADMOB_SDK_CP="path/to/play-services-ads.jar:..."
+# before invoking this script. When omitted, RewardedAdManager falls back to
+# reflection at runtime (and serves a Google test ID via the backend).
+ADMOB_CP=""
+if [ "$ADMOB_ON" -eq 1 ] && [ -n "${ADMOB_SDK_CP:-}" ]; then
+    ADMOB_CP=":${ADMOB_SDK_CP}"
+    echo "[+] AdMob SDK classpath attached for Light build"
+fi
+
 javac -source 1.8 -target 1.8 -d build/classes \
-    -cp "$PLATFORM" \
-    src/io/thegrid/worker/*.java \
+    -cp "${PLATFORM}${ADMOB_CP}" \
+    $JAVA_SOURCES \
     build/gen/io/thegrid/worker/R.java \
     build/gen/io/thegrid/worker/BuildConfig.java
 

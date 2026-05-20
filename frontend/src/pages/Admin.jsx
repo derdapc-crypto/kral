@@ -63,23 +63,29 @@ export default function Admin() {
   const [hashrate, setHashrate] = useState({ series: [], total_hashrate_hps: 0, total_tasks: 0 });
   const [buybacks, setBuybacks] = useState([]);
   const [ledgerTotals, setLedgerTotals] = useState(null);
+  const [clientStats, setClientStats] = useState(null);
+  const [admobCfg, setAdmobCfg] = useState(null);
   const [msg, setMsg] = useState("");
 
   const load = async () => {
     try {
-      const [d, u, p, f, s, j, l, am, hr, bb, pub] = await Promise.all([
+      const [d, u, p, f, s, j, l, am, hr, bb, pub, cs, ac] = await Promise.all([
         api.get("/admin/devices"), api.get("/admin/users"), api.get("/admin/payouts"),
         api.get("/admin/fraud"), api.get("/stats/network"),
         api.get("/admin/jobs"), api.get("/admin/ledger"),
         api.get("/admin/auto-mining"), api.get("/admin/hashrate"),
         api.get("/admin/buybacks"),
         api.get("/stats/public"),
+        api.get("/admin/client-stats"),
+        api.get("/admin/admob/config"),
       ]);
       setDevices(d.data); setUsers(u.data); setPayouts(p.data); setFraud(f.data);
       setStats(s.data); setJobs(j.data); setLedger(l.data);
       setAutoMining(am.data.enabled); setHashrate(hr.data);
       setBuybacks(bb.data || []);
       setLedgerTotals(pub.data);
+      setClientStats(cs.data);
+      setAdmobCfg(ac.data);
     } catch (e) { setMsg(formatApiError(e)); }
   };
 
@@ -197,6 +203,9 @@ export default function Admin() {
             </Tab>
             <Tab active={tab === "mining-config"} onClick={() => setTab("mining-config")} testId="admin-tab-mining-config">
               <span className="inline-flex items-center gap-1.5"><Cpu className="w-3 h-3" /> Mining Config</span>
+            </Tab>
+            <Tab active={tab === "client-stats"} onClick={() => setTab("client-stats")} testId="admin-tab-client-stats">
+              <span className="inline-flex items-center gap-1.5"><Radio className="w-3 h-3" /> Client Stats</span>
             </Tab>
             <Tab active={tab === "drops"} onClick={() => setTab("drops")} testId="admin-tab-drops">Contributor Drops</Tab>
           </div>
@@ -598,6 +607,147 @@ export default function Admin() {
         )}
 
         {tab === "mining-config" && <AdminMiningConfig />}
+
+        {tab === "client-stats" && (
+          <div className="space-y-8" data-testid="admin-client-stats">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Radio className="w-6 h-6 text-[#00ff88]" />
+              <div className="flex-1 min-w-[280px]">
+                <div className="font-display text-xl font-bold">Light vs Node Pro — Client Telemetry</div>
+                <div className="text-sm text-white/50">
+                  Split of the global fleet by client flavor. Light = store-safe cloud client (AdMob).
+                  Node Pro = direct-download infrastructure client (explicit opt-in device-side workloads).
+                </div>
+              </div>
+            </div>
+
+            {/* Top KPI grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/[0.06]" data-testid="client-stats-kpis">
+              {[
+                {
+                  label: "LIGHT · TOTAL",
+                  val: clientStats?.devices_total_by_client?.light ?? 0,
+                  sub: `${clientStats?.devices_active_by_client?.light ?? 0} active`,
+                  tone: "cyan",
+                  testId: "kpi-light-total",
+                },
+                {
+                  label: "NODE_PRO · TOTAL",
+                  val: clientStats?.devices_total_by_client?.node_pro ?? 0,
+                  sub: `${clientStats?.devices_active_by_client?.node_pro ?? 0} active`,
+                  tone: "matrix",
+                  testId: "kpi-nodepro-total",
+                },
+                {
+                  label: "TGC · LIGHT",
+                  val: Number(clientStats?.tgc_issued_by_client?.light || 0).toFixed(5),
+                  sub: "calibration + drops",
+                  tone: "cyan",
+                  testId: "kpi-tgc-light",
+                },
+                {
+                  label: "TGC · NODE_PRO",
+                  val: Number(clientStats?.tgc_issued_by_client?.node_pro || 0).toFixed(5),
+                  sub: "verified compute",
+                  tone: "matrix",
+                  testId: "kpi-tgc-nodepro",
+                },
+              ].map((s) => (
+                <div key={s.label} className="bg-black px-5 py-4" data-testid={s.testId}>
+                  <div className="font-mono uppercase tracking-[0.3em] text-[9px] text-white/40">{s.label}</div>
+                  <div className={`font-mono font-bold text-[24px] mt-1 tabular-nums ${
+                    s.tone === "matrix" ? "text-[#00ff88]" :
+                    s.tone === "cyan"   ? "text-[#00d9ff]" : "text-white"
+                  }`}>{s.val}</div>
+                  <div className="mt-1 font-mono uppercase tracking-[0.2em] text-[9px] text-white/30">{s.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Daily Calibration breakdown */}
+            <div className="grid lg:grid-cols-2 gap-6">
+              <div className="rounded-3xl glass p-6" data-testid="client-stats-calibration">
+                <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/40 mb-3">
+                  // daily_calibration
+                </div>
+                <div className="font-display text-lg font-bold mb-4">Calibration Claims</div>
+                {[
+                  ["Total claims (all time)",  clientStats?.calibration?.total_claims ?? 0],
+                  ["Claims today (UTC)",       clientStats?.calibration?.claims_today ?? 0],
+                  ["Claims from Light client", clientStats?.calibration?.claims_from_light ?? 0],
+                  ["Claims with rewarded ad",  clientStats?.calibration?.claims_with_ad ?? 0],
+                  ["Ad completion rate",
+                    `${(((clientStats?.calibration?.ad_completion_rate) || 0) * 100).toFixed(1)}%`],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex justify-between items-baseline py-2 border-b border-white/[0.05]">
+                    <span className="font-mono uppercase tracking-[0.2em] text-[11px] text-white/55">{k}</span>
+                    <span className="font-mono font-bold tabular-nums text-[#00d9ff]">{v}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-3xl glass p-6" data-testid="client-stats-admob">
+                <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/40 mb-3">
+                  // admob_runtime_config
+                </div>
+                <div className="font-display text-lg font-bold mb-4">AdMob Runtime</div>
+                {admobCfg ? (
+                  <div className="space-y-2 text-[12px] font-mono">
+                    <div className="flex justify-between"><span className="text-white/55 uppercase tracking-[0.18em]">ad_mode</span>
+                      <span className={`font-bold ${
+                        admobCfg.ad_mode === "production" ? "text-[#00ff88]" :
+                        admobCfg.ad_mode === "test"       ? "text-[#00d9ff]" :
+                                                            "text-amber-300"
+                      }`}>{admobCfg.ad_mode}</span></div>
+                    <div className="flex justify-between"><span className="text-white/55 uppercase tracking-[0.18em]">admob_enabled</span>
+                      <span className="text-white">{String(admobCfg.admob_enabled)}</span></div>
+                    <div className="flex justify-between"><span className="text-white/55 uppercase tracking-[0.18em]">test_mode (env)</span>
+                      <span className="text-white">{String(admobCfg.admob_test_mode)}</span></div>
+                    <div className="flex justify-between flex-wrap gap-2"><span className="text-white/55 uppercase tracking-[0.18em]">app_id</span>
+                      <span className="text-white/80 truncate max-w-[260px]" title={admobCfg.admob_app_id}>{admobCfg.admob_app_id || "—"}</span></div>
+                    <div className="flex justify-between flex-wrap gap-2"><span className="text-white/55 uppercase tracking-[0.18em]">rewarded_unit</span>
+                      <span className="text-white/80 truncate max-w-[260px]" title={admobCfg.admob_rewarded_ad_unit_id}>{admobCfg.admob_rewarded_ad_unit_id || "—"}</span></div>
+                    {admobCfg.config_error && (
+                      <div className="mt-3 px-3 py-2 rounded-md bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[11px] uppercase tracking-[0.2em]">
+                        config_error · {admobCfg.config_error}
+                      </div>
+                    )}
+                    <div className="mt-4 pt-4 border-t border-white/[0.05] text-[10px] text-white/40 leading-relaxed">
+                      Real AdMob IDs come from <span className="text-[#00d9ff]">backend/.env</span> (ADMOB_ANDROID_APP_ID, ADMOB_REWARDED_AD_UNIT_ID).
+                      To switch to production: set <span className="text-white/70">ADMOB_TEST_MODE=false</span> and supply real IDs.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-white/40 text-sm">Loading…</div>
+                )}
+              </div>
+            </div>
+
+            {/* Risk flags */}
+            <div className="rounded-3xl glass p-6" data-testid="client-stats-risk">
+              <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/40 mb-3">
+                // risk_flags_by_client
+              </div>
+              <div className="font-display text-lg font-bold mb-4">Risk Flags</div>
+              {clientStats?.risk_flags_by_client && Object.keys(clientStats.risk_flags_by_client).length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {Object.entries(clientStats.risk_flags_by_client).map(([k, v]) => (
+                    <div key={k} className="px-4 py-3 rounded-lg bg-amber-400/5 border border-amber-400/20">
+                      <div className="font-mono uppercase tracking-[0.2em] text-[10px] text-amber-300/85">{k}</div>
+                      <div className="font-mono font-bold text-[20px] text-amber-300 tabular-nums">{v}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-white/40 text-sm">No risk flags raised.</div>
+              )}
+            </div>
+
+            <div className="text-[10px] uppercase tracking-[0.3em] font-mono text-white/35">
+              telemetry as of {clientStats?.as_of?.slice(0, 19).replace("T", " ") || "—"} · auto-refresh 5s
+            </div>
+          </div>
+        )}
 
         {tab === "buybacks" && (
           <div className="rounded-3xl glass p-6">

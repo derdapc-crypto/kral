@@ -92,9 +92,13 @@ public class MainActivity extends Activity {
             }
             @Override
             public void onPageFinished(WebView view, String url) {
-                // Inject a tiny shim so the React UI knows it is running inside the native APK.
+                // Inject a tiny shim so the React UI knows it is running inside the native APK
+                // and which flavor (light vs node_pro) is hosting it.
+                String clientType = "io.thegrid.light".equals(getPackageName()) ? "light" : "node_pro";
                 view.evaluateJavascript(
                     "window.__GRID_NATIVE__=true;" +
+                    "window.__GRID_CLIENT_TYPE__='" + clientType + "';" +
+                    "window.__GRID_ADMOB_ENABLED__=" + (BuildConfig.ADMOB_ENABLED ? "true" : "false") + ";" +
                     "window.dispatchEvent(new CustomEvent('grid-native-ready'));", null);
             }
             // v1.5.6 — show an in-APK offline page when WebView fails to load
@@ -415,6 +419,66 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String getWorkerStats() {
             return WorkerState.statsJson(host);
+        }
+
+        // ---------- v1.7.5 Light AdMob bridge ----------
+        /** Reports the flavor of the currently-running APK to the React UI. */
+        @JavascriptInterface
+        public String getClientType() {
+            return "io.thegrid.light".equals(host.getPackageName()) ? "light" : "node_pro";
+        }
+
+        /** True only on Light APK builds that bundled the AdMob SDK. */
+        @JavascriptInterface
+        public boolean isAdMobAvailable() {
+            return BuildConfig.ADMOB_ENABLED && RewardedAdManager.sdkPresent();
+        }
+
+        /**
+         * Trigger a Rewarded Ad lifecycle. Resolves asynchronously by firing one of:
+         *   - window event 'grid:rewarded_ad_completed'
+         *   - window event 'grid:rewarded_ad_failed'
+         *   - window event 'grid:rewarded_ad_closed_without_reward'
+         *
+         * In Node Pro builds AdMob is disabled at compile time
+         * (BuildConfig.ADMOB_ENABLED=false) so this always fires 'failed' instantly.
+         */
+        @JavascriptInterface
+        public void requestRewardedAd() {
+            // Pull the AdMob runtime config so we use whichever ad unit ID the
+            // backend dictates (test in dev, real in production).  We avoid a
+            // network call in the bridge thread; instead we rely on the React
+            // side passing the config… but simplest: fetch in a worker thread.
+            new Thread(() -> {
+                String adUnitId = "ca-app-pub-3940256099942544/5224354917"; // safe Google test default
+                boolean testMode = true;
+                try {
+                    String base = GridApi.base(host).replaceAll("/+$", "");
+                    java.net.URL u = new java.net.URL(base + "/api/admob/config");
+                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) u.openConnection();
+                    c.setConnectTimeout(4000); c.setReadTimeout(4000);
+                    c.setRequestMethod("GET");
+                    java.io.BufferedReader br = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(c.getInputStream(), "UTF-8"));
+                    StringBuilder sb = new StringBuilder();
+                    String line; while ((line = br.readLine()) != null) sb.append(line);
+                    br.close();
+                    JSONObject j = new JSONObject(sb.toString());
+                    String rid = j.optString("admob_rewarded_ad_unit_id", "");
+                    if (rid != null && !rid.isEmpty()) adUnitId = rid;
+                    testMode = j.optBoolean("admob_test_mode", true);
+                    String mode = j.optString("ad_mode", "test");
+                    if ("disabled".equals(mode)) {
+                        // Backend explicitly says AdMob disabled — fail immediately.
+                        host.runOnUiThread(() -> host.webView.evaluateJavascript(
+                            "window.dispatchEvent(new CustomEvent('grid:rewarded_ad_failed'));", null));
+                        return;
+                    }
+                } catch (Throwable ignored) {
+                    // network error → keep test default + try the test-mode soft path
+                }
+                RewardedAdManager.requestAndShow(host, host.webView, adUnitId, testMode);
+            }).start();
         }
     }
 }

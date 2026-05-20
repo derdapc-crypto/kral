@@ -1763,6 +1763,7 @@ async def daily_calibration_claim(payload: dict = None, user: dict = Depends(get
     payload = payload or {}
     client_type = str(payload.get("client_type") or "unknown")
     ad_completed = bool(payload.get("ad_completed", False))
+    ad_mode      = str(payload.get("ad_mode") or "unknown")  # 'test' | 'production' | 'disabled' | 'unknown'
     device_id   = payload.get("device_id")
 
     # Light clients are required to complete a rewarded ad before claim.
@@ -1806,6 +1807,7 @@ async def daily_calibration_claim(payload: dict = None, user: dict = Depends(get
             "device_id": device_id,
             "client_type": client_type,
             "ad_completed": ad_completed,
+            "ad_mode": ad_mode,
             "eligible": True,
             "reason": "eligible",
             "created_at": now_iso,
@@ -1837,6 +1839,8 @@ async def daily_calibration_claim(payload: dict = None, user: dict = Depends(get
         "kind": "daily_calibration_bonus",
         "client_type": client_type,
         "ad_completed": ad_completed,
+        "ad_mode": ad_mode,
+        "reward_source": "daily_calibration",
         "tier": tier,
         "calibration_id": calib_id,
         "created_at": now_iso,
@@ -2973,41 +2977,104 @@ async def admin_client_stats(user: dict = Depends(require_admin)):
     }
 
 
-_ADMOB_DEFAULTS = {
-    "id": "global",
-    "admob_app_id":                 "ca-app-pub-3940256099942544~3347511713",  # Google test
-    "admob_rewarded_ad_unit_id":    "ca-app-pub-3940256099942544/5224354917",  # Google test
-    "admob_interstitial_ad_unit_id":"ca-app-pub-3940256099942544/1033173712",  # Google test
-    "admob_test_mode":              True,
-    "updated_at":                   None,
-}
+_ADMOB_TEST_APP_ID            = "ca-app-pub-3940256099942544~3347511713"
+_ADMOB_TEST_REWARDED_UNIT_ID  = "ca-app-pub-3940256099942544/5224354917"
+_ADMOB_TEST_INTERSTITIAL_UNIT = "ca-app-pub-3940256099942544/1033173712"
+
+
+def _admob_runtime_config() -> dict:
+    """Build the AdMob payload that ships to the Light APK.
+
+    Precedence:
+      1. If ADMOB_TEST_MODE=true → ALWAYS return Google's official test IDs.
+      2. Else use the .env real IDs (ADMOB_ANDROID_APP_ID, ADMOB_REWARDED_AD_UNIT_ID, …).
+      3. Else if real IDs are missing while TEST_MODE=false → return ad_mode='disabled'
+         so the client falls back to a "config missing" state instead of serving fake ads.
+    No real production IDs are ever hardcoded in source — they ONLY come from .env.
+    """
+    enabled    = (os.environ.get("ADMOB_ENABLED", "true").lower() == "true")
+    test_mode  = (os.environ.get("ADMOB_TEST_MODE", "true").lower() == "true")
+    real_app   = (os.environ.get("ADMOB_ANDROID_APP_ID")          or "").strip()
+    real_rew   = (os.environ.get("ADMOB_REWARDED_AD_UNIT_ID")     or "").strip()
+    real_int   = (os.environ.get("ADMOB_INTERSTITIAL_AD_UNIT_ID") or "").strip()
+
+    if not enabled:
+        return {
+            "id":                             "global",
+            "admob_enabled":                  False,
+            "admob_test_mode":                False,
+            "ad_mode":                        "disabled",
+            "admob_app_id":                   "",
+            "admob_rewarded_ad_unit_id":      "",
+            "admob_interstitial_ad_unit_id":  "",
+        }
+
+    if test_mode:
+        return {
+            "id":                             "global",
+            "admob_enabled":                  True,
+            "admob_test_mode":                True,
+            "ad_mode":                        "test",
+            "admob_app_id":                   _ADMOB_TEST_APP_ID,
+            "admob_rewarded_ad_unit_id":      _ADMOB_TEST_REWARDED_UNIT_ID,
+            "admob_interstitial_ad_unit_id":  _ADMOB_TEST_INTERSTITIAL_UNIT,
+        }
+
+    # Production mode — real IDs MUST come from .env. If any is missing, fail safe.
+    if not (real_app and real_rew):
+        return {
+            "id":                             "global",
+            "admob_enabled":                  True,
+            "admob_test_mode":                False,
+            "ad_mode":                        "disabled",
+            "admob_app_id":                   "",
+            "admob_rewarded_ad_unit_id":      "",
+            "admob_interstitial_ad_unit_id":  "",
+            "config_error":                   "production_ids_missing_in_env",
+        }
+    return {
+        "id":                             "global",
+        "admob_enabled":                  True,
+        "admob_test_mode":                False,
+        "ad_mode":                        "production",
+        "admob_app_id":                   real_app,
+        "admob_rewarded_ad_unit_id":      real_rew,
+        "admob_interstitial_ad_unit_id":  real_int,
+    }
 
 
 @api.get("/admob/config")
 async def admob_config_public():
     """Returned to the Light APK at startup. NodePro never calls this."""
-    row = await db.admob_config.find_one({"id": "global"}, {"_id": 0})
-    if not row:
-        await db.admob_config.insert_one({
-            **_ADMOB_DEFAULTS,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        })
-        return _ADMOB_DEFAULTS
-    return {**_ADMOB_DEFAULTS, **row}
+    cfg = _admob_runtime_config()
+    cfg["updated_at"] = datetime.now(timezone.utc).isoformat()
+    return cfg
 
 
 @api.get("/admin/admob/config")
 async def admob_config_admin(user: dict = Depends(require_admin)):
-    return await admob_config_public()
+    cfg = _admob_runtime_config()
+    cfg["env_source"] = {
+        "ADMOB_ENABLED":                bool((os.environ.get("ADMOB_ENABLED", "true").lower() == "true")),
+        "ADMOB_TEST_MODE":              bool((os.environ.get("ADMOB_TEST_MODE", "true").lower() == "true")),
+        "ADMOB_ANDROID_APP_ID_set":     bool((os.environ.get("ADMOB_ANDROID_APP_ID") or "").strip()),
+        "ADMOB_REWARDED_AD_UNIT_ID_set":bool((os.environ.get("ADMOB_REWARDED_AD_UNIT_ID") or "").strip()),
+    }
+    return cfg
 
 
 @api.post("/admin/admob/config")
 async def admob_config_write(payload: dict, user: dict = Depends(require_admin)):
+    """Operator override stored in MongoDB (does NOT mutate .env).
+    Used for emergency test/production toggles without redeploy.
+    """
     allowed = ["admob_app_id", "admob_rewarded_ad_unit_id",
-               "admob_interstitial_ad_unit_id", "admob_test_mode"]
+               "admob_interstitial_ad_unit_id", "admob_test_mode", "admob_enabled"]
     update: dict = {k: payload[k] for k in allowed if k in payload}
     if "admob_test_mode" in update:
         update["admob_test_mode"] = bool(update["admob_test_mode"])
+    if "admob_enabled" in update:
+        update["admob_enabled"] = bool(update["admob_enabled"])
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
     update["updated_by"] = user["email"]
     await db.admob_config.update_one(
