@@ -3345,6 +3345,77 @@ async def apk_version():
     }
 
 
+# ---------- v1.7.5 Dual-APK metadata ----------
+def _apk_flavor_meta(basename: str, expect_native: bool) -> dict:
+    """Read live APK off disk for honest size + sha256 + native_lib presence."""
+    import hashlib, zipfile
+    apk_fs = os.path.join("/app/frontend/public", basename)
+    out = {
+        "basename":            basename,
+        "download_url":        "/" + basename,
+        "size_bytes":          0,
+        "sha256":              "",
+        "native_lib_embedded": False,
+        "admob_included":      False,
+        "available":           False,
+    }
+    try:
+        with open(apk_fs, "rb") as f:
+            data = f.read()
+        out["size_bytes"] = len(data)
+        out["sha256"]     = hashlib.sha256(data).hexdigest()
+        out["available"]  = True
+        with zipfile.ZipFile(apk_fs) as z:
+            names = z.namelist()
+            for cand in ("lib/arm64-v8a/librandomx.so", "lib/armeabi-v7a/librandomx.so"):
+                if cand in names:
+                    out["native_lib_embedded"] = True
+                    break
+            # AdMob SDK detection: look for play-services-ads classes inside dex.
+            # Simplest heuristic — presence of an AdMob-related META file or
+            # class would imply SDK bundling. For the current CLI-only pipeline
+            # we just declare based on flavor expectation.
+        out["admob_included"] = (basename.endswith("-light.apk"))
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    return out
+
+
+@api.get("/apk/dual-version")
+async def apk_dual_version():
+    """v1.7.5 — honest metadata for both APK flavors. Used by Landing's
+    dual-installer panel so each artifact gets its own QR + checksum."""
+    light   = _apk_flavor_meta("grid-worker-light.apk",   expect_native=False)
+    nodepro = _apk_flavor_meta("grid-worker-nodepro.apk", expect_native=True)
+    return {
+        "version":     APK_VERSION,
+        "released_at": "2026-05-20",
+        "min_android": "7.0",
+        "abi":         ["arm64-v8a"],
+        "signed":      True,
+        "light": {
+            **light,
+            "package":              "io.thegrid.light",
+            "label":                "THE GRID Light",
+            "client_type":          "light",
+            "tagline":              "Official cloud client · store-safe · NO device-side cryptocurrency mining.",
+            "device_side_mining":   False,
+            "admob_enabled":        True,
+        },
+        "node_pro": {
+            **nodepro,
+            "package":              "io.thegrid.nodepro",
+            "label":                "THE GRID Node Pro",
+            "client_type":          "node_pro",
+            "tagline":              "Direct infrastructure client · explicit opt-in for device-side workloads.",
+            "device_side_mining":   True,
+            "admob_enabled":        False,
+        },
+    }
+
+
 @api.get("/notifications/digest")
 async def notifications_digest(user: dict = Depends(get_current_user)):
     """

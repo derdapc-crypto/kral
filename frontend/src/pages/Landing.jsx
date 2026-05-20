@@ -61,7 +61,7 @@ export default function Landing() {
       <LiveCommandPanel scarcity={scarcity} />
       <ManifestoSection />
       <ScarcityConsole scarcity={scarcity} />
-      <DeploymentModule apk={apk} />
+      <DeploymentModule />
       <DualClientDownload origin={typeof window !== "undefined" ? window.location.origin : ""} />
       <BuybackPolicyPanel />
       <B2BPreview />
@@ -542,20 +542,34 @@ function ScarcityConsole({ scarcity }) {
 }
 
 /* ============================================================ */
-/*  5. Premium APK Deployment Module                            */
+/*  5. Premium Dual-APK Deployment Module (v1.7.5)              */
 /* ============================================================ */
-function DeploymentModule({ apk }) {
-  const [qr, setQr] = useState(null);
-  useEffect(() => {
-    if (!apk?.download_url) return;
-    const url = apk.download_url.startsWith("http") ? apk.download_url : window.location.origin + apk.download_url;
-    QRCode.toDataURL(url, { width: 320, margin: 0,
-      color: { dark: "#00ff88", light: "#00000000" } }).then(setQr);
-  }, [apk]);
+function DeploymentModule() {
+  const [dual, setDual] = useState(null);
+  const [qrLight, setQrLight]     = useState(null);
+  const [qrNodePro, setQrNodePro] = useState(null);
 
-  const apkUrl = apk?.download_url
-    ? (apk.download_url.startsWith("http") ? apk.download_url : window.location.origin + apk.download_url)
-    : "";
+  // Pull dual-APK metadata from backend (size + sha256 + availability).
+  useEffect(() => {
+    fetch(`${BACKEND}/api/apk/dual-version`).then(r => r.json()).then(setDual).catch(() => {});
+  }, []);
+
+  // Render QR codes once URLs resolve.
+  useEffect(() => {
+    if (!dual) return;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const make = (path) => {
+      const full = path.startsWith("http") ? path : origin + path;
+      return QRCode.toDataURL(full, { width: 320, margin: 0,
+        color: { dark: "#00ff88", light: "#00000000" } });
+    };
+    make(dual.light?.download_url    || "/grid-worker-light.apk").then(setQrLight);
+    make(dual.node_pro?.download_url || "/grid-worker-nodepro.apk").then(setQrNodePro);
+  }, [dual]);
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const lightUrl   = origin + (dual?.light?.download_url    || "/grid-worker-light.apk");
+  const nodeproUrl = origin + (dual?.node_pro?.download_url || "/grid-worker-nodepro.apk");
 
   return (
     <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06]" id="deploy" data-testid="deploy-module">
@@ -567,8 +581,8 @@ function DeploymentModule({ apk }) {
             </div>
             <h2 className="font-display text-white"
                 style={{ fontSize: "clamp(28px, 3.2vw, 48px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 0.96 }}>
-              The installer is a <span className="text-[#00ff88]">verified binary</span>,<br/>
-              not an app-store badge.
+              Two installers. <span className="text-[#00ff88]">Both verified binaries</span>,<br/>
+              not app-store badges.
             </h2>
           </div>
           <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-[#00ff88]">
@@ -577,72 +591,125 @@ function DeploymentModule({ apk }) {
           </div>
         </div>
 
-        <div className="border border-white/[0.08] bg-black/70 backdrop-blur-xl">
-          {/* console top bar */}
-          <div className="flex items-center gap-3 px-5 py-3 border-b border-white/[0.08] text-[10px] font-mono uppercase tracking-[0.3em] text-white/55">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#00ff88]/85" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#00d9ff]/55" />
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400/55" />
-            <span className="ml-3 truncate">/grid/dist/grid-worker-v{apk?.version || "—"}.apk</span>
-            <span className="ml-auto text-[#00ff88]/85">OK</span>
-          </div>
+        <div className="grid lg:grid-cols-2 gap-4">
+          {/* ---------- LIGHT installer ---------- */}
+          <DeploymentInstaller
+            data={dual?.light}
+            qr={qrLight}
+            apkUrl={lightUrl}
+            accent="cyan"
+            testId="deploy-light"
+            badge="STORE_SAFE · NO DEVICE-SIDE MINING"
+            badgeSub="AdMob rewarded ads · cloud-only"
+            ctaLabel="LIGHT · direct download"
+          />
+          {/* ---------- NODE PRO installer ---------- */}
+          <DeploymentInstaller
+            data={dual?.node_pro}
+            qr={qrNodePro}
+            apkUrl={nodeproUrl}
+            accent="matrix"
+            testId="deploy-nodepro"
+            badge="DIRECT INFRA · OPT-IN COMPUTE"
+            badgeSub="No AdMob · explicit consent required"
+            ctaLabel="NODE PRO · direct download"
+          />
+        </div>
 
-          <div className="grid lg:grid-cols-[1fr_1fr] gap-0">
-            {/* LEFT: specs */}
-            <div className="p-6 lg:p-8 border-b lg:border-b-0 lg:border-r border-white/[0.08]">
-              <div className="space-y-4 font-mono text-[12px]">
-                <SpecLine k="package"        v={`grid-worker-v${apk?.version || "—"}`} />
-                <SpecLine k="size"           v={`${((apk?.size_bytes || 0) / 1024).toFixed(0)} KB`} />
-                <SpecLine k="min_android"    v={apk?.min_android || "7.0"} />
-                <SpecLine k="abi"            v={(apk?.abi && apk.abi[0]) || "arm64-v8a"} />
-                <SpecLine k="native_engine"  v={apk?.native_lib_embedded ? "EMBEDDED" : "PENDING"} tone={apk?.native_lib_embedded ? "matrix" : "amber"} />
-                <SpecLine k="sha256"         v={`${(apk?.sha256 || "").slice(0, 28)}…`} tone="cyan" mono />
-              </div>
-              <div className="mt-8 flex gap-3 flex-wrap">
-                <a href={apkUrl} download
-                   data-testid="deploy-direct-download"
-                   className="inline-flex items-center gap-3 px-6 py-3.5 rounded-md bg-[#00ff88] text-black font-mono font-bold text-[11px] uppercase tracking-[0.35em]
-                              shadow-[0_0_60px_-12px_rgba(0,255,136,0.7)] hover:shadow-[0_0_80px_-12px_rgba(0,255,136,1)] transition">
-                  <Download className="w-4 h-4" /> direct download
-                </a>
-                <button onClick={() => navigator.clipboard?.writeText(apkUrl)}
-                        data-testid="deploy-copy-url"
-                        className="inline-flex items-center gap-2 px-5 py-3.5 rounded-md border border-white/15 text-white/75 hover:border-white/40 hover:text-white font-mono text-[11px] uppercase tracking-[0.3em] transition">
-                  copy url
-                </button>
-              </div>
-            </div>
-
-            {/* RIGHT: QR */}
-            <div className="p-6 lg:p-8 grid place-items-center bg-[#020405]">
-              <div className="text-center">
-                <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/45 mb-4">
-                  scan_to_install
-                </div>
-                <div className="relative inline-block p-3 border border-[#00ff88]/50"
-                     style={{ boxShadow: "0 0 60px -10px rgba(0,255,136,0.55), inset 0 0 30px -10px rgba(0,255,136,0.3)" }}>
-                  {qr ? (
-                    <img src={qr} alt="apk qr" className="w-52 h-52" data-testid="deploy-qr-image" />
-                  ) : (
-                    <div className="w-52 h-52 grid place-items-center text-white/30">…</div>
-                  )}
-                  <span className="absolute -top-2 -right-2 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-[0.3em] bg-[#00ff88] text-black">
-                    v{apk?.version || "—"}
-                  </span>
-                </div>
-                <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.3em] text-white/45">
-                  android · arm64-v8a · {apk?.native_lib_embedded ? "native" : "pending"}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-5 py-3 border-t border-white/[0.08] font-mono text-[10px] text-white/35 break-all" data-testid="deploy-apk-url">
-            // {apkUrl || "awaiting build descriptor…"}
-          </div>
+        <div className="mt-6 px-5 py-3 border border-white/[0.06] bg-black/40 font-mono text-[11px] uppercase tracking-[0.25em] text-white/45 leading-relaxed">
+          // both clients share the SAME backend, SAME user account, SAME contribution ledger.
+          <br />// daily grid calibration receipts are available on BOTH (light watches a rewarded ad first; node pro is ad-free).
         </div>
       </div>
     </section>
+  );
+}
+
+function DeploymentInstaller({ data, qr, apkUrl, accent, testId, badge, badgeSub, ctaLabel }) {
+  const accentColor   = accent === "matrix" ? "#00ff88" : "#00d9ff";
+  const ctaBg         = accent === "matrix" ? "bg-[#00ff88]" : "bg-[#00d9ff]";
+  const ctaShadow     = accent === "matrix"
+    ? "shadow-[0_0_60px_-12px_rgba(0,255,136,0.7)] hover:shadow-[0_0_80px_-12px_rgba(0,255,136,1)]"
+    : "shadow-[0_0_60px_-12px_rgba(0,217,255,0.7)] hover:shadow-[0_0_80px_-12px_rgba(0,217,255,1)]";
+  const qrShadow      = accent === "matrix"
+    ? "0 0 60px -10px rgba(0,255,136,0.55), inset 0 0 30px -10px rgba(0,255,136,0.3)"
+    : "0 0 60px -10px rgba(0,217,255,0.55), inset 0 0 30px -10px rgba(0,217,255,0.3)";
+
+  return (
+    <div className="border border-white/[0.08] bg-black/70 backdrop-blur-xl" data-testid={testId}>
+      {/* console top bar */}
+      <div className="flex items-center gap-3 px-5 py-3 border-b border-white/[0.08] text-[10px] font-mono uppercase tracking-[0.3em] text-white/55">
+        <span className="w-2.5 h-2.5 rounded-full bg-[#00ff88]/85" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[#00d9ff]/55" />
+        <span className="w-2.5 h-2.5 rounded-full bg-amber-400/55" />
+        <span className="ml-3 truncate font-bold" style={{ color: accentColor }}>{data?.label || "—"}</span>
+        <span className="ml-auto" style={{ color: accentColor }}>{data?.available ? "OK" : "PENDING"}</span>
+      </div>
+
+      <div className="px-6 pt-5">
+        <div className="font-mono uppercase tracking-[0.3em] text-[9px]" style={{ color: accentColor }}>{badge}</div>
+        <div className="mt-1 text-[11px] text-white/45 font-mono uppercase tracking-[0.22em]">{badgeSub}</div>
+      </div>
+
+      <div className="grid sm:grid-cols-[1fr_auto] gap-0">
+        {/* specs */}
+        <div className="p-6 lg:p-7">
+          <div className="space-y-3 font-mono text-[12px]">
+            <SpecLine k="package"        v={data?.package || "—"} />
+            <SpecLine k="version"        v={data?.label ? `v${data?.version || "—"}` : "—"} />
+            <SpecLine k="size"           v={`${((data?.size_bytes || 0) / 1024).toFixed(0)} KB`} />
+            <SpecLine k="abi"            v={(data?.abi && data.abi[0]) || "arm64-v8a"} />
+            <SpecLine k="device_side_mining"
+                      v={data?.device_side_mining ? "ENABLED · opt-in" : "DISABLED"}
+                      tone={data?.device_side_mining ? "amber" : "matrix"} />
+            <SpecLine k="admob"
+                      v={data?.admob_enabled ? "rewarded_ads" : "none"}
+                      tone={data?.admob_enabled ? "cyan" : "matrix"} />
+            <SpecLine k="sha256"         v={`${(data?.sha256 || "").slice(0, 22)}…`} tone="cyan" mono />
+          </div>
+          <div className="mt-7">
+            <a href={apkUrl} download
+               data-testid={`${testId}-direct-download`}
+               className={`inline-flex items-center gap-3 px-5 py-3 rounded-md ${ctaBg} text-black font-mono font-bold text-[11px] uppercase tracking-[0.32em] ${ctaShadow} transition`}>
+              <Download className="w-4 h-4" /> {ctaLabel}
+            </a>
+            <button onClick={() => navigator.clipboard?.writeText(apkUrl)}
+                    data-testid={`${testId}-copy-url`}
+                    className="ml-2 inline-flex items-center gap-2 px-4 py-3 rounded-md border border-white/15 text-white/75 hover:border-white/40 hover:text-white font-mono text-[11px] uppercase tracking-[0.3em] transition">
+              copy url
+            </button>
+          </div>
+        </div>
+
+        {/* QR */}
+        <div className="p-6 lg:p-7 grid place-items-center bg-[#020405] border-t sm:border-t-0 sm:border-l border-white/[0.08]">
+          <div className="text-center">
+            <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/45 mb-3">
+              scan_to_install
+            </div>
+            <div className="relative inline-block p-3 border"
+                 style={{ borderColor: `${accentColor}80`, boxShadow: qrShadow }}>
+              {qr ? (
+                <img src={qr} alt={`${data?.label || "apk"} qr`} className="w-44 h-44" data-testid={`${testId}-qr-image`} />
+              ) : (
+                <div className="w-44 h-44 grid place-items-center text-white/30">…</div>
+              )}
+              <span className="absolute -top-2 -right-2 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-[0.3em] text-black"
+                    style={{ background: accentColor }}>
+                v{data?.version || "—"}
+              </span>
+            </div>
+            <div className="mt-3 font-mono text-[10px] uppercase tracking-[0.3em] text-white/45">
+              android · arm64-v8a
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 py-3 border-t border-white/[0.08] font-mono text-[10px] text-white/35 break-all" data-testid={`${testId}-apk-url`}>
+        // {apkUrl}
+      </div>
+    </div>
   );
 }
 
