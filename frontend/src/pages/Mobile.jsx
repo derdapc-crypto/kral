@@ -335,6 +335,34 @@ export default function Mobile() {
 
         {tab === "node" && (
           <>
+            {/* v1.7.5 — dual client download banner (shown on web /mobile only,
+                hidden inside the APK WebView via the GridNative.isAndroid hook) */}
+            {typeof window !== "undefined" && !window.GridNative && (
+              <div className="mt-4 rounded-xl border border-white/10 bg-black/60 p-3" data-testid="mobile-client-matrix">
+                <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/45 mb-2">
+                  // choose_your_client
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <a href="/grid-worker-light.apk" download data-testid="mobile-light-cta"
+                     className="block p-3 rounded-lg border border-[#00d9ff]/30 hover:border-[#00d9ff]/70 bg-black/40">
+                    <div className="text-[10px] uppercase tracking-[0.3em] text-[#00d9ff] font-mono">light</div>
+                    <div className="font-mono-cyber font-black text-[12px] text-white mt-1">CLOUD CLIENT</div>
+                    <div className="text-[9px] text-white/45 mt-1 leading-tight">
+                      store-safe · no device mining
+                    </div>
+                  </a>
+                  <a href="/grid-worker-nodepro.apk" download data-testid="mobile-nodepro-cta"
+                     className="block p-3 rounded-lg border border-[#00ff88]/30 hover:border-[#00ff88]/70 bg-black/40">
+                    <div className="text-[10px] uppercase tracking-[0.3em] text-[#00ff88] font-mono">node pro</div>
+                    <div className="font-mono-cyber font-black text-[12px] text-white mt-1">DIRECT CLIENT</div>
+                    <div className="text-[9px] text-white/45 mt-1 leading-tight">
+                      opt-in device-side workloads
+                    </div>
+                  </a>
+                </div>
+              </div>
+            )}
+
             <div className="mt-6 grid place-items-center">
               <button onClick={handleEngage}
                 disabled={!device}

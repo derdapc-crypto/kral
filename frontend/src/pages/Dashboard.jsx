@@ -213,6 +213,32 @@ export default function Dashboard() {
                          tone={totalWorkUnits === 0 ? "amber" : "matrix"} />
             <CockpitCell k="SNAPSHOT_READINESS"    v="PRE-MAINNET · ACCUMULATING" tone="violet" />
           </div>
+
+          {/* v1.7.5 — active client badge (derived from the first device's client_type) */}
+          {devices.length > 0 && (
+            <div className="mt-4 inline-flex items-center gap-3 px-4 py-2 border border-white/10 rounded-md bg-black/40"
+                 data-testid="dashboard-active-client">
+              <span className="font-mono uppercase tracking-[0.3em] text-[9px] text-white/45">active_client</span>
+              {(() => {
+                const ct = devices[0]?.client_type || "unknown";
+                const isLight = ct === "light";
+                const isNode  = ct === "node_pro";
+                const label = isLight ? "LIGHT_CLOUD" : isNode ? "NODE_PRO_DIRECT" : "LEGACY";
+                const tone  = isLight ? "text-[#00d9ff]" : isNode ? "text-[#00ff88]" : "text-white/55";
+                const sub   = isLight
+                  ? "Official cloud client · no device-side workloads"
+                  : isNode
+                    ? "Direct infrastructure client · device-side workloads enabled by user opt-in"
+                    : "Unidentified client · upgrade recommended";
+                return (
+                  <>
+                    <span className={`font-mono-cyber font-black text-[12px] tracking-[0.2em] ${tone}`}>{label}</span>
+                    <span className="text-[10px] text-white/45 hidden md:inline">· {sub}</span>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
 
         {/* Power-Up + Tier Forecast (still visible — they reflect contribution velocity) */}

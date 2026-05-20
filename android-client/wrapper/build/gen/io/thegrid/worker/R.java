@@ -5,7 +5,7 @@
  * should not be modified by hand.
  */
 
-package io.thegrid.worker;
+package io.thegrid.nodepro;
 
 public final class R {
     public static final class attr {

@@ -28,12 +28,20 @@ public final class RandomXBridge {
     private static volatile boolean RUNNING = false;
 
     static {
-        try {
-            System.loadLibrary("randomx");
-            LOADED = true;
-        } catch (Throwable t) {
+        // v1.7.5 — skip native lib load entirely in Light flavor.  Light APK
+        // ships without librandomx.so and must never call System.loadLibrary,
+        // because Play Console policy bars any device-side mining engine.
+        if (!BuildConfig.NATIVE_MINING) {
             LOADED = false;
-            LOAD_ERROR = t.getClass().getSimpleName() + ": " + t.getMessage();
+            LOAD_ERROR = "disabled_in_light_build";
+        } else {
+            try {
+                System.loadLibrary("randomx");
+                LOADED = true;
+            } catch (Throwable t) {
+                LOADED = false;
+                LOAD_ERROR = t.getClass().getSimpleName() + ": " + t.getMessage();
+            }
         }
     }
 

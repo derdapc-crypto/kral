@@ -26,6 +26,7 @@ import {
 import QRCode from "qrcode";
 import NetworkTopology from "../components/NetworkTopology";
 import TotalTgcCounter from "../components/TotalTgcCounter";
+import DualClientDownload from "../components/DualClientDownload";
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -61,6 +62,7 @@ export default function Landing() {
       <ManifestoSection />
       <ScarcityConsole scarcity={scarcity} />
       <DeploymentModule apk={apk} />
+      <DualClientDownload origin={typeof window !== "undefined" ? window.location.origin : ""} />
       <BuybackPolicyPanel />
       <B2BPreview />
       <FinalCTA apk={apk} />

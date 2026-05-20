@@ -549,7 +549,8 @@ public class GridWorkerService extends Service {
             "\"native_pow\":%s,\"mining_status\":\"%s\",\"node_state\":\"%s\"," +
             "\"eco_mode\":%s,\"allow_on_battery\":%s,\"active_threads\":%d," +
             "\"local_hashrate_hps\":%.2f,\"accepted_shares\":%d,\"rejected_shares\":%d," +
-            "\"native_lib_loaded\":%s,\"mining_requested\":%s,\"node_engaged\":%s}",
+            "\"native_lib_loaded\":%s,\"mining_requested\":%s,\"node_engaged\":%s," +
+            "\"client_type\":\"%s\",\"app_flavor\":\"%s\",\"build_version\":\"%s\"}",
             deviceId, charging, onWifi, batteryPct, batteryPct, tempC,
             (tempC > TEMP_LIMIT_C ? "hot" : "nominal"),
             netType,
@@ -560,7 +561,8 @@ public class GridWorkerService extends Service {
             WorkerState.isAllowOnBattery(ctx),
             activeThreads,
             localHashrate, accepted, rejected,
-            RandomXBridge.available(), miningRequested, miningRequested);
+            RandomXBridge.available(), miningRequested, miningRequested,
+            BuildConfig.FLAVOR, BuildConfig.FLAVOR, BuildConfig.VERSION_NAME);
         try {
             String resp = GridApi.post(ctx, "/api/devices/heartbeat", body);
             WorkerState.markHeartbeat(ctx);

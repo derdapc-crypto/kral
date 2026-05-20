@@ -5,9 +5,9 @@
   with different package names.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="io.thegrid.nodepro"
-    android:versionCode="10705"
-    android:versionName="1.7.5">
+    package="@@PACKAGE@@"
+    android:versionCode="@@VERSION_CODE@@"
+    android:versionName="@@VERSION_NAME@@">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 
@@ -22,7 +22,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
-        android:label="THE GRID Node Pro"
+        android:label="@@APP_LABEL@@"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/AppTheme"

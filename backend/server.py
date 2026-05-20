@@ -242,6 +242,7 @@ class DeviceRegisterIn(BaseModel):
     app_version: Optional[str] = None
     device_id: Optional[str] = None  # client-generated stable device id
     is_emulator: Optional[bool] = False
+    client_type: Optional[str] = None  # v1.7.5 — "light" | "node_pro" | None
 
 
 class HeartbeatIn(BaseModel):
@@ -917,6 +918,8 @@ async def register_device(data: DeviceRegisterIn, request: Request, user: dict =
         "register_ip": ip,
         "session_tasks": 0,
         "session_tgc": 0.0,
+        # v1.7.5 — client type telemetry
+        "client_type": data.client_type or "unknown",
     }
     await db.devices.insert_one(doc)
     doc.pop("_id", None)
@@ -1748,8 +1751,24 @@ async def daily_calibration_status(user: dict = Depends(get_current_user)):
 
 
 @api.post("/daily-calibration/claim")
-async def daily_calibration_claim(user: dict = Depends(get_current_user)):
-    """Atomic daily calibration claim with same-day idempotency."""
+async def daily_calibration_claim(payload: dict = None, user: dict = Depends(get_current_user)):
+    """Atomic daily calibration claim with same-day idempotency.
+
+    v1.7.5 — request body may carry:
+      - client_type: "light" | "node_pro" | None
+      - ad_completed: bool (Light clients MUST set this true; gated by AdMob
+        rewarded ad on device. NodePro and unknown clients ignore it.)
+      - device_id: optional
+    """
+    payload = payload or {}
+    client_type = str(payload.get("client_type") or "unknown")
+    ad_completed = bool(payload.get("ad_completed", False))
+    device_id   = payload.get("device_id")
+
+    # Light clients are required to complete a rewarded ad before claim.
+    if client_type == "light" and not ad_completed:
+        raise HTTPException(status_code=402, detail="ad_not_completed")
+
     date_key = _today_utc_key()
 
     # Idempotency: unique (user_id, date_key) — return existing claim instead of dupliacting.
@@ -1784,7 +1803,9 @@ async def daily_calibration_claim(user: dict = Depends(get_current_user)):
             "date_key": date_key,
             "reward_tgc": reward_tgc,
             "reward_tier": tier,
-            "device_id": None,
+            "device_id": device_id,
+            "client_type": client_type,
+            "ad_completed": ad_completed,
             "eligible": True,
             "reason": "eligible",
             "created_at": now_iso,
@@ -1810,10 +1831,12 @@ async def daily_calibration_claim(user: dict = Depends(get_current_user)):
     await db.tgc_ledger.insert_one({
         "id": burn_ledger_id,
         "user_id": user["id"],
-        "device_id": None,
+        "device_id": device_id,
         "tgc": reward_tgc,
         "usdt_value": round(reward_tgc * USDT_PER_TGC, 6),
         "kind": "daily_calibration_bonus",
+        "client_type": client_type,
+        "ad_completed": ad_completed,
         "tier": tier,
         "calibration_id": calib_id,
         "created_at": now_iso,
@@ -2890,6 +2913,109 @@ async def admin_buybacks_reject(application_id: str, user: dict = Depends(requir
     )
     updated = await db.buyback_applications.find_one({"id": application_id}, {"_id": 0})
     return {"ok": True, "status": "rejected", "application": updated}
+
+
+# ---------- v1.7.5 Client Type Telemetry & AdMob Config ----------
+@api.get("/admin/client-stats")
+async def admin_client_stats(user: dict = Depends(require_admin)):
+    """Light vs Node Pro split across the entire network."""
+    # Devices by client_type
+    cutoff_iso = (datetime.now(timezone.utc) - timedelta(seconds=300)).isoformat()
+    dev_total: dict = {"light": 0, "node_pro": 0, "unknown": 0}
+    dev_active: dict = {"light": 0, "node_pro": 0, "unknown": 0}
+    async for row in db.devices.aggregate([
+        {"$group": {"_id": "$client_type", "count": {"$sum": 1}}},
+    ]):
+        k = (row["_id"] or "unknown")
+        dev_total[k] = dev_total.get(k, 0) + int(row["count"])
+    async for row in db.devices.aggregate([
+        {"$match": {"last_heartbeat": {"$gte": cutoff_iso}}},
+        {"$group": {"_id": "$client_type", "count": {"$sum": 1}}},
+    ]):
+        k = (row["_id"] or "unknown")
+        dev_active[k] = dev_active.get(k, 0) + int(row["count"])
+
+    # TGC issued by client_type (positive entries only)
+    tgc_by_client: dict = {}
+    async for row in db.tgc_ledger.aggregate([
+        {"$match": {"tgc": {"$gt": 0}}},
+        {"$group": {"_id": "$client_type", "sum": {"$sum": "$tgc"}}},
+    ]):
+        tgc_by_client[row["_id"] or "unknown"] = round(float(row["sum"] or 0), 5)
+
+    # Daily calibration breakdown
+    calib_total      = await db.daily_calibrations.count_documents({})
+    calib_with_ad    = await db.daily_calibrations.count_documents({"ad_completed": True})
+    calib_light      = await db.daily_calibrations.count_documents({"client_type": "light"})
+    calib_today      = await db.daily_calibrations.count_documents({"date_key": _today_utc_key()})
+
+    # Risk flags by client type
+    risk_by_client: dict = {}
+    async for row in db.devices.aggregate([
+        {"$match": {"risk_flagged": True}},
+        {"$group": {"_id": "$client_type", "count": {"$sum": 1}}},
+    ]):
+        risk_by_client[row["_id"] or "unknown"] = int(row["count"])
+
+    return {
+        "devices_total_by_client":  dev_total,
+        "devices_active_by_client": dev_active,
+        "tgc_issued_by_client":     tgc_by_client,
+        "calibration": {
+            "total_claims":         calib_total,
+            "claims_with_ad":       calib_with_ad,
+            "claims_from_light":    calib_light,
+            "claims_today":         calib_today,
+            "ad_completion_rate":   (calib_with_ad / max(1, calib_total)) if calib_total else 0.0,
+        },
+        "risk_flags_by_client":     risk_by_client,
+        "as_of":                    datetime.now(timezone.utc).isoformat(),
+    }
+
+
+_ADMOB_DEFAULTS = {
+    "id": "global",
+    "admob_app_id":                 "ca-app-pub-3940256099942544~3347511713",  # Google test
+    "admob_rewarded_ad_unit_id":    "ca-app-pub-3940256099942544/5224354917",  # Google test
+    "admob_interstitial_ad_unit_id":"ca-app-pub-3940256099942544/1033173712",  # Google test
+    "admob_test_mode":              True,
+    "updated_at":                   None,
+}
+
+
+@api.get("/admob/config")
+async def admob_config_public():
+    """Returned to the Light APK at startup. NodePro never calls this."""
+    row = await db.admob_config.find_one({"id": "global"}, {"_id": 0})
+    if not row:
+        await db.admob_config.insert_one({
+            **_ADMOB_DEFAULTS,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return _ADMOB_DEFAULTS
+    return {**_ADMOB_DEFAULTS, **row}
+
+
+@api.get("/admin/admob/config")
+async def admob_config_admin(user: dict = Depends(require_admin)):
+    return await admob_config_public()
+
+
+@api.post("/admin/admob/config")
+async def admob_config_write(payload: dict, user: dict = Depends(require_admin)):
+    allowed = ["admob_app_id", "admob_rewarded_ad_unit_id",
+               "admob_interstitial_ad_unit_id", "admob_test_mode"]
+    update: dict = {k: payload[k] for k in allowed if k in payload}
+    if "admob_test_mode" in update:
+        update["admob_test_mode"] = bool(update["admob_test_mode"])
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    update["updated_by"] = user["email"]
+    await db.admob_config.update_one(
+        {"id": "global"},
+        {"$set": update, "$setOnInsert": {"id": "global"}},
+        upsert=True,
+    )
+    return await admob_config_public()
 
 
 @api.get("/admin/payouts")
