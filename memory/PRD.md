@@ -65,6 +65,72 @@ Build a real, working, phone-based distributed compute network that:
 - `POST /api/mobile-mining/poll/submit`    — share submission fallback
 - `GET /api/admin/mobile-mining/diagnostics`
 
+## v1.7.5 "Dual-Client Network & Monetization" — Feb 2026 ✅
+
+**Goal**: Resolve store Trust & Safety compliance by splitting THE GRID into
+two distinct APK clients that share one backend, ledger, and user account.
+
+### Dual APK pipeline
+- `build-apk.sh` accepts `FLAVOR=light|nodepro` and emits two artifacts:
+  - **THE GRID LIGHT** → `grid-worker-light.apk`, package `io.thegrid.light`,
+    NO `librandomx.so`, AdMob Rewarded Ad gates the Daily Calibration claim.
+  - **THE GRID NODE PRO** → `grid-worker-nodepro.apk`, package
+    `io.thegrid.nodepro`, bundles `librandomx.so`, NO AdMob SDK.
+- BuildConfig.java auto-generated with `FLAVOR`, `VERSION_NAME`,
+  `VERSION_CODE`, `ADMOB_ENABLED`, `NATIVE_MINING`.
+- `RewardedAdManager.java` compiled ONLY for the light flavor.
+
+### AdMob — env-driven, never hardcoded
+- `backend/.env` keys: `ADMOB_ENABLED`, `ADMOB_TEST_MODE`,
+  `ADMOB_ANDROID_APP_ID`, `ADMOB_REWARDED_AD_UNIT_ID`,
+  `ADMOB_INTERSTITIAL_AD_UNIT_ID`.
+- `ADMOB_TEST_MODE=true` (default) → Google test IDs
+  (`ca-app-pub-3940256099942544/5224354917`).
+- `ADMOB_TEST_MODE=false` + real IDs in .env → production IDs returned.
+- `ADMOB_TEST_MODE=false` + missing real IDs → `ad_mode='disabled'` +
+  `config_error='production_ids_missing_in_env'` (fail-safe, no fake ads).
+- Operator-runtime override via `POST /api/admin/admob/config` writes to
+  `db.admob_config` and overlays on top of .env at read time (test_mode
+  override forces test IDs, disabled override forces ad_mode='disabled').
+
+### Backend ad-gate
+- `POST /api/daily-calibration/claim` body accepts
+  `{client_type, ad_completed, ad_mode, device_id}`.
+- `client_type=='light'` + `ad_completed=false` → **HTTP 402 `ad_not_completed`**.
+- `client_type=='node_pro'` or `'unknown'` → ad gate skipped.
+- `tgc_ledger` rows carry `client_type`, `ad_completed`, `ad_mode`,
+  `reward_source='daily_calibration'`, `tier`.
+
+### New endpoints
+- `GET  /api/admob/config` (public — for Light APK at startup)
+- `GET  /api/admin/admob/config` (admin — with env_source diagnostics)
+- `POST /api/admin/admob/config` (admin — runtime override, persisted in MongoDB)
+- `GET  /api/admin/client-stats` (admin — light vs node_pro split)
+
+### Frontend
+- Admin → new **Client Stats** tab (data-testid `admin-tab-client-stats`):
+  KPI grid (Light total / active, Node Pro total / active, TGC by client),
+  Calibration Claims panel, AdMob Runtime panel (ad_mode, IDs, env source),
+  Risk Flags panel.
+- `DailyCalibration.jsx` detects flavor via `window.__GRID_CLIENT_TYPE__`
+  (injected by MainActivity.onPageFinished). Light flow:
+  `ad_loading` → `requestRewardedAd()` → CustomEvents
+  (`grid:rewarded_ad_completed` / `_failed` / `_closed_without_reward`) →
+  claim with `ad_completed=true, ad_mode='test'`. Web preview soft-completes
+  after 1.5s when AdMob is in test mode (backend still enforces gating).
+- `Landing.jsx` + `Mobile.jsx`: dual download panels.
+- `Dashboard.jsx`: active client badge (`light_cloud` / `node_pro_direct`).
+
+### Android wrapper
+- `RewardedAdManager.java` uses **reflection** to call Google Play Services
+  AdMob SDK — code compiles without the AAR on classpath. When the SDK is
+  bundled (`ADMOB_SDK_CP` set during build), it runs the real Rewarded Ad
+  lifecycle. When missing, it soft-completes in test mode (so QA flows
+  without a real device) and fails hard in production.
+- `MainActivity` injects `__GRID_CLIENT_TYPE__` + `__GRID_ADMOB_ENABLED__`
+  into the WebView at page load.
+- JS bridge: `getClientType()`, `isAdMobAvailable()`, `requestRewardedAd()`.
+
 ## v1.6.4 "Operator-Tunable Mining Policy" — Feb 2026 ✅
 - Admin → Mining Config tab: global kill switch + CPU throttle (5-100%)
   + max threads (1-8) + min battery + max temperature + require_wifi /

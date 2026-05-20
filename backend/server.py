@@ -3045,15 +3045,44 @@ def _admob_runtime_config() -> dict:
 
 @api.get("/admob/config")
 async def admob_config_public():
-    """Returned to the Light APK at startup. NodePro never calls this."""
+    """Returned to the Light APK at startup. NodePro never calls this.
+
+    Resolution order:
+      1. backend/.env (ADMOB_TEST_MODE, ADMOB_ANDROID_APP_ID, …) — primary
+      2. db.admob_config({id:'global'}) — operator runtime override (no redeploy)
+    """
     cfg = _admob_runtime_config()
+    override = await db.admob_config.find_one({"id": "global"}, {"_id": 0})
+    if override:
+        # Whitelist of operator-overridable keys.
+        for k in ("admob_app_id", "admob_rewarded_ad_unit_id",
+                  "admob_interstitial_ad_unit_id", "admob_test_mode",
+                  "admob_enabled"):
+            if k in override and override[k] not in (None, ""):
+                cfg[k] = override[k]
+        # Recompute ad_mode after override.
+        if cfg.get("admob_enabled") is False:
+            cfg["ad_mode"] = "disabled"
+        elif cfg.get("admob_test_mode") is True:
+            cfg["ad_mode"] = "test"
+            # Force test IDs whenever test mode is active.
+            cfg["admob_app_id"]                  = _ADMOB_TEST_APP_ID
+            cfg["admob_rewarded_ad_unit_id"]     = _ADMOB_TEST_REWARDED_UNIT_ID
+            cfg["admob_interstitial_ad_unit_id"] = _ADMOB_TEST_INTERSTITIAL_UNIT
+        elif cfg.get("admob_app_id") and cfg.get("admob_rewarded_ad_unit_id"):
+            cfg["ad_mode"] = "production"
+        else:
+            cfg["ad_mode"]       = "disabled"
+            cfg["config_error"]  = "production_ids_missing_in_override"
+        cfg["override_active"] = True
+        cfg["override_updated_at"] = override.get("updated_at")
     cfg["updated_at"] = datetime.now(timezone.utc).isoformat()
     return cfg
 
 
 @api.get("/admin/admob/config")
 async def admob_config_admin(user: dict = Depends(require_admin)):
-    cfg = _admob_runtime_config()
+    cfg = await admob_config_public()
     cfg["env_source"] = {
         "ADMOB_ENABLED":                bool((os.environ.get("ADMOB_ENABLED", "true").lower() == "true")),
         "ADMOB_TEST_MODE":              bool((os.environ.get("ADMOB_TEST_MODE", "true").lower() == "true")),
