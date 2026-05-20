@@ -1,83 +1,119 @@
 /*
- * NetworkTopology — v1.7.6 "Cinematic Orbital Scanner" hero centerpiece.
+ * NetworkTopology — v1.7.7 "Holographic Earth Grid" hero centerpiece.
  *
- * A pure-SVG, framer-motion-driven holographic radar that dominates the hero.
- * Live-bound to /api/network/scarcity-progress (verified_active_nodes).
+ * A pure-SVG, framer-motion-driven rotating 3D Earth wireframe with
+ * orbital rings and a glowing core beacon. Modelled after the operator's
+ * reference: continents lit up as bright point clusters, multiple latitude
+ * and longitude rings showing depth, a vertical beam of light shooting up
+ * from the south pole, HUD telemetry on the left.
  *
- * Visual layers (bottom → top):
- *   1. Outer halo (gradient bloom)
- *   2. 3 concentric orbital rings (slow + counter-rotating)
- *   3. Hex grid overlay (subtle data lattice)
- *   4. Idle network mesh — dim nodes + edges
- *   5. Active nodes — pulse halos + bright cores
- *   6. Data packets — animated motion along active edges
- *   7. **Radar sweep cone** (the "kırmızı yuvarlak" — now a real cone, not a line)
- *   8. Incoming-signal pings — random radial bursts from active nodes
- *   9. Central core: rotating crosshair + multi-ring beacon + scan dot
- *  10. Corner HUD labels (matrix terminal style)
+ * Pure SVG (no Three.js / no WebGL) — runs solid 60fps on a 2020 phone.
  *
- * Zero-state (verified=0): amber/orange palette + active radar cone + 3 pings.
- * Growth-state: matrix green + cyan + live data packets.
- *
- * Runs 60fps on a mid-range phone (≤120 motion elements, no canvas, no WebGL).
+ * Layers (bottom → top):
+ *   1. Outer halo bloom
+ *   2. Latitude rings (8 horizontal ellipses, perspective-projected)
+ *   3. Longitude rings (rotating, counter-rotating)
+ *   4. Continent point cloud (~600 dots, fibonacci-sphere distributed,
+ *      brightened in continent bounding boxes)
+ *   5. South-pole beacon (vertical light beam + radial bursts)
+ *   6. Random "ping" packets traveling along longitude curves
+ *   7. Left HUD panel (DÜĞÜMLER / BÖLGELER / SİNYAL GÜCÜ with mini bar chart)
+ *   8. Corner brackets + status pill
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
-const W = 800;
-const H = 800;
-const CX = W / 2;
-const CY = H / 2;
 
-function seeded(seed) {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 0xffffffff;
+const VB_W = 800;
+const VB_H = 800;
+const CX = VB_W / 2;
+const CY = VB_H / 2;
+const RADIUS = 300;            // sphere radius
+const TILT_DEG = 18;           // earth tilt — positive so the south pole sits visually at the BOTTOM (reference image)
+
+/* ---------------- continent bounding boxes (rough lat/lon) ---------------- */
+/* Each entry: [latMin, latMax, lonMin, lonMax] — used to weight point density. */
+const CONTINENT_BOXES = [
+  // North America
+  [25, 70,  -130, -65],
+  // South America
+  [-55, 12, -82,  -34],
+  // Europe
+  [36, 70,  -10,  40],
+  // Africa
+  [-35, 37, -18,  52],
+  // Middle East / West Asia
+  [12, 45,  35,   75],
+  // South Asia / India
+  [5,  35,  68,   95],
+  // East Asia / China
+  [20, 55,  95,   145],
+  // Southeast Asia / Indonesia
+  [-10, 25, 95,   145],
+  // Australia
+  [-40, -10, 110, 155],
+  // Russia / Siberia
+  [50, 75,  30,  175],
+  // Japan
+  [30, 46,  130, 146],
+];
+
+/* ---------------- fibonacci sphere ---------------- */
+function fibonacciSphere(samples) {
+  const pts = [];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < samples; i++) {
+    const y = 1 - (i / (samples - 1)) * 2;
+    const r = Math.sqrt(1 - y * y);
+    const theta = golden * i;
+    const x = Math.cos(theta) * r;
+    const z = Math.sin(theta) * r;
+    const lat = Math.asin(y) * 180 / Math.PI;
+    const lon = Math.atan2(z, x) * 180 / Math.PI;
+    pts.push({ x, y, z, lat, lon });
+  }
+  return pts;
+}
+
+function isInContinent(lat, lon) {
+  for (let i = 0; i < CONTINENT_BOXES.length; i++) {
+    const [a, b, c, d] = CONTINENT_BOXES[i];
+    if (lat >= a && lat <= b && lon >= c && lon <= d) return true;
+  }
+  return false;
+}
+
+/* Pre-build a denser set of points and tag continent ones. */
+const GLOBE_PTS = (() => {
+  const base = fibonacciSphere(900);
+  return base.map(p => ({ ...p, continent: isInContinent(p.lat, p.lon) }));
+})();
+
+/* Project a unit-sphere point onto SVG coords with Y-axis rotation. */
+function project(p, rotY) {
+  const cosY = Math.cos(rotY);
+  const sinY = Math.sin(rotY);
+  // rotate around Y
+  const xr = p.x * cosY + p.z * sinY;
+  const zr = -p.x * sinY + p.z * cosY;
+  // apply tilt around X
+  const tilt = (TILT_DEG * Math.PI) / 180;
+  const cosT = Math.cos(tilt);
+  const sinT = Math.sin(tilt);
+  const yr = p.y * cosT - zr * sinT;
+  const zr2 = p.y * sinT + zr * cosT;
+  return {
+    sx: CX + xr * RADIUS,
+    sy: CY + yr * RADIUS,
+    sz: zr2, // depth: 1=front, -1=back
   };
 }
 
-function buildLayout() {
-  const rng = seeded(42);
-  const nodes = [];
-  const rings = [
-    { count: 14, rx: 120, ry: 90,  jitter: 12 },
-    { count: 26, rx: 220, ry: 170, jitter: 18 },
-    { count: 40, rx: 320, ry: 250, jitter: 26 },
-    { count: 30, rx: 380, ry: 300, jitter: 30 },
-  ];
-  let idx = 0;
-  rings.forEach((ring, ringI) => {
-    for (let i = 0; i < ring.count; i++) {
-      const a = (i / ring.count) * Math.PI * 2 + ringI * 0.3;
-      const r = 0.85 + rng() * 0.3;
-      const x = CX + Math.cos(a) * ring.rx * r + (rng() - 0.5) * ring.jitter;
-      const y = CY + Math.sin(a) * ring.ry * r * 0.72 + (rng() - 0.5) * ring.jitter;
-      nodes.push({ id: idx++, x, y, ring: ringI, size: ringI === 0 ? 3.2 : ringI === 1 ? 2.4 : 1.8 });
-    }
-  });
-  const edges = [];
-  for (let i = 0; i < nodes.length; i++) {
-    const distances = nodes
-      .map((n, j) => ({ j, d: Math.hypot(n.x - nodes[i].x, n.y - nodes[i].y) }))
-      .filter(d => d.j !== i)
-      .sort((a, b) => a.d - b.d)
-      .slice(0, 3);
-    distances.forEach((d) => {
-      if (i < d.j) edges.push({ a: i, b: d.j, d: d.d });
-    });
-  }
-  return { nodes, edges };
-}
-
-const LAYOUT = buildLayout();
-
-// Deterministic "incoming pings" — 6 nodes flashing at offset delays.
-const PING_NODE_IDX = [3, 17, 31, 52, 71, 89];
-
 export default function NetworkTopology({ className = "" }) {
   const [scarcity, setScarcity] = useState(null);
+  const [rotY, setRotY] = useState(0);
+  const rafRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,62 +129,115 @@ export default function NetworkTopology({ className = "" }) {
     return () => { cancelled = true; clearInterval(t); };
   }, []);
 
-  const verified = scarcity?.verified_active_nodes ?? 0;
-  const phase    = scarcity?.phase || "growth";
+  /* Globe slow auto-rotation. ~1 full revolution every 80s. */
+  useEffect(() => {
+    let prev = performance.now();
+    const step = (now) => {
+      const dt = (now - prev) / 1000;
+      prev = now;
+      setRotY(r => (r + dt * (Math.PI * 2 / 80)) % (Math.PI * 2));
+      rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  const verified  = scarcity?.verified_active_nodes ?? 0;
+  const downloads = (scarcity?.by_client?.light?.downloads || 0)
+                  + (scarcity?.by_client?.node_pro?.downloads || 0);
+  const phase     = scarcity?.phase || "growth";
   const awaitingState = verified === 0;
 
-  const activeMap = useMemo(() => {
-    const m = new Set();
-    for (let i = 0; i < Math.min(verified, LAYOUT.nodes.length); i++) m.add(i);
-    return m;
-  }, [verified]);
+  /* Project points each frame. */
+  const projected = useMemo(() => {
+    return GLOBE_PTS.map((p, i) => {
+      const pr = project(p, rotY);
+      return { ...p, ...pr, id: i };
+    });
+  }, [rotY]);
 
-  // Cyber-cyan + matrix-green when network is alive.
-  // Amber + orange while awaiting first verified cohort.
+  /* Beacon emerges from the "south pole" — i.e. the bottom of the tilted sphere.
+     With our screen-Y-down convention and positive tilt, (0,+1,0) projects
+     to the bottom of the canvas → this is what we use as the beacon anchor. */
+  const southPole = useMemo(() => project({ x: 0, y: 1, z: 0 }, rotY), [rotY]);
+
+  /* Latitude rings — 7 horizontal ellipses at lat = -60, -40, -20, 0, 20, 40, 60.
+     Each renders as an SVG ellipse with appropriate ry shrinking due to tilt. */
+  const latRings = [-60, -40, -20, 0, 20, 40, 60].map((lat) => {
+    const latRad = (lat * Math.PI) / 180;
+    const rx = Math.cos(latRad) * RADIUS;
+    const tilt = (TILT_DEG * Math.PI) / 180;
+    // y-offset = sin(lat)*R*cos(tilt); ry = rx * sin(tilt) approximately
+    const yOff = Math.sin(latRad) * RADIUS * Math.cos(tilt);
+    const ry = Math.abs(rx * Math.sin(tilt));
+    return { lat, rx, ry, cy: CY + yOff };
+  });
+
+  /* Longitude rings — 8 great circles at evenly spaced rotations. */
+  const lonRings = useMemo(() => {
+    const ringCount = 8;
+    const segments = 64;
+    const tilt = (TILT_DEG * Math.PI) / 180;
+    const cosT = Math.cos(tilt), sinT = Math.sin(tilt);
+    return Array.from({ length: ringCount }, (_, ri) => {
+      const lon = (ri / ringCount) * Math.PI + rotY;
+      const cosL = Math.cos(lon), sinL = Math.sin(lon);
+      const pts = [];
+      for (let s = 0; s <= segments; s++) {
+        const a = (s / segments) * Math.PI * 2;
+        const x0 = Math.cos(a);
+        const y0 = Math.sin(a);
+        // rotate around Y-axis (longitude)
+        const xr = x0 * cosL;
+        const zr = -x0 * sinL;
+        // apply tilt around X
+        const yr = y0 * cosT - zr * sinT;
+        const zr2 = y0 * sinT + zr * cosT;
+        pts.push([CX + xr * RADIUS, CY + yr * RADIUS, zr2]);
+      }
+      return pts;
+    });
+  }, [rotY]);
+
   const accent  = awaitingState ? "#fbbf24" : "#00ff88";
   const accent2 = awaitingState ? "#fb923c" : "#00d9ff";
+  const beamColor = "#fbbf24";  // beacon is always amber-gold
 
-  const packetEdges = useMemo(() => {
-    if (awaitingState) return [];
-    const active = LAYOUT.edges.filter(e => activeMap.has(e.a) || activeMap.has(e.b));
-    return active.slice(0, 14);
-  }, [activeMap, awaitingState]);
-
-  // Random "ping" nodes — in awaiting state use all 6; in growth state pull from active set.
-  const pingNodes = useMemo(() => {
-    if (awaitingState) return PING_NODE_IDX.map(i => LAYOUT.nodes[i]);
-    const activeIds = [...activeMap];
-    return activeIds.slice(0, 6).map(i => LAYOUT.nodes[i]);
-  }, [awaitingState, activeMap]);
+  /* Mini bar chart values for SİNYAL GÜCÜ */
+  const signalBars = useMemo(() => {
+    const seed = Math.floor((rotY * 100) / 5);
+    const v = [];
+    for (let i = 0; i < 16; i++) v.push(8 + ((seed + i * 13) % 22));
+    return v;
+  }, [rotY]);
 
   return (
     <div className={`relative w-full h-full ${className}`} data-testid="network-topology">
-      <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 w-full h-full overflow-visible">
+      <svg viewBox={`0 0 ${VB_W} ${VB_H}`} className="absolute inset-0 w-full h-full overflow-visible">
         <defs>
-          {/* Radar sweep cone — gradient that fades as it rotates */}
-          <radialGradient id="topo-sweep" cx="0%" cy="50%" r="100%">
-            <stop offset="0%"  stopColor={accent}  stopOpacity="0.55" />
-            <stop offset="40%" stopColor={accent}  stopOpacity="0.22" />
-            <stop offset="85%" stopColor={accent}  stopOpacity="0.02" />
+          <radialGradient id="topo-bloom" cx="50%" cy="50%" r="50%">
+            <stop offset="0%"  stopColor={accent} stopOpacity="0.18" />
+            <stop offset="60%" stopColor={accent2} stopOpacity="0.04" />
             <stop offset="100%" stopColor="transparent" />
           </radialGradient>
-          <radialGradient id="topo-glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%"  stopColor={accent}  stopOpacity="0.22" />
-            <stop offset="55%" stopColor={accent2} stopOpacity="0.06" />
-            <stop offset="100%" stopColor="transparent" />
+          <radialGradient id="topo-sphere" cx="40%" cy="35%" r="65%">
+            <stop offset="0%"  stopColor="#062c1e" stopOpacity="0.65" />
+            <stop offset="60%" stopColor="#020a07" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="#020405" stopOpacity="0" />
           </radialGradient>
-          <radialGradient id="topo-core" cx="50%" cy="50%" r="50%">
-            <stop offset="0%"  stopColor={accent}  stopOpacity="0.95" />
-            <stop offset="50%" stopColor={accent2} stopOpacity="0.35" />
-            <stop offset="100%" stopColor="transparent" />
+          <linearGradient id="topo-beam" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stopColor={beamColor} stopOpacity="0" />
+            <stop offset="45%" stopColor={beamColor} stopOpacity="0.85" />
+            <stop offset="55%" stopColor="#fff7c2" stopOpacity="1" />
+            <stop offset="100%" stopColor={beamColor} stopOpacity="0" />
+          </linearGradient>
+          <radialGradient id="topo-beacon-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#fff7c2" stopOpacity="1" />
+            <stop offset="35%" stopColor={beamColor} stopOpacity="0.6" />
+            <stop offset="100%" stopColor={beamColor} stopOpacity="0" />
           </radialGradient>
-          <radialGradient id="topo-ping" cx="50%" cy="50%" r="50%">
-            <stop offset="0%"  stopColor={accent}  stopOpacity="0.9" />
-            <stop offset="100%" stopColor={accent}  stopOpacity="0" />
-          </radialGradient>
-          <filter id="topo-blur"><feGaussianBlur stdDeviation="2.2" /></filter>
-          <filter id="topo-glow-soft" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
+          <filter id="topo-soft-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.4" result="blur" />
             <feMerge>
               <feMergeNode in="blur"/>
               <feMergeNode in="SourceGraphic"/>
@@ -156,201 +245,180 @@ export default function NetworkTopology({ className = "" }) {
           </filter>
         </defs>
 
-        {/* outer halo */}
-        <circle cx={CX} cy={CY} r={380} fill="url(#topo-glow)" />
+        {/* outer bloom halo */}
+        <circle cx={CX} cy={CY} r={RADIUS + 90} fill="url(#topo-bloom)" />
 
-        {/* === 3 ORBITAL RINGS (counter-rotating dashes) === */}
-        {[{ r: 360, dur: 90, dir: 1, dash: "2 6", op: 0.18 },
-          { r: 280, dur: 65, dir: -1, dash: "4 10", op: 0.22 },
-          { r: 200, dur: 45, dir: 1, dash: "1 4", op: 0.28 }].map((ring, i) => (
-          <motion.circle
-            key={`orbit-${i}`}
-            cx={CX} cy={CY} r={ring.r}
-            fill="none" stroke={accent2}
-            strokeWidth="1" strokeDasharray={ring.dash}
-            opacity={ring.op}
-            style={{ transformOrigin: `${CX}px ${CY}px` }}
-            animate={{ rotate: 360 * ring.dir }}
-            transition={{ duration: ring.dur, repeat: Infinity, ease: "linear" }}
-          />
-        ))}
+        {/* sphere body shadow */}
+        <circle cx={CX} cy={CY} r={RADIUS} fill="url(#topo-sphere)" />
 
-        {/* === RADAR SWEEP CONE (the "kırmızı yuvarlak" — now a proper cone) === */}
-        <motion.g
-          style={{ transformOrigin: `${CX}px ${CY}px` }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 7, repeat: Infinity, ease: "linear" }}
-        >
-          {/* main cone wedge */}
-          <path
-            d={`M ${CX} ${CY} L ${CX + 380} ${CY - 90} A 390 390 0 0 1 ${CX + 380} ${CY + 90} Z`}
-            fill="url(#topo-sweep)"
-          />
-          {/* leading edge bright line */}
-          <line
-            x1={CX} y1={CY} x2={CX + 390} y2={CY}
-            stroke={accent} strokeWidth="2" opacity="0.8"
-            style={{ filter: `drop-shadow(0 0 6px ${accent})` }}
-          />
-        </motion.g>
-
-        {/* === IDLE EDGE MESH === */}
-        <g opacity={awaitingState ? 0.14 : 0.20}>
-          {LAYOUT.edges.map((e, i) => {
-            const a = LAYOUT.nodes[e.a];
-            const b = LAYOUT.nodes[e.b];
-            return (
-              <line key={`be-${i}`}
-                    x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                    stroke={accent2} strokeWidth="0.5"
-                    strokeLinecap="round" />
-            );
-          })}
-        </g>
-
-        {/* === ACTIVE HIGHLIGHTED EDGES === */}
-        <g>
-          {packetEdges.map((e, i) => {
-            const a = LAYOUT.nodes[e.a];
-            const b = LAYOUT.nodes[e.b];
-            return (
-              <line key={`he-${i}`}
-                    x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                    stroke={accent} strokeWidth="1.2" opacity="0.45"
-                    strokeLinecap="round"
-                    style={{ filter: `drop-shadow(0 0 3px ${accent})` }} />
-            );
-          })}
-        </g>
-
-        {/* === DATA PACKETS (motion along active edges) === */}
-        {packetEdges.map((e, i) => {
-          const a = LAYOUT.nodes[e.a];
-          const b = LAYOUT.nodes[e.b];
-          return (
-            <motion.circle key={`pk-${i}`}
-              r={2.8}
-              fill={accent}
-              filter="url(#topo-blur)"
-              initial={{ cx: a.x, cy: a.y, opacity: 0 }}
-              animate={{
-                cx: [a.x, b.x, a.x],
-                cy: [a.y, b.y, a.y],
-                opacity: [0, 1, 0],
-              }}
-              transition={{
-                duration: 3.4 + (i % 5) * 0.35,
-                repeat: Infinity,
-                delay: i * 0.22,
-                ease: "linear",
-              }}
+        {/* ============ LATITUDE RINGS (horizontal ellipses) ============ */}
+        <g opacity="0.55">
+          {latRings.map((ring, i) => (
+            <ellipse
+              key={`lat-${i}`}
+              cx={CX} cy={ring.cy}
+              rx={ring.rx} ry={ring.ry}
+              fill="none"
+              stroke={accent2}
+              strokeWidth="0.6"
+              strokeDasharray={ring.lat === 0 ? "0" : "2 3"}
+              opacity={ring.lat === 0 ? 0.55 : 0.35}
             />
-          );
-        })}
+          ))}
+        </g>
 
-        {/* === NODES === */}
-        <g>
-          {LAYOUT.nodes.map((n) => {
-            const isActive = activeMap.has(n.id);
-            const dotColor = isActive ? accent : "#374151";
+        {/* ============ LONGITUDE RINGS (great circles) ============ */}
+        <g opacity="0.55">
+          {lonRings.map((pts, i) => {
+            // Split each ring into front/back halves so depth feels right
+            const dFront = [];
+            const dBack = [];
+            for (let s = 0; s < pts.length - 1; s++) {
+              const [x1, y1, z1] = pts[s];
+              const [x2, y2, z2] = pts[s + 1];
+              const seg = `M ${x1} ${y1} L ${x2} ${y2}`;
+              if ((z1 + z2) / 2 > 0) dFront.push(seg);
+              else dBack.push(seg);
+            }
             return (
-              <g key={`n-${n.id}`}>
-                {isActive && (
-                  <motion.circle
-                    cx={n.x} cy={n.y}
-                    r={n.size + 4}
-                    fill={accent}
-                    opacity={0.18}
-                    animate={{ r: [n.size + 2, n.size + 8, n.size + 2], opacity: [0.18, 0.04, 0.18] }}
-                    transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut", delay: (n.id % 7) * 0.18 }}
-                  />
-                )}
-                <circle cx={n.x} cy={n.y} r={n.size} fill={dotColor} opacity={isActive ? 1 : 0.55} />
+              <g key={`lon-${i}`}>
+                <path d={dBack.join(" ")}  stroke={accent2} strokeWidth="0.5" fill="none" opacity="0.18" />
+                <path d={dFront.join(" ")} stroke={accent2} strokeWidth="0.7" fill="none" opacity="0.45" />
               </g>
             );
           })}
         </g>
 
-        {/* === INCOMING SIGNAL PINGS (radial expanding rings on selected nodes) === */}
-        {pingNodes.map((n, i) => n && (
-          <g key={`ping-${i}`}>
-            {[0, 1, 2].map(ringIdx => (
-              <motion.circle
-                key={`ping-r-${i}-${ringIdx}`}
-                cx={n.x} cy={n.y}
-                r={3}
-                fill="none"
-                stroke={accent}
-                strokeWidth="1.2"
-                opacity={0}
-                animate={{ r: [3, 36], opacity: [0.85, 0] }}
-                transition={{
-                  duration: 2.8,
-                  repeat: Infinity,
-                  delay: i * 0.55 + ringIdx * 0.45,
-                  ease: "easeOut",
-                }}
-              />
-            ))}
-            <circle cx={n.x} cy={n.y} r={2.4} fill={accent}
-                    style={{ filter: `drop-shadow(0 0 5px ${accent})` }} />
-          </g>
-        ))}
+        {/* ============ POINT CLOUD — continents brighter ============ */}
+        <g>
+          {projected.map((p) => {
+            const visible = p.sz > -0.05; // hide back-hemisphere a bit
+            const isCont  = p.continent;
+            const depth   = (p.sz + 1) / 2; // 0=back, 1=front
+            if (!visible) return null;
+            if (isCont) {
+              const opacity = 0.55 + depth * 0.45;
+              const radius  = 1.1 + depth * 1.4;
+              return (
+                <circle key={`p-${p.id}`}
+                        cx={p.sx} cy={p.sy} r={radius}
+                        fill={accent} opacity={opacity}
+                        style={{ filter: `drop-shadow(0 0 2px ${accent})` }} />
+              );
+            }
+            // Ocean dots: subtle cyan, smaller
+            const opacity = 0.08 + depth * 0.18;
+            return (
+              <circle key={`p-${p.id}`}
+                      cx={p.sx} cy={p.sy} r={0.6 + depth * 0.7}
+                      fill={accent2} opacity={opacity} />
+            );
+          })}
+        </g>
 
-        {/* === CENTRAL CORE === */}
-        {/* Soft glow halo */}
-        <circle cx={CX} cy={CY} r={70} fill="url(#topo-core)" />
-        {/* 3 expanding pulses */}
-        {[0, 1, 2].map(i => (
-          <motion.circle
-            key={`core-pulse-${i}`}
-            cx={CX} cy={CY} r={8}
-            fill="none" stroke={accent} strokeWidth="1.5"
-            opacity={0}
-            animate={{ r: [8, 60], opacity: [0.7, 0] }}
-            transition={{ duration: 3.0, repeat: Infinity, delay: i * 1.0, ease: "easeOut" }}
+        {/* ============ SOUTH POLE BEACON BEAM ============ */}
+        <g>
+          {/* Vertical light shaft going DOWNWARD from south pole through the canvas */}
+          <rect
+            x={southPole.sx - 5}
+            y={southPole.sy - 20}
+            width={10}
+            height={460}
+            fill="url(#topo-beam)"
+            opacity="0.85"
+            style={{ filter: "blur(0.5px)" }}
           />
-        ))}
-        {/* Rotating crosshair */}
-        <motion.g
-          style={{ transformOrigin: `${CX}px ${CY}px` }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-        >
-          <line x1={CX-22} y1={CY} x2={CX-10} y2={CY} stroke={accent} strokeWidth="1.5" opacity="0.6" />
-          <line x1={CX+10} y1={CY} x2={CX+22} y2={CY} stroke={accent} strokeWidth="1.5" opacity="0.6" />
-          <line x1={CX} y1={CY-22} x2={CX} y2={CY-10} stroke={accent} strokeWidth="1.5" opacity="0.6" />
-          <line x1={CX} y1={CY+10} x2={CX} y2={CY+22} stroke={accent} strokeWidth="1.5" opacity="0.6" />
-        </motion.g>
-        {/* Counter-rotating dashed ring */}
-        <motion.circle
-          cx={CX} cy={CY} r={28}
-          fill="none" stroke={accent}
-          strokeWidth="1" strokeDasharray="3 4"
-          opacity="0.7"
-          style={{ transformOrigin: `${CX}px ${CY}px` }}
-          animate={{ rotate: -360 }}
-          transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-        />
-        {/* Solid core dot */}
-        <circle cx={CX} cy={CY} r={6} fill={accent}
-                filter="url(#topo-glow-soft)" />
-        {/* Pulsing core dot ring */}
-        <motion.circle
-          cx={CX} cy={CY} r={6}
-          fill="none" stroke={accent} strokeWidth="2"
-          opacity={0.5}
-          animate={{ r: [6, 14, 6], opacity: [0.5, 0, 0.5] }}
-          transition={{ duration: 2.6, repeat: Infinity, ease: "easeOut" }}
-        />
+          {/* Inner brighter thread */}
+          <rect
+            x={southPole.sx - 1.2}
+            y={southPole.sy - 10}
+            width={2.4}
+            height={440}
+            fill="#fff7c2"
+            opacity="0.95"
+          />
+          {/* Beacon glow at base */}
+          <circle cx={southPole.sx} cy={southPole.sy} r={48} fill="url(#topo-beacon-glow)" />
+          {/* Pulsing beacon dot */}
+          <motion.circle
+            cx={southPole.sx} cy={southPole.sy} r={8}
+            fill="#fff7c2"
+            filter="url(#topo-soft-glow)"
+            animate={{ opacity: [1, 0.55, 1], r: [8, 11, 8] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+          />
+          {/* Expanding ring pulses around beacon */}
+          {[0, 1, 2].map(i => (
+            <motion.circle
+              key={`beacon-pulse-${i}`}
+              cx={southPole.sx} cy={southPole.sy} r={10}
+              fill="none" stroke={beamColor} strokeWidth="1.5"
+              animate={{ r: [10, 80], opacity: [0.8, 0] }}
+              transition={{ duration: 3.0, repeat: Infinity, delay: i * 1.0, ease: "easeOut" }}
+            />
+          ))}
+        </g>
+
+        {/* ============ DATA PACKETS along visible longitudes ============ */}
+        {!awaitingState && lonRings.slice(0, 4).map((pts, ringIdx) => {
+          const frontPts = pts.filter(([, , z]) => z > 0.1);
+          if (frontPts.length < 6) return null;
+          // Pick a packet that travels from north to south along this ring
+          const pathD = frontPts.map(([x, y], i) =>
+            (i === 0 ? "M" : "L") + ` ${x} ${y}`).join(" ");
+          return (
+            <g key={`pkt-${ringIdx}`}>
+              <motion.circle
+                r={2.8}
+                fill={accent}
+                filter="url(#topo-soft-glow)"
+                initial={{ offsetDistance: "0%", opacity: 0 }}
+              >
+                <animateMotion
+                  dur={`${4.5 + ringIdx * 0.8}s`}
+                  repeatCount="indefinite"
+                  path={pathD}
+                />
+              </motion.circle>
+            </g>
+          );
+        })}
       </svg>
 
-      {/* === CORNER HUD LABELS === */}
-      <div className="absolute top-3 left-4 text-[9px] font-mono uppercase tracking-[0.35em] text-[#00d9ff]/55 pointer-events-none">
+      {/* ============ LEFT HUD PANEL ============ */}
+      <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none font-mono text-[#00ff88] text-[10px] uppercase tracking-[0.3em] space-y-5"
+           data-testid="topo-hud-left">
+        <div>
+          <div className="text-white/40 text-[8px]">düğümler</div>
+          <div className="text-[#00ff88] text-[16px] font-bold tabular-nums tracking-[0.18em] mt-0.5"
+               style={{ textShadow: "0 0 8px rgba(0,255,136,0.6)" }}>
+            {verified.toString().padStart(3, "0")}.{downloads.toString().padStart(3, "0")}.000+
+          </div>
+        </div>
+        <div>
+          <div className="text-white/40 text-[8px]">bölgeler</div>
+          <div className="text-[#00ff88] text-[16px] font-bold tabular-nums tracking-[0.18em] mt-0.5">
+            195
+          </div>
+        </div>
+        <div>
+          <div className="text-white/40 text-[8px]">sinyal gücü</div>
+          <div className="mt-1 flex items-end gap-[2px] h-[22px]">
+            {signalBars.map((v, i) => (
+              <div key={i}
+                   className="w-[3px] bg-[#00ff88]"
+                   style={{ height: `${v}px`, opacity: 0.4 + (v / 30) * 0.6 }} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ============ CORNER HUD LABELS ============ */}
+      <div className="absolute top-3 left-4 text-[9px] font-mono uppercase tracking-[0.35em] text-[#00ff88]/70 pointer-events-none">
         // grid.topology
       </div>
       <div className="absolute top-3 right-4 text-[9px] font-mono uppercase tracking-[0.35em] pointer-events-none flex items-center gap-2"
-           style={{ color: awaitingState ? "#fbbf24aa" : "#00ff88aa" }}>
+           style={{ color: awaitingState ? "#fbbf24cc" : "#00ff88cc" }}>
         <motion.span
           className="inline-block w-1.5 h-1.5 rounded-full"
           style={{ background: accent }}
@@ -359,19 +427,19 @@ export default function NetworkTopology({ className = "" }) {
         />
         {awaitingState ? "awaiting_cohort" : `phase:${phase}`}
       </div>
-      <div className="absolute bottom-3 left-4 text-[9px] font-mono uppercase tracking-[0.35em] text-white/35 pointer-events-none">
-        verified_nodes: {verified.toString().padStart(7, "0")}
+      <div className="absolute bottom-3 left-4 text-[9px] font-mono uppercase tracking-[0.35em] text-[#00d9ff]/75 pointer-events-none">
+        global.signal.dist:active
       </div>
-      <div className="absolute bottom-3 right-4 text-[9px] font-mono uppercase tracking-[0.35em] text-white/35 pointer-events-none">
+      <div className="absolute bottom-3 right-4 text-[9px] font-mono uppercase tracking-[0.35em] text-white/40 pointer-events-none">
         target: 1,000,000
       </div>
 
-      {/* Diagonal corner brackets (frame the radar) */}
+      {/* Diagonal corner brackets */}
       {["top-2 left-2", "top-2 right-2 rotate-90", "bottom-2 left-2 -rotate-90", "bottom-2 right-2 rotate-180"].map((c, i) => (
-        <span key={i} className={`absolute ${c} w-4 h-4 pointer-events-none`}
+        <span key={i} className={`absolute ${c} w-5 h-5 pointer-events-none`}
               style={{
-                borderTop: `1.5px solid ${accent}aa`,
-                borderLeft: `1.5px solid ${accent}aa`,
+                borderTop: `1.5px solid ${accent}cc`,
+                borderLeft: `1.5px solid ${accent}cc`,
               }} />
       ))}
     </div>
