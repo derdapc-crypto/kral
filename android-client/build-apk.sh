@@ -6,6 +6,11 @@ set -euo pipefail
 cd "$(dirname "$0")/wrapper"
 
 SDK=/opt/android-sdk
+# v1.6.5 — on ARM64 container hosts the Google-provided x86_64 build-tools
+# binaries (aapt/zipalign/apksigner) won't execute.  Prefer the Debian
+# `aapt` / `zipalign` / `apksigner` packages from /usr/bin which ship as
+# native arm64.  The Google `android.jar` framework JAR is platform-agnostic
+# and is still pulled from $SDK/platforms.
 DEB_BT=/usr/bin
 PLATFORM=$SDK/platforms/android-34/android.jar
 D8_JAR=$SDK/build-tools/34.0.0/lib/d8.jar

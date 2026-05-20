@@ -13,9 +13,40 @@ import java.nio.charset.StandardCharsets;
 /**
  * Minimal HTTP client for THE GRID backend. Uses HttpsURLConnection (no extra deps).
  * Returns raw JSON strings; callers parse with the tiny in-class JSON helpers.
+ *
+ * v1.6.5 — backend URL is now configurable at runtime. First-launch picker
+ * lets the user point the app at any deployment (own VPS, preview env, etc.).
+ * Default falls back to the live preview environment so a freshly downloaded
+ * APK keeps working without configuration.
  */
 public class GridApi {
-    public static final String BASE = "https://grid-supercomputer.emergent.host";
+    /** Hard-coded fallback if no override has been saved yet. */
+    public static final String DEFAULT_BASE = "https://grid-supercomputer.preview.emergentagent.com";
+    /** Legacy constant kept for compatibility with old call sites — prefer {@link #base(Context)}. */
+    public static final String BASE = DEFAULT_BASE;
+    private static final String PREF_KEY = "grid_backend_base";
+
+    /** Returns the currently-configured backend URL (no trailing slash). */
+    public static String base(Context ctx) {
+        try {
+            String s = ctx.getSharedPreferences("grid_prefs", Context.MODE_PRIVATE)
+                          .getString(PREF_KEY, null);
+            if (s == null || s.length() < 8) return DEFAULT_BASE;
+            return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
+        } catch (Exception ignored) { return DEFAULT_BASE; }
+    }
+
+    /** Persist a new backend URL (e.g. user typed it on the first-launch picker). */
+    public static void setBase(Context ctx, String url) {
+        if (url == null) return;
+        url = url.trim();
+        if (url.endsWith("/")) url = url.substring(0, url.length() - 1);
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "https://" + url;
+        }
+        ctx.getSharedPreferences("grid_prefs", Context.MODE_PRIVATE)
+           .edit().putString(PREF_KEY, url).apply();
+    }
 
     public static String post(Context ctx, String path, String body) throws Exception {
         return request(ctx, "POST", path, body);
@@ -25,7 +56,7 @@ public class GridApi {
     }
 
     private static String request(Context ctx, String method, String path, String body) throws Exception {
-        URL url = new URL(BASE + path);
+        URL url = new URL(base(ctx) + path);
         HttpURLConnection c = (HttpURLConnection) url.openConnection();
         c.setRequestMethod(method);
         c.setConnectTimeout(15000);

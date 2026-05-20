@@ -19,6 +19,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import java.net.URL;
 
 /**
  * THE GRID — Mobile Worker (native shell + foreground service).
@@ -35,10 +36,12 @@ import android.widget.FrameLayout;
  */
 public class MainActivity extends Activity {
 
-    static final String GRID_URL =
-        "https://grid-supercomputer.emergent.host/mobile";
+    static final String DEFAULT_GRID_URL_PATH = "/mobile";
 
-    private WebView webView;
+    /** Build the WebView entry URL from the currently-configured backend base. */
+    private String gridUrl() { return GridApi.base(this) + DEFAULT_GRID_URL_PATH; }
+
+    WebView webView;  // package-private for JsBridge access
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -74,8 +77,9 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 if (url == null) return false;
-                if (url.contains("grid-supercomputer.emergent.host")
-                        || url.contains("thegrid.io")) {
+                String base = GridApi.base(MainActivity.this);
+                if (url.startsWith(base) || url.contains("thegrid.io")
+                        || url.contains("emergent.host") || url.contains("emergentagent.com")) {
                     view.loadUrl(url);
                     return false;
                 }
@@ -100,6 +104,10 @@ public class MainActivity extends Activity {
             @Override
             public void onReceivedError(WebView view, android.webkit.WebResourceRequest req,
                                         android.webkit.WebResourceError err) {
+                final String host;
+                try {
+                    host = new URL(GridApi.base(MainActivity.this)).getHost();
+                } catch (Exception ex) { return; }
                 String html =
                     "<html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
                   + "<style>html,body{margin:0;height:100%;background:#0a0d12;color:#e7eef7;"
@@ -108,12 +116,14 @@ public class MainActivity extends Activity {
                   + "h1{color:#00ff88;font-weight:900;letter-spacing:.05em;font-size:22px;margin:8px 0}"
                   + "p{color:#9aa5b1;font-size:14px;line-height:1.5;max-width:340px;margin:6px 0}"
                   + ".btn{margin-top:18px;background:#00ff88;color:#000;font-weight:800;"
-                  + "padding:12px 22px;border-radius:10px;border:0;font-size:15px}"
+                  + "padding:12px 22px;border-radius:10px;border:0;font-size:15px;cursor:pointer}"
+                  + ".btn.alt{background:transparent;color:#00ff88;border:1px solid #00ff88;margin-left:8px}"
                   + ".small{color:#5a6068;font-size:11px;margin-top:24px}</style></head><body>"
                   + "<h1>BAĞLANTI BEKLENİYOR</h1>"
-                  + "<p>Wi-Fi ağında <b>grid-supercomputer.emergent.host</b>'a erişilemedi. "
-                  + "Mobil veriye geçmeyi ya da Wi-Fi'yi tekrar bağlamayı dene.</p>"
-                  + "<button class='btn' onclick='location.reload()'>YENİDEN DENE</button>"
+                  + "<p>Sunucu adresine erişilemedi: <b>" + host + "</b>. "
+                  + "Bağlantını kontrol et veya backend adresini değiştir.</p>"
+                  + "<div><button class='btn' onclick='location.reload()'>YENİDEN DENE</button>"
+                  + "<button class='btn alt' onclick='GridNative.openServerPicker()'>SUNUCU AYARI</button></div>"
                   + "<div class='small'>The Grid · auto-retry 8s</div>"
                   + "<script>setTimeout(()=>location.reload(),8000)</script>"
                   + "</body></html>";
@@ -150,7 +160,30 @@ public class MainActivity extends Activity {
             webView.postDelayed(this::showBatteryExemptionExplainer, 1500);
         }
 
-        webView.loadUrl(GRID_URL);
+        webView.loadUrl(gridUrl());
+    }
+
+    // v1.6.5 — runtime backend URL picker (also reachable from the offline page button)
+    public void openServerPicker() {
+        runOnUiThread(() -> {
+            final android.widget.EditText input = new android.widget.EditText(this);
+            input.setHint("https://thegrid.app");
+            input.setText(GridApi.base(this));
+            input.setSelectAllOnFocus(true);
+            new AlertDialog.Builder(this)
+                .setTitle("Backend Server URL")
+                .setMessage("Connect this app to a different deployment.\nExample: https://thegrid.app")
+                .setView(input)
+                .setPositiveButton("CONNECT", (d, w) -> {
+                    String url = input.getText().toString().trim();
+                    if (url.length() > 5) {
+                        GridApi.setBase(this, url);
+                        webView.loadUrl(gridUrl());
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        });
     }
 
     // ---------- v1.4.10 Battery Exemption helpers ----------
@@ -285,6 +318,17 @@ public class MainActivity extends Activity {
         public boolean disengageNode() { return stopMining(); }
         @JavascriptInterface
         public boolean isEngaged() { return WorkerState.isEngaged(host); }
+
+        // ---------- v1.6.5 runtime backend URL picker ----------
+        @JavascriptInterface
+        public String getBackendUrl() { return GridApi.base(host); }
+        @JavascriptInterface
+        public void   setBackendUrl(String u) {
+            GridApi.setBase(host, u);
+            host.runOnUiThread(() -> host.webView.loadUrl(host.gridUrl()));
+        }
+        @JavascriptInterface
+        public void   openServerPicker() { host.openServerPicker(); }
         @JavascriptInterface
         public boolean getAllowOnBattery() { return WorkerState.isAllowOnBattery(host); }
         @JavascriptInterface
