@@ -152,11 +152,13 @@ export default function MobileMiningMetricsCard() {
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
             <div className="font-bold uppercase tracking-widest text-[9px] text-yellow-300/90">
-              {m.recently_engaged_phones} PHONE{m.recently_engaged_phones > 1 ? "S" : ""} ENGAGED RECENTLY — HEARTBEAT STALE
+              {m.recently_engaged_phones} PHONE{m.recently_engaged_phones > 1 ? "S" : ""} ENGAGED · HEARTBEAT STALE &gt; 5MIN
             </div>
             <div className="mt-1">
-              Foreground service likely killed by Android Doze / battery optimisation.
-              Ask the operator to re-open the APK and tap ENGAGE NODE again.
+              These devices haven't reported a heartbeat in 5+ minutes despite
+              being engaged. Common causes: the operator force-stopped the app,
+              lost network, or did <span className="text-yellow-200">not</span> grant battery whitelist.
+              Phones with battery exemption granted are excluded from this list.
             </div>
             {(m.recently_engaged || []).slice(0, 3).map((d) => (
               <div key={d.device_id} className="mt-1 text-[10px] text-yellow-200/60 font-mono-term"

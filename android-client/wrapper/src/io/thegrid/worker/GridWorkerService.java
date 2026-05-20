@@ -520,6 +520,16 @@ public class GridWorkerService extends Service {
         if (deviceId == null) return;
         boolean linked = bridge != null && bridge.linked();
 
+        // v1.7.5 — battery whitelist signal. The admin "Doze killed" warning
+        // panel uses this to exclude phones that already granted permission.
+        boolean batteryExempt = false;
+        try {
+            android.os.PowerManager pm = (android.os.PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
+            if (pm != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                batteryExempt = pm.isIgnoringBatteryOptimizations(ctx.getPackageName());
+            }
+        } catch (Throwable ignored) {}
+
         // v1.3.7: pull live native miner stats via the JNI bridge. If the bridge
         // isn't loaded the fields are honestly zero and `native_pow=false`.
         boolean nativePow      = RandomXBridge.available() && RandomXBridge.running();
@@ -550,6 +560,7 @@ public class GridWorkerService extends Service {
             "\"eco_mode\":%s,\"allow_on_battery\":%s,\"active_threads\":%d," +
             "\"local_hashrate_hps\":%.2f,\"accepted_shares\":%d,\"rejected_shares\":%d," +
             "\"native_lib_loaded\":%s,\"mining_requested\":%s,\"node_engaged\":%s," +
+            "\"battery_exempt\":%s," +
             "\"client_type\":\"%s\",\"app_flavor\":\"%s\",\"build_version\":\"%s\"}",
             deviceId, charging, onWifi, batteryPct, batteryPct, tempC,
             (tempC > TEMP_LIMIT_C ? "hot" : "nominal"),
@@ -562,6 +573,7 @@ public class GridWorkerService extends Service {
             activeThreads,
             localHashrate, accepted, rejected,
             RandomXBridge.available(), miningRequested, miningRequested,
+            batteryExempt,
             BuildConfig.FLAVOR, BuildConfig.FLAVOR, BuildConfig.VERSION_NAME);
         try {
             String resp = GridApi.post(ctx, "/api/devices/heartbeat", body);

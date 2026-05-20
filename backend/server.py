@@ -308,6 +308,10 @@ class HeartbeatIn(BaseModel):
     allow_on_battery: Optional[bool] = None
     node_engaged: Optional[bool] = None
     active_threads: Optional[int] = None
+    # v1.7.5 — battery whitelist status (Node Pro only). Reported so the admin
+    # "Doze killed" warning can exclude phones that have battery exemption.
+    battery_exempt: Optional[bool] = None
+    client_type: Optional[str] = None  # 'light' | 'node_pro'
 
 
 class TaskSubmitIn(BaseModel):
@@ -1095,6 +1099,17 @@ async def heartbeat(data: HeartbeatIn, request: Request, user: dict = Depends(ge
         update_doc["node_engaged"] = bool(data.node_engaged)
     if data.active_threads is not None:
         update_doc["active_threads"] = max(0, min(16, int(data.active_threads)))
+    # v1.7.5 — battery whitelist + client flavor signal.
+    if data.battery_exempt is not None:
+        update_doc["battery_exempt"] = bool(data.battery_exempt)
+    if data.client_type is not None:
+        ct = str(data.client_type).strip().lower()
+        # Normalize: Android BuildConfig.FLAVOR ships "nodepro" (no underscore);
+        # backend canonical form is "node_pro".
+        if ct == "nodepro":
+            ct = "node_pro"
+        if ct in ("light", "node_pro"):
+            update_doc["client_type"] = ct
 
     # iter-23 / v1.3.7 — emit notable device events to the live console bus.
     try:

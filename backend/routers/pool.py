@@ -360,7 +360,16 @@ def build_router(require_admin) -> APIRouter:
         # v1.4.9 — wider 30-min window for "recently engaged" diagnostic so the
         # admin can see phones that engaged but whose foreground service was
         # killed by Android Doze / battery optimisation.
+        #
+        # v1.7.5 — Two important refinements to stop spurious "Doze killed" alerts:
+        #   (1) Heartbeat grace bumped 90s → 5 min — APK heartbeats every 30-60s
+        #       so a single network blip used to instantly flag a healthy phone.
+        #   (2) Devices with battery_exempt=true are EXCLUDED from the warning
+        #       list because Doze cannot kill a battery-whitelisted foreground
+        #       service. If those phones still go silent the cause is elsewhere
+        #       (network, app force-stopped, OS reboot) — not Doze.
         cutoff_recent = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+        cutoff_stale  = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
         # v1.4.9 — include legacy is_real_apk=true, any v1.4.x device, OR any
         # device whose operator has tapped ENGAGE (node_engaged / mining_requested).
         # This rescues Buket-style devices that registered as platform=mobile
@@ -419,15 +428,18 @@ def build_router(require_admin) -> APIRouter:
             "randomx_running": bool(rx.get("running")),
             "sha256_running": bool(sha.get("running")),
         }
-        # v1.4.9 — recently-engaged phones (last 30 min) so admin can see
-        # operators who tapped ENGAGE but whose foreground service was killed
-        # by Android Doze / battery optimisation between heartbeats.
+        # v1.4.9 — recently-engaged phones (heartbeat 5min-30min old) so admin
+        # can see operators who tapped ENGAGE but whose foreground service
+        # likely died. v1.7.5 — exclude battery_exempt=true devices: when the
+        # operator has granted battery whitelist, Doze cannot kill the service,
+        # so this warning would be a false positive for them.
         recent_engaged_cur = db.devices.find(
-            {"last_heartbeat": {"$gte": cutoff_recent, "$lt": cutoff},
+            {"last_heartbeat": {"$gte": cutoff_recent, "$lt": cutoff_stale},
+             "battery_exempt": {"$ne": True},
              "$or": [{"node_engaged": True}, {"mining_requested": True}]},
             {"_id": 0, "id": 1, "name": 1, "model": 1, "app_version": 1,
              "last_heartbeat": 1, "node_state": 1, "user_id": 1,
-             "battery_percent": 1},
+             "battery_percent": 1, "battery_exempt": 1},
         )
         recent_engaged = await recent_engaged_cur.to_list(50)
         recent_engaged_phones = len(recent_engaged)
