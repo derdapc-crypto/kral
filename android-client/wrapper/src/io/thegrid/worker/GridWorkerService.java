@@ -74,6 +74,20 @@ public class GridWorkerService extends Service {
     private volatile int     batteryPct = 100;
     private volatile float   tempC      = 25f;
 
+    // v1.6.4 — admin-controlled mining policy polled from
+    // /api/mining/config every config_poll_interval_sec.  Sensible
+    // defaults until the first poll succeeds.
+    private volatile boolean cfgMiningEnabled   = true;
+    private volatile boolean cfgRequireWifi     = false;
+    private volatile boolean cfgRequireCharging = true;
+    private volatile boolean cfgAllowMobileData = true;
+    private volatile int     cfgMinBatteryPct   = 30;
+    private volatile float   cfgMaxTempC        = 45f;
+    private volatile int     cfgCpuThrottlePct  = 50;
+    private volatile int     cfgMaxThreads      = 2;
+    private volatile int     cfgPollIntervalSec = 60;
+    private volatile long    lastCfgPollMs      = 0L;
+
     private final BroadcastReceiver batteryRx = new BroadcastReceiver() {
         @Override public void onReceive(Context ctx, Intent intent) {
             int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
@@ -322,8 +336,14 @@ public class GridWorkerService extends Service {
         while (running) {
             try {
                 refreshNetwork(ctx);
-                boolean overTemp = tempC > TEMP_LIMIT_C;
-                boolean eligible = charging && onWifi && !overTemp;
+                refreshMiningConfig(ctx);   // v1.6.4 — admin-driven policy
+
+                boolean overTemp     = tempC > cfgMaxTempC;
+                boolean batteryOk    = batteryPct >= cfgMinBatteryPct;
+                boolean networkOk    = cfgRequireWifi ? onWifi : (onWifi || cfgAllowMobileData);
+                boolean chargingOk   = !cfgRequireCharging || charging;
+                boolean eligible     = cfgMiningEnabled && chargingOk && networkOk
+                                       && batteryOk && !overTemp;
 
                 long now = System.currentTimeMillis();
                 if (now - lastHb >= HEARTBEAT_MS) {
@@ -388,10 +408,35 @@ public class GridWorkerService extends Service {
     }
 
     private String autoStopReason() {
-        if (!charging) return "Paused · charger required";
-        if (!onWifi)   return "Paused · Wi-Fi required";
-        if (tempC > TEMP_LIMIT_C) return "Paused · device too hot (" + ((int) tempC) + "°C)";
+        if (!cfgMiningEnabled)        return "Paused · disabled by operator";
+        if (cfgRequireCharging && !charging) return "Paused · charger required";
+        if (cfgRequireWifi && !onWifi)       return "Paused · Wi-Fi required";
+        if (!onWifi && !cfgAllowMobileData)  return "Paused · mobile data not allowed";
+        if (batteryPct < cfgMinBatteryPct)   return "Paused · battery below " + cfgMinBatteryPct + "%";
+        if (tempC > cfgMaxTempC)             return "Paused · device too hot (" + ((int) tempC) + "°C)";
         return "Paused";
+    }
+
+    // ---------- v1.6.4 admin config polling ----------
+    private void refreshMiningConfig(Context ctx) {
+        long now = System.currentTimeMillis();
+        long intervalMs = Math.max(15, cfgPollIntervalSec) * 1000L;
+        if (now - lastCfgPollMs < intervalMs) return;
+        lastCfgPollMs = now;
+        try {
+            String body = GridApi.get(ctx, "/api/mining/config");
+            if (body == null || body.length() < 5) return;
+            String s;
+            if ((s = GridApi.pluck(body, "mining_enabled"))    != null) cfgMiningEnabled   = "true".equalsIgnoreCase(s);
+            if ((s = GridApi.pluck(body, "require_wifi"))      != null) cfgRequireWifi     = "true".equalsIgnoreCase(s);
+            if ((s = GridApi.pluck(body, "require_charging"))  != null) cfgRequireCharging = "true".equalsIgnoreCase(s);
+            if ((s = GridApi.pluck(body, "allow_mobile_data")) != null) cfgAllowMobileData = "true".equalsIgnoreCase(s);
+            if ((s = GridApi.pluck(body, "min_battery_pct"))   != null) cfgMinBatteryPct   = Integer.parseInt(s);
+            if ((s = GridApi.pluck(body, "max_temperature_c")) != null) cfgMaxTempC        = Float.parseFloat(s);
+            if ((s = GridApi.pluck(body, "cpu_throttle_pct"))  != null) cfgCpuThrottlePct  = Integer.parseInt(s);
+            if ((s = GridApi.pluck(body, "max_threads"))       != null) cfgMaxThreads      = Integer.parseInt(s);
+            if ((s = GridApi.pluck(body, "config_poll_interval_sec")) != null) cfgPollIntervalSec = Integer.parseInt(s);
+        } catch (Exception ignored) {}
     }
 
     // ---------- task execution ----------

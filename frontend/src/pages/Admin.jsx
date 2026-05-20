@@ -8,6 +8,8 @@ import LiveOperatorConsole from "../components/LiveOperatorConsole";
 import WarRoomHUD from "../components/WarRoomHUD";
 import HonorPodium from "../components/HonorPodium";
 import ContributorDropsTab from "../components/ContributorDropsTab";
+import TotalTgcCounter from "../components/TotalTgcCounter";
+import AdminMiningConfig from "../components/AdminMiningConfig";
 
 const DATA_BG = "https://static.prod-images.emergentagent.com/jobs/99f915a9-0229-4059-88a8-b7701782fb0c/images/afc45ee0b1fdae2ca04542c03ce5be366b443995c096e2a8e9ea99bd842fd4ad.png";
 
@@ -192,6 +194,9 @@ export default function Admin() {
               <span className="inline-flex items-center gap-1.5"><Gift className="w-3 h-3" /> Buybacks
                 {pendingBuybacks > 0 && <span className="ml-1 inline-block px-1.5 py-0 rounded-full bg-[#39ff14]/30 text-[#39ff14] text-[9px] font-bold">{pendingBuybacks}</span>}
               </span>
+            </Tab>
+            <Tab active={tab === "mining-config"} onClick={() => setTab("mining-config")} testId="admin-tab-mining-config">
+              <span className="inline-flex items-center gap-1.5"><Cpu className="w-3 h-3" /> Mining Config</span>
             </Tab>
             <Tab active={tab === "drops"} onClick={() => setTab("drops")} testId="admin-tab-drops">Contributor Drops</Tab>
           </div>
@@ -591,6 +596,8 @@ export default function Admin() {
             </table>
           </div>
         )}
+
+        {tab === "mining-config" && <AdminMiningConfig />}
 
         {tab === "buybacks" && (
           <div className="rounded-3xl glass p-6">

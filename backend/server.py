@@ -1837,6 +1837,82 @@ async def daily_calibration_claim(user: dict = Depends(get_current_user)):
     }
 
 
+# ---------- v1.6.4 Mining Config (admin-controlled, polled by APK) ----------
+# Sane defaults — admin can override every field at runtime via /api/admin/mining/config.
+_MINING_CONFIG_DEFAULTS = {
+    "id": "global",
+    "mining_enabled": True,
+    "cpu_throttle_pct": 50,    # 0-100, percentage of CPU mining is allowed
+    "max_threads": 2,           # 1-8, RandomX threads
+    "require_wifi": False,      # if True, Wi-Fi mandatory; if False, mobile data OK
+    "require_charging": True,   # if True, device must be plugged in
+    "min_battery_pct": 30,      # 0-100, minimum battery level to mine
+    "max_temperature_c": 45,    # 30-60, max device temperature
+    "allow_mobile_data": True,  # if False, refuse to mine on cellular
+    "config_poll_interval_sec": 60,  # how often APK polls this config
+    "updated_at": None,
+    "updated_by": None,
+}
+
+
+async def _load_mining_config() -> dict:
+    row = await db.mining_config.find_one({"id": "global"}, {"_id": 0})
+    if not row:
+        await db.mining_config.insert_one({**_MINING_CONFIG_DEFAULTS,
+                                           "updated_at": datetime.now(timezone.utc).isoformat()})
+        return _MINING_CONFIG_DEFAULTS.copy()
+    # Backfill any missing field with defaults so APK never sees a null value.
+    merged = {**_MINING_CONFIG_DEFAULTS, **row}
+    return merged
+
+
+@api.get("/mining/config")
+async def mining_config_public():
+    """Public endpoint polled by the APK every N seconds (default 60s).
+    Returns the current admin-controlled mining policy.  No auth required —
+    the APK calls this before/while running its foreground service."""
+    return await _load_mining_config()
+
+
+@api.get("/admin/mining/config")
+async def admin_mining_config_read(user: dict = Depends(require_admin)):
+    return await _load_mining_config()
+
+
+@api.post("/admin/mining/config")
+async def admin_mining_config_write(payload: dict, user: dict = Depends(require_admin)):
+    """Admin writes any subset of the config fields.  Validation enforces
+    sensible ranges so a typo can't brick the entire fleet."""
+    allowed_fields = {
+        "mining_enabled":           lambda v: bool(v),
+        "cpu_throttle_pct":         lambda v: max(0, min(100, int(v))),
+        "max_threads":              lambda v: max(1, min(8, int(v))),
+        "require_wifi":             lambda v: bool(v),
+        "require_charging":         lambda v: bool(v),
+        "min_battery_pct":          lambda v: max(0, min(100, int(v))),
+        "max_temperature_c":        lambda v: max(30, min(60, int(v))),
+        "allow_mobile_data":        lambda v: bool(v),
+        "config_poll_interval_sec": lambda v: max(15, min(3600, int(v))),
+    }
+    update = {}
+    for key, coerce in allowed_fields.items():
+        if key in payload:
+            try:
+                update[key] = coerce(payload[key])
+            except Exception:
+                raise HTTPException(status_code=400, detail=f"invalid value for {key}")
+    if not update:
+        raise HTTPException(status_code=400, detail="no valid fields supplied")
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    update["updated_by"] = user["email"]
+    await db.mining_config.update_one(
+        {"id": "global"},
+        {"$set": update, "$setOnInsert": {"id": "global"}},
+        upsert=True,
+    )
+    return await _load_mining_config()
+
+
 # ---------- v1.5.4 Foundation Buyback Program (config-driven) ----------
 # Defaults stored in DB so the operator can flip the window without redeploy.
 _BUYBACK_DEFAULTS = {

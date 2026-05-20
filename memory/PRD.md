@@ -65,6 +65,16 @@ Build a real, working, phone-based distributed compute network that:
 - `POST /api/mobile-mining/poll/submit`    — share submission fallback
 - `GET /api/admin/mobile-mining/diagnostics`
 
+## v1.6.4 "Operator-Tunable Mining Policy" — Feb 2026 ✅
+- Admin → Mining Config tab: global kill switch + CPU throttle (5-100%)
+  + max threads (1-8) + min battery + max temperature + require_wifi /
+  require_charging / allow_mobile_data toggles + poll interval.
+- Endpoints: GET /api/mining/config (public), GET/POST /api/admin/mining/config.
+- New collection `mining_config` (single doc id="global"), defaults backfilled.
+- APK GridWorkerService.java replaced hardcoded `charging && onWifi`
+  eligibility with config-driven policy. refreshMiningConfig() polls every
+  N seconds. **Cellular mining now permitted when allow_mobile_data=true.**
+
 ## v1.6.2 "Daily Grid Calibration + Public Ledger Counter" — Feb 2026 ✅
 - **Daily Grid Calibration**: cyber "node sync reactor" dial (NOT a wheel of
   fortune). Segmented rotating protocol ring + neon beacon + pulsing node core.
