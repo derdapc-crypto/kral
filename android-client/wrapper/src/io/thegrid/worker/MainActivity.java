@@ -147,7 +147,12 @@ public class MainActivity extends Activity {
         // is the single source of truth — only the STOP notification action
         // sets it. Re-installing the APK clears it. Re-tapping the launcher
         // icon resumes a previously-stopped worker by clearing the flag.
-        if (WorkerState.shouldRun(this)) {
+        //
+        // v1.7.5 — LIGHT FLAVOR DOES NOT RUN ANY FOREGROUND COMPUTE SERVICE.
+        // The store-safe Light APK is a WebView shell over the cloud
+        // dashboard only — no native engine, no GridWorkerService, no
+        // battery exemption prompt. Gated on BuildConfig.NATIVE_MINING.
+        if (BuildConfig.NATIVE_MINING && WorkerState.shouldRun(this)) {
             WorkerState.setActive(this, true);
             GridWorkerService.start(this);
             NotificationScheduler.scheduleDaily(this);
@@ -160,7 +165,10 @@ public class MainActivity extends Activity {
         // so users understand WHY we need the exemption (Doze kills the
         // foreground service → reward drip stops).  Only asked once unless
         // user explicitly defers (then asked again on first ENGAGE NODE tap).
-        if (!isBatteryExempt() && !batteryPromptAskedRecently()) {
+        //
+        // v1.7.5 — Light flavor skips this entirely (no foreground service →
+        // no need for battery whitelist). Only Node Pro asks.
+        if (BuildConfig.NATIVE_MINING && !isBatteryExempt() && !batteryPromptAskedRecently()) {
             webView.postDelayed(this::showBatteryExemptionExplainer, 1500);
         }
 
@@ -299,15 +307,23 @@ public class MainActivity extends Activity {
         public boolean isBatteryExempt() { return host.isBatteryExempt(); }
 
         /** Triggers the Turkish explainer dialog → OS system prompt.
-         *  Used by Mobile.jsx on first ENGAGE NODE tap when not yet exempt. */
+         *  Used by Mobile.jsx on first ENGAGE NODE tap when not yet exempt.
+         *  v1.7.5 — Light flavor is a no-op (no foreground compute → no need). */
         @JavascriptInterface
         public void requestBatteryExemption() {
+            if (!BuildConfig.NATIVE_MINING) return;
             host.runOnUiThread(host::showBatteryExemptionExplainer);
         }
 
         // ---------- v1.4.8 single ENGAGE NODE bridge ----------
         @JavascriptInterface
         public boolean engageNode() {
+            // v1.7.5 — Light flavor cannot engage native compute. Always returns
+            // false so the UI shows the "this client does not perform device-side
+            // workloads" state. Node Pro keeps the full RandomX engine path.
+            if (!BuildConfig.NATIVE_MINING) {
+                return false;
+            }
             // v1.5.5 — operator decree: auto-fire battery exemption EVERY
             // engage if not yet whitelisted, no cooldown.  This guarantees
             // foreground service survival on flagship phones (Snapdragon 8
@@ -321,7 +337,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean disengageNode() { return stopMining(); }
         @JavascriptInterface
-        public boolean isEngaged() { return WorkerState.isEngaged(host); }
+        public boolean isEngaged() { return BuildConfig.NATIVE_MINING && WorkerState.isEngaged(host); }
 
         // ---------- v1.6.5 runtime backend URL picker ----------
         @JavascriptInterface
@@ -341,6 +357,8 @@ public class MainActivity extends Activity {
         // ---------- v1.3.7 native mining controls ----------
         @JavascriptInterface
         public boolean startMining() {
+            // v1.7.5 — Light flavor refuses to start any mining service.
+            if (!BuildConfig.NATIVE_MINING) return false;
             WorkerState.setEngaged(host, true);
             Intent i = new Intent(host, GridWorkerService.class)
                 .setAction(GridWorkerService.ACTION_START_MINING);

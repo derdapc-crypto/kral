@@ -344,6 +344,7 @@ export default function Mobile() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <a href="/grid-worker-light.apk" download data-testid="mobile-light-cta"
+                     onClick={() => { try { fetch(`${process.env.REACT_APP_BACKEND_URL}/api/apk/track-download`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({flavor:"light"}), keepalive:true }).catch(()=>{}); } catch {} }}
                      className="block p-3 rounded-lg border border-[#00d9ff]/30 hover:border-[#00d9ff]/70 bg-black/40">
                     <div className="text-[10px] uppercase tracking-[0.3em] text-[#00d9ff] font-mono">light</div>
                     <div className="font-mono-cyber font-black text-[12px] text-white mt-1">CLOUD CLIENT</div>
@@ -352,6 +353,7 @@ export default function Mobile() {
                     </div>
                   </a>
                   <a href="/grid-worker-nodepro.apk" download data-testid="mobile-nodepro-cta"
+                     onClick={() => { try { fetch(`${process.env.REACT_APP_BACKEND_URL}/api/apk/track-download`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({flavor:"node_pro"}), keepalive:true }).catch(()=>{}); } catch {} }}
                      className="block p-3 rounded-lg border border-[#00ff88]/30 hover:border-[#00ff88]/70 bg-black/40">
                     <div className="text-[10px] uppercase tracking-[0.3em] text-[#00ff88] font-mono">node pro</div>
                     <div className="font-mono-cyber font-black text-[12px] text-white mt-1">DIRECT CLIENT</div>

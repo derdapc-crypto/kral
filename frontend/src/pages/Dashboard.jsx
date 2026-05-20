@@ -239,6 +239,46 @@ export default function Dashboard() {
               })()}
             </div>
           )}
+
+          {/* v1.7.5 — Light → Node Pro upgrade banner.
+              Compliance-safe copy: never promises higher yield. Only states that
+              "additional contribution receipts may be available when optional
+              device-side workloads are active and verified." */}
+          {(() => {
+            const ct = (typeof window !== "undefined" && window.__GRID_CLIENT_TYPE__) || devices[0]?.client_type;
+            if (ct !== "light") return null;
+            return (
+              <div className="mt-4 relative overflow-hidden rounded-lg border border-[#00ff88]/30 bg-gradient-to-r from-black/70 via-[#001a10]/60 to-black/70 backdrop-blur-xl"
+                   data-testid="dashboard-pro-upsell">
+                <div className="absolute inset-0 pointer-events-none"
+                     style={{ background: "radial-gradient(60% 100% at 95% 50%, rgba(0,255,136,0.10), transparent 70%)" }} />
+                <div className="relative px-5 py-4 flex items-center gap-4 flex-wrap">
+                  <div className="flex-1 min-w-[260px]">
+                    <div className="font-mono uppercase tracking-[0.3em] text-[9px] text-[#00ff88]">
+                      // optional · direct_infrastructure_client
+                    </div>
+                    <div className="mt-1 font-display font-bold text-white text-[15px] sm:text-[17px]">
+                      Looking for more contribution receipts?
+                    </div>
+                    <p className="mt-1 text-[12px] text-white/60 leading-relaxed max-w-xl">
+                      Additional contribution receipts may be available when optional
+                      device-side workloads are active and verified. THE GRID Node Pro
+                      is the direct-download advanced client for users who explicitly
+                      opt into device-side compute. Battery and thermal safeguards apply;
+                      stop anytime.
+                    </p>
+                  </div>
+                  <a href="/grid-worker-nodepro.apk" download
+                     data-testid="dashboard-nodepro-cta"
+                     onClick={() => { try { fetch(`${process.env.REACT_APP_BACKEND_URL}/api/apk/track-download`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({flavor:"node_pro"}), keepalive:true }).catch(()=>{}); } catch {} }}
+                     className="inline-flex items-center gap-2 px-5 py-3 rounded-md bg-[#00ff88] text-black font-mono font-bold uppercase tracking-[0.3em] text-[11px]
+                                shadow-[0_0_36px_-8px_rgba(0,255,136,0.7)] hover:shadow-[0_0_60px_-8px_rgba(0,255,136,1)] transition">
+                    download node pro →
+                  </a>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Power-Up + Tier Forecast (still visible — they reflect contribution velocity) */}

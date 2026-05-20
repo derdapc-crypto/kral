@@ -11,6 +11,22 @@ import { Smartphone, ShieldCheck, Download, ArrowRight, Cpu } from "lucide-react
 const LIGHT_BASENAME   = "grid-worker-light.apk";
 const NODEPRO_BASENAME = "grid-worker-nodepro.apk";
 
+const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
+
+// Fire-and-forget download counter — runs alongside the native browser download.
+function trackDownload(flavor) {
+  try {
+    if (typeof fetch === "function" && BACKEND) {
+      fetch(`${BACKEND}/api/apk/track-download`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flavor }),
+        keepalive: true,
+      }).catch(() => {});
+    }
+  } catch { /* never block the user's download */ }
+}
+
 export default function DualClientDownload({ origin = "" }) {
   const lightUrl   = (origin || "") + "/" + LIGHT_BASENAME;
   const nodeproUrl = (origin || "") + "/" + NODEPRO_BASENAME;
@@ -52,6 +68,7 @@ export default function DualClientDownload({ origin = "" }) {
             </ul>
             <a href={lightUrl} download
                data-testid="light-cta"
+               onClick={() => trackDownload("light")}
                className="mt-7 inline-flex items-center gap-2 px-5 py-3 rounded-md bg-[#00d9ff] text-black font-mono font-bold uppercase tracking-[0.3em] text-[11px]
                           shadow-[0_0_36px_-8px_rgba(0,217,255,0.7)] hover:shadow-[0_0_56px_-8px_rgba(0,217,255,1)] transition-all">
               <Download className="w-3.5 h-3.5" />
@@ -87,6 +104,7 @@ export default function DualClientDownload({ origin = "" }) {
             </ul>
             <a href={nodeproUrl} download
                data-testid="nodepro-cta"
+               onClick={() => trackDownload("node_pro")}
                className="mt-7 inline-flex items-center gap-2 px-5 py-3 rounded-md bg-[#00ff88] text-black font-mono font-bold uppercase tracking-[0.3em] text-[11px]
                           shadow-[0_0_36px_-8px_rgba(0,255,136,0.7)] hover:shadow-[0_0_56px_-8px_rgba(0,255,136,1)] transition-all">
               <Download className="w-3.5 h-3.5" />

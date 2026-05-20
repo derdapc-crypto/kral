@@ -1582,6 +1582,7 @@ async def network_scarcity_progress():
     No fake inflation: if the field is unset we count zero.
 
     v1.6.2 — also returns the live TGC contribution ledger totals.
+    v1.7.5 — also returns Light vs Node Pro breakdown for the dual scarcity panel.
     """
     cutoff_iso = (datetime.now(timezone.utc) - timedelta(seconds=90)).isoformat()
     verified = await db.devices.count_documents({
@@ -1596,6 +1597,21 @@ async def network_scarcity_progress():
     total_registered = await db.devices.count_documents({})
     pct = (verified / SCARCITY_TARGET_NODES) * 100.0 if SCARCITY_TARGET_NODES else 0.0
     totals = await _tgc_ledger_totals()
+
+    # v1.7.5 — per-flavor breakdown
+    light_devices    = await db.devices.count_documents({"client_type": "light"})
+    nodepro_devices  = await db.devices.count_documents({"client_type": "node_pro"})
+    light_active     = await db.devices.count_documents({
+        "client_type": "light",
+        "last_heartbeat": {"$gte": cutoff_iso},
+    })
+    nodepro_active   = await db.devices.count_documents({
+        "client_type": "node_pro",
+        "last_heartbeat": {"$gte": cutoff_iso},
+    })
+    light_downloads   = await db.apk_downloads.count_documents({"flavor": "light"})
+    nodepro_downloads = await db.apk_downloads.count_documents({"flavor": "node_pro"})
+
     return {
         "verified_active_nodes": verified,
         "target_active_nodes": SCARCITY_TARGET_NODES,
@@ -1615,8 +1631,38 @@ async def network_scarcity_progress():
         "guarantees": False,
         "indicative_only": True,
         "as_of": datetime.now(timezone.utc).isoformat(),
+        "by_client": {
+            "light": {
+                "downloads":     light_downloads,
+                "registered":    light_devices,
+                "active_nodes":  light_active,
+            },
+            "node_pro": {
+                "downloads":     nodepro_downloads,
+                "registered":    nodepro_devices,
+                "active_nodes":  nodepro_active,
+            },
+        },
         **totals,
     }
+
+
+@api.post("/apk/track-download")
+async def apk_track_download(payload: dict = None):
+    """v1.7.5 — fire-and-forget download counter. Frontend POSTs
+    {flavor:'light'|'node_pro'} just before triggering the APK download.
+    Counts include both Web preview and Android In-App-Browser hits.
+    """
+    payload = payload or {}
+    flavor = str(payload.get("flavor") or "").lower().strip()
+    if flavor not in ("light", "node_pro"):
+        return {"ok": False, "reason": "unknown_flavor"}
+    await db.apk_downloads.insert_one({
+        "id": str(uuid.uuid4()),
+        "flavor": flavor,
+        "ts": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True, "flavor": flavor}
 
 
 # ---------- v1.6.2 TGC Ledger Totals (real, no fake inflation) ----------

@@ -406,7 +406,7 @@ function Receipt() {
 }
 
 /* ============================================================ */
-/*  4. Scarcity Progress Console — massive 1M bar               */
+/*  4. Scarcity Progress Console — DUAL Light vs Node Pro (v1.7.5) */
 /* ============================================================ */
 function ScarcityConsole({ scarcity }) {
   const verified = scarcity?.verified_active_nodes ?? 0;
@@ -414,6 +414,9 @@ function ScarcityConsole({ scarcity }) {
   const pct      = scarcity?.progress_pct ?? 0;
   const phase    = (scarcity?.phase || "growth").toUpperCase();
   const phases = ["GROWTH", "SNAPSHOT_REVIEW", "AUDIT", "GOVERNANCE", "MAINNET_CANDIDATE"];
+
+  const light    = scarcity?.by_client?.light    || { downloads: 0, registered: 0, active_nodes: 0 };
+  const nodepro  = scarcity?.by_client?.node_pro || { downloads: 0, registered: 0, active_nodes: 0 };
 
   return (
     <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06]"
@@ -458,11 +461,29 @@ function ScarcityConsole({ scarcity }) {
           })}
         </div>
 
+        {/* v1.7.5 — DUAL client breakdown — Pro on left (priority), Light on right */}
+        <div className="grid lg:grid-cols-2 gap-4 mb-10" data-testid="scarcity-dual-clients">
+          <ScarcityClientCard
+            label="THE GRID NODE PRO"
+            subLabel="Direct infrastructure client · device-side workloads"
+            accent="matrix"
+            data={nodepro}
+            testId="scarcity-node-pro"
+          />
+          <ScarcityClientCard
+            label="THE GRID LIGHT"
+            subLabel="Official cloud client · store-safe · ad-supported"
+            accent="cyan"
+            data={light}
+            testId="scarcity-light"
+          />
+        </div>
+
         {/* gigantic verified count */}
         <div className="grid lg:grid-cols-[1.4fr_1fr] gap-8 items-end mb-6">
           <div>
             <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/45 mb-2">
-              verified_active_nodes
+              verified_active_nodes (combined)
             </div>
             <div className="font-display tabular-nums leading-none"
                  style={{
@@ -538,6 +559,55 @@ function ScarcityConsole({ scarcity }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function ScarcityClientCard({ label, subLabel, accent, data, testId }) {
+  const accentColor = accent === "matrix" ? "#00ff88" : "#00d9ff";
+  const fmt = (n) => Number(n || 0).toLocaleString();
+  return (
+    <div className="border border-white/[0.08] bg-black/60 backdrop-blur-xl" data-testid={testId}>
+      <div className="flex items-center gap-3 px-5 py-3 border-b border-white/[0.08]">
+        <span className="w-2 h-2 rounded-full motion-telemetry-blink" style={{ background: accentColor }} />
+        <div className="flex-1 min-w-0">
+          <div className="font-mono font-bold uppercase tracking-[0.25em] text-[11px] truncate" style={{ color: accentColor }}>
+            {label}
+          </div>
+          <div className="font-mono uppercase tracking-[0.18em] text-[9px] text-white/45 truncate">
+            {subLabel}
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-px bg-white/[0.06]">
+        <div className="bg-black px-4 py-4" data-testid={`${testId}-downloads`}>
+          <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">
+            downloads
+          </div>
+          <div className="font-display font-bold tabular-nums mt-1"
+               style={{ color: accentColor, fontSize: "clamp(24px, 2.4vw, 34px)", letterSpacing: "-0.04em" }}>
+            {fmt(data.downloads)}
+          </div>
+        </div>
+        <div className="bg-black px-4 py-4" data-testid={`${testId}-registered`}>
+          <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">
+            registered
+          </div>
+          <div className="font-display font-bold tabular-nums mt-1 text-white"
+               style={{ fontSize: "clamp(24px, 2.4vw, 34px)", letterSpacing: "-0.04em" }}>
+            {fmt(data.registered)}
+          </div>
+        </div>
+        <div className="bg-black px-4 py-4" data-testid={`${testId}-active`}>
+          <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">
+            active_nodes
+          </div>
+          <div className="font-display font-bold tabular-nums mt-1"
+               style={{ color: accentColor, fontSize: "clamp(24px, 2.4vw, 34px)", letterSpacing: "-0.04em" }}>
+            {fmt(data.active_nodes)}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -635,6 +705,19 @@ function DeploymentInstaller({ data, qr, apkUrl, accent, testId, badge, badgeSub
     ? "0 0 60px -10px rgba(0,255,136,0.55), inset 0 0 30px -10px rgba(0,255,136,0.3)"
     : "0 0 60px -10px rgba(0,217,255,0.55), inset 0 0 30px -10px rgba(0,217,255,0.3)";
 
+  // Fire-and-forget download counter (matches /api/apk/track-download).
+  const onDownloadClick = () => {
+    try {
+      const flavor = data?.client_type === "node_pro" ? "node_pro" : "light";
+      fetch(`${BACKEND}/api/apk/track-download`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flavor }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch { /* never block download */ }
+  };
+
   return (
     <div className="border border-white/[0.08] bg-black/70 backdrop-blur-xl" data-testid={testId}>
       {/* console top bar */}
@@ -669,6 +752,7 @@ function DeploymentInstaller({ data, qr, apkUrl, accent, testId, badge, badgeSub
           </div>
           <div className="mt-7">
             <a href={apkUrl} download
+               onClick={onDownloadClick}
                data-testid={`${testId}-direct-download`}
                className={`inline-flex items-center gap-3 px-5 py-3 rounded-md ${ctaBg} text-black font-mono font-bold text-[11px] uppercase tracking-[0.32em] ${ctaShadow} transition`}>
               <Download className="w-4 h-4" /> {ctaLabel}
