@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import SanctaraLogo from "./SanctaraLogo";
 
 /**
  * LegalLayout — shared scaffolding for /privacy and /terms.
@@ -20,10 +21,10 @@ export default function LegalLayout({ title, lastUpdated, children }) {
 
       <header className="border-b border-white/[0.06] px-6 lg:px-8 py-5">
         <div className="max-w-[820px] mx-auto flex items-center justify-between gap-4 flex-wrap">
-          <Link to="/"
-                data-testid="legal-back-home"
-                className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.3em] text-white/55 hover:text-[#00ff88] transition">
-            <ArrowLeft className="w-3.5 h-3.5" /> back to grid
+          <Link to="/" data-testid="legal-back-home"
+                className="inline-flex items-center gap-3 text-white/70 hover:text-[#00ff88] transition">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <SanctaraLogo size={22} showWordmark={true} />
           </Link>
           <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/35">
             // legal · public.disclosure
@@ -54,11 +55,11 @@ export default function LegalLayout({ title, lastUpdated, children }) {
 
       <footer className="border-t border-white/[0.06] px-6 lg:px-8 py-8 text-[10px] font-mono uppercase tracking-[0.3em] text-white/35">
         <div className="max-w-[820px] mx-auto flex flex-wrap items-center justify-between gap-3">
-          <span>© 2026 sanctara.network network</span>
+          <span>© 2026 sanctara.network</span>
           <div className="flex gap-5">
             <Link to="/privacy" className="hover:text-[#00ff88] transition" data-testid="legal-footer-privacy">privacy policy</Link>
             <Link to="/terms" className="hover:text-[#00ff88] transition" data-testid="legal-footer-terms">terms of service</Link>
-            <Link to="/" className="hover:text-[#00ff88] transition" data-testid="legal-footer-home">grid</Link>
+            <Link to="/" className="hover:text-[#00ff88] transition" data-testid="legal-footer-home">sanctara</Link>
           </div>
         </div>
       </footer>

@@ -639,14 +639,14 @@ export default function Admin() {
                   testId: "kpi-nodepro-total",
                 },
                 {
-                  label: "TGC · LIGHT",
+                  label: "SANCT · LIGHT",
                   val: Number(clientStats?.tgc_issued_by_client?.light || 0).toFixed(5),
                   sub: "calibration + drops",
                   tone: "cyan",
                   testId: "kpi-tgc-light",
                 },
                 {
-                  label: "TGC · NODE_PRO",
+                  label: "SANCT · NODE_PRO",
                   val: Number(clientStats?.tgc_issued_by_client?.node_pro || 0).toFixed(5),
                   sub: "verified compute",
                   tone: "matrix",
@@ -791,7 +791,7 @@ export default function Admin() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">TGC at apply</div>
+                        <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">SANCT at apply</div>
                         <div className="font-mono-num text-[#00ff88] text-lg">{Number(b.tgc_balance_at_apply || 0).toFixed(2)}</div>
                         <div className="text-[10px] text-white/40">burn on approve: <span className="text-red-300">−{Number(b.target_tgc || 0).toFixed(0)} SANCT</span></div>
                         {b.burned_tgc ? <div className="text-[10px] text-red-300 mt-1">burned: {Number(b.burned_tgc).toFixed(2)} SANCT</div> : null}
@@ -801,7 +801,7 @@ export default function Admin() {
                       <div className="mt-4 flex gap-2">
                         <button onClick={() => approveBuyback(b.id, b.target_tgc)} data-testid={`buyback-approve-${b.id}`}
                           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#00ff88] to-[#00d9ff] text-black font-semibold text-xs">
-                          <Check className="w-3.5 h-3.5" /> Approve &amp; Burn TGC
+                          <Check className="w-3.5 h-3.5" /> Approve &amp; Burn SANCT
                         </button>
                         <button onClick={() => rejectBuyback(b.id)} data-testid={`buyback-reject-${b.id}`}
                           className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-red-400/30 text-red-400 text-xs hover:bg-red-400/10">

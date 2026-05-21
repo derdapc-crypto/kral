@@ -2,8 +2,8 @@
 
 This document walks an operator through bringing **SANCTARA** online on a
 production domain using a single Ubuntu VPS, MongoDB Atlas, Caddy or Nginx,
-and the dual APK distribution pipeline (`grid-worker-light.apk` +
-`grid-worker-nodepro.apk`).
+and the dual APK distribution pipeline (`sanctara-light.apk` +
+`sanctara-node-pro.apk`).
 
 > **v1.7.5 Dual-Client Architecture** — Two distinct mobile APKs share the
 > same backend, the same MongoDB cluster, and the same user / TGC ledger.
@@ -236,8 +236,8 @@ sudo certbot --nginx -d sanctara.io -d www.sanctara.io -d api.sanctara.io
 
 ## 7. Host the dual APKs
 
-The backend serves them from `/grid-worker-light.apk` and
-`/grid-worker-nodepro.apk` — same path you find them under
+The backend serves them from `/sanctara-light.apk` and
+`/sanctara-node-pro.apk` — same path you find them under
 `/app/frontend/public/` in this repo.
 
 Either:
@@ -249,7 +249,7 @@ Either:
 Verify:
 
 ```bash
-curl -I https://sanctara.io/grid-worker-light.apk
+curl -I https://sanctara.io/sanctara-light.apk
 # → HTTP/2 200, Content-Type: application/vnd.android.package-archive
 
 curl -s https://api.sanctara.io/api/apk/dual-version | python3 -m json.tool
@@ -367,7 +367,7 @@ sudo crontab -e
 5. Add screenshots, icon, feature graphic.
 6. Submit for review (7–14 days typical).
 
-**DO NOT submit `grid-worker-nodepro.apk` to Play Store. It is direct-download only.**
+**DO NOT submit `sanctara-node-pro.apk` to Play Store. It is direct-download only.**
 
 ---
 

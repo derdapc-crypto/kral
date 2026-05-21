@@ -59,7 +59,7 @@ export default function TotalTgcCounter({
   value = 0,
   subValues = null,
   variant = "default",
-  label = "TOTAL_TGC_RECEIPTS_ISSUED",
+  label = "TOTAL_SANCT_RECEIPTS_ISSUED",
   tone = "matrix",
   testId = "total-tgc-counter",
 }) {
@@ -84,7 +84,7 @@ export default function TotalTgcCounter({
              letterSpacing: "-0.02em",
              lineHeight: 1.05,
            }}>
-        {formatTgc(animated)} <span className="text-white/35 text-[0.45em] font-mono tracking-[0.25em] uppercase">tgc</span>
+        {formatTgc(animated)} <span className="text-white/35 text-[0.45em] font-mono tracking-[0.25em] uppercase">sanct</span>
       </div>
       <div className="mt-1.5 font-mono uppercase tracking-[0.25em] text-[9px] text-white/30">
         ledger_total · real_data_only · no_fake_inflation

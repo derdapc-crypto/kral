@@ -8,8 +8,8 @@
 import React from "react";
 import { Smartphone, ShieldCheck, Download, ArrowRight, Cpu } from "lucide-react";
 
-const LIGHT_BASENAME   = "grid-worker-light.apk";
-const NODEPRO_BASENAME = "grid-worker-nodepro.apk";
+const LIGHT_BASENAME   = "sanctara-light.apk";
+const NODEPRO_BASENAME = "sanctara-node-pro.apk";
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
 

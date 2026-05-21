@@ -269,7 +269,7 @@ export default function Dashboard() {
                       stop anytime.
                     </p>
                   </div>
-                  <a href="/grid-worker-nodepro.apk" download
+                  <a href="/sanctara-node-pro.apk" download
                      data-testid="dashboard-nodepro-cta"
                      onClick={() => { try { fetch(`${process.env.REACT_APP_BACKEND_URL}/api/apk/track-download`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({flavor:"node_pro"}), keepalive:true }).catch(()=>{}); } catch {} }}
                      className="inline-flex items-center gap-2 px-5 py-3 rounded-md bg-[#00ff88] text-black font-mono font-bold uppercase tracking-[0.3em] text-[11px]

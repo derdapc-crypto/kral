@@ -20,7 +20,7 @@ export default function LegalFooterMini({ testIdPrefix = "" }) {
           <Link to="/terms" className="hover:text-[#00ff88] transition"
                 data-testid={`${p}legal-terms-link`}>terms</Link>
           <Link to="/" className="hover:text-[#00ff88] transition"
-                data-testid={`${p}legal-home-link`}>grid</Link>
+                data-testid={`${p}legal-home-link`}>sanctara</Link>
         </div>
       </div>
     </div>

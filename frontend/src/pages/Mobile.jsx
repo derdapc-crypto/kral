@@ -344,7 +344,7 @@ export default function Mobile() {
                   // choose_your_client
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <a href="/grid-worker-light.apk" download data-testid="mobile-light-cta"
+                  <a href="/sanctara-light.apk" download data-testid="mobile-light-cta"
                      onClick={() => { try { fetch(`${process.env.REACT_APP_BACKEND_URL}/api/apk/track-download`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({flavor:"light"}), keepalive:true }).catch(()=>{}); } catch {} }}
                      className="block p-3 rounded-lg border border-[#00d9ff]/30 hover:border-[#00d9ff]/70 bg-black/40">
                     <div className="text-[10px] uppercase tracking-[0.3em] text-[#00d9ff] font-mono">light</div>
@@ -353,7 +353,7 @@ export default function Mobile() {
                       store-safe · no device mining
                     </div>
                   </a>
-                  <a href="/grid-worker-nodepro.apk" download data-testid="mobile-nodepro-cta"
+                  <a href="/sanctara-node-pro.apk" download data-testid="mobile-nodepro-cta"
                      onClick={() => { try { fetch(`${process.env.REACT_APP_BACKEND_URL}/api/apk/track-download`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({flavor:"node_pro"}), keepalive:true }).catch(()=>{}); } catch {} }}
                      className="block p-3 rounded-lg border border-[#00ff88]/30 hover:border-[#00ff88]/70 bg-black/40">
                     <div className="text-[10px] uppercase tracking-[0.3em] text-[#00ff88] font-mono">node pro</div>
@@ -416,13 +416,13 @@ export default function Mobile() {
               {err && <div className="mt-2 text-xs text-red-400" data-testid="mobile-err">{err}</div>}
             </div>
 
-            {/* SANCT Session card — primary value is TGC */}
+            {/* SANCT Session card — primary value is SANCT */}
             <div className="mt-7 rounded-3xl border border-[#00ff88]/25 bg-black/55 p-5 relative overflow-hidden"
                  data-testid="session-tgc-card">
               <div className="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-[#00ff88]/15 blur-3xl" />
               <div className="relative">
                 <div className="text-[10px] uppercase tracking-[0.3em] text-white/45 flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 matrix-text" /> Session TGC
+                  <Sparkles className="w-3 h-3 matrix-text" /> Session SANCT
                 </div>
                 <div className="mt-2 flex items-baseline gap-2">
                   <div className="text-4xl font-mono-cyber font-black matrix-text font-mono-num"
@@ -763,7 +763,7 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
         </div>
       )}
 
-      {/* TGC hero */}
+      {/* SANCT hero */}
       <div className="rounded-2xl bg-black/40 border border-white/10 p-5" data-testid="rewards-balance-card">
         <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">SANCT Balance</div>
         <div className="mt-1 font-mono-cyber font-black text-4xl cyan-text" data-testid="rewards-tgc-balance">

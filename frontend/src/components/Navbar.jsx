@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { LogOut, Shield, Download, Briefcase, Cpu } from "lucide-react";
+import { LogOut, Shield, Download, Briefcase } from "lucide-react";
 import ApkSetupModal from "./ApkSetupModal";
+import SanctaraLogo from "./SanctaraLogo";
 
 /**
  * Premium SaaS navbar (v1.4.0) — investor-facing surface. Restrained neon,
@@ -28,14 +29,8 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#02040a]/80 border-b border-white/[0.06]">
       <div className="max-w-7xl mx-auto px-6 sm:px-10 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5 group" data-testid="nav-logo">
-          <div className="relative w-7 h-7 rounded-lg grid place-items-center"
-               style={{ background: "linear-gradient(135deg, #00ffe1, #00d4ff)" }}>
-            <Cpu className="w-4 h-4 text-black" strokeWidth={2.4} />
-          </div>
-          <span className="font-grotesk font-bold text-[17px] tracking-tight text-white">
-            SANCTARA
-          </span>
+        <Link to="/" className="flex items-center gap-2.5 group text-white" data-testid="nav-logo">
+          <SanctaraLogo size={32} showWordmark={true} />
         </Link>
 
         <nav className="hidden md:flex items-center gap-7">

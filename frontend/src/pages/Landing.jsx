@@ -27,6 +27,7 @@ import QRCode from "qrcode";
 import NetworkTopology from "../components/NetworkTopology";
 import TotalTgcCounter from "../components/TotalTgcCounter";
 import DualClientDownload from "../components/DualClientDownload";
+import SanctaraLogo from "../components/SanctaraLogo";
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -133,10 +134,8 @@ function NavBar({ apk }) {
     <header className="fixed top-0 inset-x-0 z-40 border-b border-white/[0.06] bg-black/55 backdrop-blur-xl"
             data-testid="nav-bar">
       <div className="max-w-[1240px] mx-auto px-6 lg:px-8 h-14 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5" data-testid="nav-home">
-          <div className="w-7 h-7 rounded-md border border-[#00ff88]/40 grid place-items-center bg-black">
-            <Cpu className="w-3.5 h-3.5 text-[#00ff88]" />
-          </div>
+        <Link to="/" className="flex items-center gap-3" data-testid="nav-home">
+          <SanctaraLogo size={26} showWordmark={false} />
           <div className="font-mono uppercase tracking-[0.3em] text-[11px] text-white">sanctara.network</div>
           <span className="hidden sm:inline-block text-[9px] uppercase tracking-[0.3em] text-white/35 border-l border-white/10 pl-2.5 ml-1">
             distributed compute · pre-mainnet
@@ -633,13 +632,13 @@ function DeploymentModule() {
       return QRCode.toDataURL(full, { width: 320, margin: 0,
         color: { dark: "#00ff88", light: "#00000000" } });
     };
-    make(dual.light?.download_url    || "/grid-worker-light.apk").then(setQrLight);
-    make(dual.node_pro?.download_url || "/grid-worker-nodepro.apk").then(setQrNodePro);
+    make(dual.light?.download_url    || "/sanctara-light.apk").then(setQrLight);
+    make(dual.node_pro?.download_url || "/sanctara-node-pro.apk").then(setQrNodePro);
   }, [dual]);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const lightUrl   = origin + (dual?.light?.download_url    || "/grid-worker-light.apk");
-  const nodeproUrl = origin + (dual?.node_pro?.download_url || "/grid-worker-nodepro.apk");
+  const lightUrl   = origin + (dual?.light?.download_url    || "/sanctara-light.apk");
+  const nodeproUrl = origin + (dual?.node_pro?.download_url || "/sanctara-node-pro.apk");
 
   return (
     <section className="relative py-20 px-6 lg:px-8 border-t border-white/[0.06]" id="deploy" data-testid="deploy-module">

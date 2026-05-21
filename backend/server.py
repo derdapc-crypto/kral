@@ -3466,8 +3466,8 @@ def _apk_flavor_meta(basename: str, expect_native: bool) -> dict:
 async def apk_dual_version():
     """v1.7.5 — honest metadata for both APK flavors. Used by Landing's
     dual-installer panel so each artifact gets its own QR + checksum."""
-    light   = _apk_flavor_meta("grid-worker-light.apk",   expect_native=False)
-    nodepro = _apk_flavor_meta("grid-worker-nodepro.apk", expect_native=True)
+    light   = _apk_flavor_meta("sanctara-light.apk",   expect_native=False)
+    nodepro = _apk_flavor_meta("sanctara-node-pro.apk", expect_native=True)
     return {
         "version":     APK_VERSION,
         "released_at": "2026-05-20",

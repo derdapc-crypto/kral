@@ -5,12 +5,12 @@
 #                     · package io.thegrid.light
 #                     · NO librandomx.so (zero device-side mining)
 #                     · AdMob test ID embedded in BuildConfig.java
-#                     · output: grid-worker-light.apk
+#                     · output: sanctara-light.apk
 #   FLAVOR=nodepro  → Direct-download advanced client.
 #                     · package io.thegrid.nodepro
 #                     · embeds librandomx.so (device-side workloads)
 #                     · NO AdMob SDK
-#                     · output: grid-worker-nodepro.apk
+#                     · output: sanctara-node-pro.apk
 #
 # Honest CLI-only pipeline — no Gradle, no Android Studio.
 set -euo pipefail
@@ -28,8 +28,8 @@ VERSION="${VERSION:-1.7.5}"
 FLAVOR="${FLAVOR:-nodepro}"
 
 case "$FLAVOR" in
-    light)   PKG="io.thegrid.light";   OUT_NAME="grid-worker-light.apk";   NATIVE_REQUIRED=0; ADMOB_ON=1 ;;
-    nodepro) PKG="io.thegrid.nodepro"; OUT_NAME="grid-worker-nodepro.apk"; NATIVE_REQUIRED=1; ADMOB_ON=0 ;;
+    light)   PKG="io.thegrid.light";   OUT_NAME="sanctara-light.apk";   NATIVE_REQUIRED=0; ADMOB_ON=1 ;;
+    nodepro) PKG="io.thegrid.nodepro"; OUT_NAME="sanctara-node-pro.apk"; NATIVE_REQUIRED=1; ADMOB_ON=0 ;;
     *)       echo "[FATAL] Unknown FLAVOR='$FLAVOR' (expected: light | nodepro)" >&2; exit 2 ;;
 esac
 OUT_DEST="/app/frontend/public/${OUT_NAME}"
