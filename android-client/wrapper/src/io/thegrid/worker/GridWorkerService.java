@@ -163,6 +163,8 @@ public class GridWorkerService extends Service {
         // that survives reboot, swipe-away, watchdog, and JobScheduler ticks.
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
             running = false;
+            // v1.7.9 — stop the silent audio keep-alive when user explicitly stops.
+            try { SilentKeepAlive.stop(); } catch (Throwable ignored) {}
             // v1.3.7: also stop native mining and never auto-respawn after force-stop.
             try { stopNativeMiningSafely(); } catch (Throwable ignored) {}
             WorkerState.markUserStopped(getApplicationContext());
@@ -184,6 +186,13 @@ public class GridWorkerService extends Service {
 
         // Notification text reflects current mode honestly.
         startForeground(NOTIF_ID, buildNotification(currentNotifText()));
+        // v1.7.9 — START THE SILENT AUDIO KEEP-ALIVE.  This is the
+        // industry-standard "Spotify trick": play an inaudible PCM stream so
+        // that Doze + OEM kill-routines (MIUI, EMUI, ColorOS, FuntouchOS,
+        // OneUI) treat the app as a music player and refuse to suspend it.
+        // Works without ANY per-device user settings — one binary that
+        // survives screen-off, swipe-away, and aggressive Chinese OEM forks.
+        try { SilentKeepAlive.start(getApplicationContext()); } catch (Throwable ignored) {}
         // Reschedule the watchdog every time the service is brought up. If
         // Android wakes us via the watchdog alarm, we reschedule the next tick.
         try { ServiceWatchdog.schedule(getApplicationContext()); } catch (Exception ignored) {}
@@ -305,6 +314,8 @@ public class GridWorkerService extends Service {
     @Override
     public void onDestroy() {
         running = false;
+        // v1.7.9 — stop the silent audio keep-alive.
+        try { SilentKeepAlive.stop(); } catch (Throwable ignored) {}
         try { unregisterReceiver(batteryRx); } catch (Exception ignored) {}
         try {
             if (networkCb != null) {
