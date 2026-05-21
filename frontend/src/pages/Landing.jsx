@@ -16,7 +16,7 @@
  * /api/apk/version, /api/token/launch, /api/foundation/buyback-status
  */
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Link as RRLink } from "react-router-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
 import {
   Cpu, Activity, ArrowRight, ArrowUpRight, Download, Server,
@@ -1020,8 +1020,12 @@ function FooterStrip({ apk }) {
             data-testid="footer-strip">
       <div className="max-w-[1240px] mx-auto flex flex-wrap items-center justify-between gap-3">
         <span>// the.grid · distributed compute · pre-mainnet</span>
-        <span>v{apk?.version || "—"} · build verified · arm64-v8a</span>
-        <span>tgc · contribution receipt · no price guarantee</span>
+        <span className="hidden lg:inline">v{apk?.version || "—"} · build verified · arm64-v8a</span>
+        <div className="flex flex-wrap items-center gap-5">
+          <RRLink to="/privacy" className="hover:text-[#00ff88] transition" data-testid="footer-privacy-link">privacy policy</RRLink>
+          <RRLink to="/terms"   className="hover:text-[#00ff88] transition" data-testid="footer-terms-link">terms of service</RRLink>
+          <span className="text-white/35">tgc · contribution receipt</span>
+        </div>
       </div>
     </footer>
   );

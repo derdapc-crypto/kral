@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { detectDeviceTier } from "../lib/tier";
 import DailyCalibration from "../components/DailyCalibration";
+import LegalFooterMini from "../components/LegalFooterMini";
 
 /**
  * Mobile.jsx — v1.4.9 "Cloud Compute Node" + new TGC economy.
@@ -680,6 +681,7 @@ export default function Mobile() {
           </Link>
         </div>
       </div>
+      <LegalFooterMini testIdPrefix="mobile" />
     </div>
   );
 }

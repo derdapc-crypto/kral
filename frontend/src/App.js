@@ -14,6 +14,8 @@ import CustomerPortal from "./pages/CustomerPortal";
 import Referrals from "./pages/Referrals";
 import Mobile from "./pages/Mobile";
 import Token from "./pages/Token";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 import { Toaster } from "./components/ui/sonner";
 
 function App() {
@@ -34,6 +36,8 @@ function App() {
             <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
             <Route path="/mobile" element={<ProtectedRoute><Mobile /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
           </Routes>
           <Toaster theme="dark" />
         </AuthProvider>

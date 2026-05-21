@@ -12,6 +12,7 @@ import CyberWealthFlow from "../components/CyberWealthFlow";
 import LiveFleetGlobe from "../components/LiveFleetGlobe";
 import DailyCalibration from "../components/DailyCalibration";
 import TotalTgcCounter from "../components/TotalTgcCounter";
+import LegalFooterMini from "../components/LegalFooterMini";
 
 function StatCard({ label, value, suffix = "", testId, tone = "white" }) {
   const toneCls = tone === "ok" ? "text-[#00ff88]" : tone === "info" ? "text-[#00d4ff]" : "text-white";
@@ -526,6 +527,7 @@ export default function Dashboard() {
         </div>
 
       </div>
+      <LegalFooterMini testIdPrefix="dashboard" />
     </div>
   );
 }

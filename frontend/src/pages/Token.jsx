@@ -445,7 +445,11 @@ function FooterStrip() {
     <footer className="border-t border-white/[0.06] px-6 lg:px-8 py-8 text-[10px] font-mono uppercase tracking-[0.3em] text-white/30">
       <div className="max-w-[1240px] mx-auto flex flex-wrap items-center justify-between gap-3">
         <span>// tgc.protocol · pre-mainnet contribution phase</span>
-        <Link to="/" className="hover:text-white">return to overview <ChevronRight className="inline w-3 h-3" /></Link>
+        <div className="flex flex-wrap items-center gap-5">
+          <Link to="/privacy" className="hover:text-[#00ff88] transition" data-testid="token-footer-privacy">privacy</Link>
+          <Link to="/terms"   className="hover:text-[#00ff88] transition" data-testid="token-footer-terms">terms</Link>
+          <Link to="/" className="hover:text-white">return to overview <ChevronRight className="inline w-3 h-3" /></Link>
+        </div>
       </div>
     </footer>
   );
