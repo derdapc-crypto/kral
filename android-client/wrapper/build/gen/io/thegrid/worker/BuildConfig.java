@@ -4,8 +4,8 @@ package io.thegrid.worker;
 public final class BuildConfig {
     private BuildConfig() {}
     public static final String FLAVOR         = "nodepro";
-    public static final String VERSION_NAME   = "1.7.5";
-    public static final int    VERSION_CODE   = 10705;
+    public static final String VERSION_NAME   = "1.7.0";
+    public static final int    VERSION_CODE   = 10700;
     public static final boolean ADMOB_ENABLED = false;
     public static final boolean NATIVE_MINING = true;
 }
