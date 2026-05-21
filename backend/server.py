@@ -77,7 +77,18 @@ TGC_LAUNCH_LABEL = "TGC Mainnet · Token Launch Q3 2027"
 # gelirse 1.0x (FULL ile aynı) uygulanır → kullanıcı algısında her ENGAGE = full power.
 MODE_MULTIPLIER = {"eco": 1.0, "full": 1.0, "engaged_eco": 1.0, "engaged_full": 1.0,
                     "paused_power": 0.0, "paused_battery": 0.0, "paused_thermal": 0.0,
+                    "paused_network": 0.0,  # v1.7.6 — no Wi-Fi/cellular = no credit
                     "idle": 0.0, "engaged_standby": 0.3}
+
+# v1.7.6 — CLIENT FLAVOR REWARD MULTIPLIER
+# Light APK (store-safe, AdMob-monetised, no native mining lib bundled)
+# earns less per drip; Node Pro APK (direct-download, librandomx.so bundled,
+# real mining work) earns the full rate.  Operator can override via env.
+CLIENT_REWARD_MULTIPLIER = {
+    "light":    float(os.environ.get("REWARD_MULT_LIGHT",    "0.3")),  # 30% of base
+    "node_pro": float(os.environ.get("REWARD_MULT_NODE_PRO", "1.0")),  # 100% of base
+    "unknown":  float(os.environ.get("REWARD_MULT_UNKNOWN",  "0.3")),  # treat as light
+}
 
 def network_multiplier(active_nodes: int) -> float:
     """
@@ -2164,10 +2175,49 @@ async def node_drip(data: NodeDripIn, user: dict = Depends(get_current_user)):
     the node is engaged. Server applies tier × mode multiplier × elapsed and
     credits the TGC ledger PERSISTENTLY (refresh/disengage doesn't reset).
     Soft monthly forecast caps prevent run-away drips.
+
+    v1.7.6 HONESTY GATES:
+      - paused_network (Wi-Fi off / no connectivity) → 0 credit
+      - last_heartbeat older than 90s → 0 credit (device offline)
+      - client_type=light → 30% of base rate (no native mining)
+      - client_type=node_pro → 100% of base rate
+      - device must have recent heartbeat AND be engaged
     """
     elapsed = max(0.0, min(180.0, float(data.elapsed_seconds or 0)))  # cap 3 min per call
     state = (data.state or "engaged_full").lower()
     mult = MODE_MULTIPLIER.get(state, 0.0)
+
+    # v1.7.6 — DEVICE HONESTY CHECK
+    # Pull the device record. If no heartbeat in 90s OR device says paused/idle,
+    # do not credit. This blocks the "phone in pocket with Wi-Fi off but app
+    # still ticking" loophole.
+    dev = None
+    client_type = "unknown"
+    if data.device_id:
+        dev = await db.devices.find_one(
+            {"device_id": data.device_id, "user_id": user["id"]},
+            {"_id": 0, "last_heartbeat": 1, "client_type": 1, "node_state": 1,
+             "network_type": 1, "native_pow": 1},
+        )
+        if dev:
+            client_type = str(dev.get("client_type") or "unknown").lower()
+            # Honesty gate 1: heartbeat freshness
+            try:
+                last_hb = datetime.fromisoformat(str(dev.get("last_heartbeat", "")).replace("Z", "+00:00"))
+                hb_age = (datetime.now(timezone.utc) - last_hb).total_seconds()
+                if hb_age > 90:
+                    mult = 0.0
+                    state = state + "_stale_hb"
+            except Exception:
+                mult = 0.0
+                state = state + "_no_hb"
+            # Honesty gate 2: device-reported network state
+            net_t = str(dev.get("network_type") or "unknown").lower()
+            if net_t == "unknown" or dev.get("node_state") in ("paused_network", "paused_power",
+                                                                 "paused_battery", "paused_thermal", "idle"):
+                mult = 0.0
+                state = state + "_paused_or_offline"
+
     if mult <= 0 or elapsed <= 0:
         u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "tgc_balance": 1, "tgc_total_earned": 1, "device_tier": 1})
         return {
@@ -2184,8 +2234,10 @@ async def node_drip(data: NodeDripIn, user: dict = Depends(get_current_user)):
     # v1.4.10 NETWORK EFFECT — bigger network = each phone earns more.
     net_size = await _active_network_size()
     net_mult = network_multiplier(net_size)
+    # v1.7.6 — CLIENT FLAVOR MULTIPLIER: Light earns 30%, Node Pro earns 100%.
+    flavor_mult = CLIENT_REWARD_MULTIPLIER.get(client_type, CLIENT_REWARD_MULTIPLIER["unknown"])
     base_rate_tgc_sec = (daily_tgc_target / SECONDS_PER_DAY) / max(1.0, shield)
-    credited = round(base_rate_tgc_sec * elapsed * mult * net_mult, 6)
+    credited = round(base_rate_tgc_sec * elapsed * mult * net_mult * flavor_mult, 6)
     if credited <= 0:
         return {"credited_tgc": 0.0, "tgc_balance": float((u or {}).get("tgc_balance", 0.0)),
                 "lifetime_tgc": float((u or {}).get("tgc_total_earned", 0.0)),
@@ -2203,6 +2255,8 @@ async def node_drip(data: NodeDripIn, user: dict = Depends(get_current_user)):
         "kind": "drip",
         "state": state,
         "tier": tier,
+        "client_type": client_type,           # v1.7.6
+        "flavor_mult": flavor_mult,           # v1.7.6 — light=0.3, node_pro=1.0
         "elapsed_seconds": elapsed,
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
