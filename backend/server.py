@@ -350,7 +350,7 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.6.5"
+APK_VERSION = "1.7.8"
 APK_PATH = "/grid-worker-v1.6.5.apk"
 APK_RELEASE_NOTES = "v1.6.5 RUNTIME-CONFIGURABLE BACKEND · APK ilk açılışta veya 'SUNUCU AYARI' butonuyla istediğin backend URL'sine bağlanır · Wi-Fi ZORUNLU DEĞİL (mobil veride de çalışır) · Admin Mining Config sekmesinden tüm fleet'i canlı yönet · v2+v3 signed"
 
