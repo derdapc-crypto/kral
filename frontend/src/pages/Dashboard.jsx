@@ -207,8 +207,8 @@ export default function Dashboard() {
             </Link>
           </div>
           <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-px bg-white/[0.06]">
-            <CockpitCell k="VERIFIED_BALANCE"      v={`${(wallet?.tgc_balance ?? 0).toFixed(5)} TGC`} tone="matrix" />
-            <CockpitCell k="LIFETIME_LEDGER"       v={`${(wallet?.tgc_total_earned ?? 0).toFixed(5)} TGC`} />
+            <CockpitCell k="VERIFIED_BALANCE"      v={`${(wallet?.tgc_balance ?? 0).toFixed(5)} SANCT`} tone="matrix" />
+            <CockpitCell k="LIFETIME_LEDGER"       v={`${(wallet?.tgc_total_earned ?? 0).toFixed(5)} SANCT`} />
             <CockpitCell k="EDGE_NODES"            v={devices.length}                                  tone="cyan" />
             <CockpitCell k="CONTRIBUTION"          v={totalWorkUnits === 0 ? "PENDING" : `${contributionScore}%`}
                          tone={totalWorkUnits === 0 ? "amber" : "matrix"} />
@@ -263,7 +263,7 @@ export default function Dashboard() {
                     </div>
                     <p className="mt-1 text-[12px] text-white/60 leading-relaxed max-w-xl">
                       Additional contribution receipts may be available when optional
-                      device-side workloads are active and verified. THE GRID Node Pro
+                      device-side workloads are active and verified. SANCTARA Node Pro
                       is the direct-download advanced client for users who explicitly
                       opt into device-side compute. Battery and thermal safeguards apply;
                       stop anytime.
@@ -361,7 +361,7 @@ export default function Dashboard() {
                   FOUNDATION · BUYBACK PROGRAM
                 </div>
                 <div className="text-[12px] text-white/70 leading-relaxed">
-                  100 TGC eşiğine ulaşan contributor'lar, Foundation Buyback Window
+                  100 SANCT eşiğine ulaşan contributor'lar, Foundation Buyback Window
                   açıldığında bakiyelerini USDT karşılığı geri alım programına sunabilir.
                   Program; dönemsel bütçe, doğrulama, risk kontrolü ve treasury likiditesine
                   bağlıdır — garanti değildir. Cüzdan adresini şimdi kaydet.

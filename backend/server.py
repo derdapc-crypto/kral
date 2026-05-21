@@ -114,7 +114,7 @@ async def _active_network_size() -> int:
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
-app = FastAPI(title="THE GRID API")
+app = FastAPI(title="Sanctara API")
 # v1.6.3 build fingerprint — 2026-02-19T23:30Z — force orchestrator to allocate
 # a fresh deployment job slot (avoids stuck deploy phase from previous d84vgu3).
 
@@ -946,10 +946,15 @@ async def my_devices_summary(user: dict = Depends(get_current_user)):
          "last_heartbeat": 1, "flagged": 1, "app_version": 1, "thermal": 1},
     ).to_list(50)
     u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "tgc_balance": 1, "tgc_total_earned": 1, "power_up_at": 1})
+    bal   = float((u or {}).get("tgc_balance", 0.0))
+    total = float((u or {}).get("tgc_total_earned", 0.0))
     return {
         "devices": rows,
-        "tgc_balance": (u or {}).get("tgc_balance", 0.0),
-        "tgc_total_earned": (u or {}).get("tgc_total_earned", 0.0),
+        "tgc_balance": bal,
+        "tgc_total_earned": total,
+        # v1.7.6 SANCTARA brand aliases (same values, public-facing names)
+        "sanct_balance": bal,
+        "sanct_total_earned": total,
         "powered_up": _is_powered_up((u or {}).get("power_up_at")),
     }
 
@@ -1564,7 +1569,7 @@ async def token_launch_status():
     return {
         "status": "pre_mainnet_accumulation",
         "redemption_locked": True,
-        "label": "TGC · Pre-Mainnet Contribution Phase",
+        "label": "SANCT · Pre-Mainnet Contribution Phase",
         "narrative_model": "milestone_driven",
         "primary_milestone": {
             "id": "verified_active_nodes",
@@ -1720,6 +1725,16 @@ async def _tgc_ledger_totals() -> dict:
         "total_daily_calibration_tgc": round(calib_tgc, 5),
         "total_drop_tgc":              round(drop_tgc, 5),
         "total_buyback_burned_tgc":    round(buyback_burn, 5),
+        # v1.7.6 SANCTARA brand migration — public-facing aliases
+        # (same numbers, marketing-friendly key names so the frontend can
+        # consume either name without breaking).
+        "total_sanct_issued":            round(total_issued, 5),
+        "total_sanct_burned":            round(total_burned, 5),
+        "circulating_sanct":             round(circulating, 5),
+        "total_compute_sanct":           round(compute_tgc, 5),
+        "total_daily_calibration_sanct": round(calib_tgc, 5),
+        "total_drop_sanct":              round(drop_tgc, 5),
+        "total_buyback_burned_sanct":    round(buyback_burn, 5),
     }
 
 
@@ -1805,8 +1820,8 @@ async def daily_calibration_status(user: dict = Depends(get_current_user)):
         "today_claim": today_claim,
         "last_claim": last_claim,
         "seconds_until_next": _seconds_until_next_utc_midnight() if today_claim else 0,
-        "label": "DAILY GRID CALIBRATION",
-        "subtitle": "Synchronize your node once per day and receive a small contribution receipt bonus.",
+        "label": "DAILY SANCTARA CALIBRATION",
+        "subtitle": "Synchronize your node once per day and receive a small SANCT contribution receipt bonus.",
         "as_of": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -1839,10 +1854,12 @@ async def daily_calibration_claim(payload: dict = None, user: dict = Depends(get
         {"_id": 0},
     )
     if existing:
+        existing_reward = float(existing.get("reward_tgc") or 0.0)
         return {
             "ok": True,
             "status": "already_claimed_today",
-            "reward_tgc": float(existing.get("reward_tgc") or 0.0),
+            "reward_tgc": existing_reward,
+            "reward_sanct": existing_reward,   # v1.7.6 SANCTARA alias
             "reward_tier": existing.get("reward_tier"),
             "claimed_at": existing.get("created_at"),
             "seconds_until_next": _seconds_until_next_utc_midnight(),
@@ -1917,6 +1934,7 @@ async def daily_calibration_claim(payload: dict = None, user: dict = Depends(get
         "ok": True,
         "status": "claimed",
         "reward_tgc": reward_tgc,
+        "reward_sanct": reward_tgc,    # v1.7.6 SANCTARA alias
         "reward_tier": tier,
         "claimed_at": now_iso,
         "calibration_id": calib_id,
@@ -3459,7 +3477,7 @@ async def apk_dual_version():
         "light": {
             **light,
             "package":              "io.thegrid.light",
-            "label":                "THE GRID Light",
+            "label":                "Sanctara Light",
             "client_type":          "light",
             "tagline":              "Official cloud client · store-safe · NO device-side cryptocurrency mining.",
             "device_side_mining":   False,
@@ -3468,7 +3486,7 @@ async def apk_dual_version():
         "node_pro": {
             **nodepro,
             "package":              "io.thegrid.nodepro",
-            "label":                "THE GRID Node Pro",
+            "label":                "Sanctara Node Pro",
             "client_type":          "node_pro",
             "tagline":              "Direct infrastructure client · explicit opt-in for device-side workloads.",
             "device_side_mining":   True,
@@ -3495,7 +3513,7 @@ async def notifications_digest(user: dict = Depends(get_current_user)):
     pu_seconds = _power_up_remaining_seconds(u.get("power_up_at"))
     pu_hours = round(pu_seconds / 3600, 1)
     powered_up = _is_powered_up(u.get("power_up_at"))
-    digest_title = "THE GRID · Daily Compute Digest"
+    digest_title = "Sanctara · Daily Compute Digest"
     if tasks_today > 0:
         digest_body = (f"Today you completed {tasks_today} verification "
                        f"task{'s' if tasks_today != 1 else ''} · earned {tgc_today:.2f} TGC")

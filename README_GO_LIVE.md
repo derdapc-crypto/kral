@@ -1,6 +1,6 @@
-# THE GRID NETWORK — Go-Live Deployment Guide
+# SANCTARA NETWORK — Go-Live Deployment Guide
 
-This document walks an operator through bringing **THE GRID** online on a
+This document walks an operator through bringing **SANCTARA** online on a
 production domain using a single Ubuntu VPS, MongoDB Atlas, Caddy or Nginx,
 and the dual APK distribution pipeline (`grid-worker-light.apk` +
 `grid-worker-nodepro.apk`).
@@ -19,7 +19,7 @@ You will need:
 
 | | |
 |---|---|
-| Domain | e.g. `thegrid.io`, DNS pointed at the VPS |
+| Domain | e.g. `sanctara.io`, DNS pointed at the VPS |
 | Ubuntu VPS | 22.04 LTS, ≥ 2 vCPU, ≥ 4 GB RAM (Hetzner CX21 is fine) |
 | MongoDB Atlas | Free `M0` tier to start, upgrade to `M10` once live |
 | AdMob | Google AdMob account with a Rewarded Ad unit |
@@ -58,7 +58,7 @@ sudo rsync --archive --chown=grid:grid ~/.ssh /home/grid
 
 1. https://cloud.mongodb.com → Create a free `M0` cluster
 2. Add the VPS IP to the IP Access List (or `0.0.0.0/0` for now)
-3. Database Access → create a user with `readWrite` on `thegrid_prod`
+3. Database Access → create a user with `readWrite` on `sanctara_prod`
 4. Get the connection string:
    `mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/?retryWrites=true&w=majority`
 5. Save it — it goes into `MONGO_URL` later.
@@ -69,8 +69,8 @@ sudo rsync --archive --chown=grid:grid ~/.ssh /home/grid
 
 ```bash
 sudo -iu grid
-git clone <your_repo_url> ~/thegrid
-cd ~/thegrid
+git clone <your_repo_url> ~/sanctara
+cd ~/sanctara
 
 # Backend env
 cp .env.example backend/.env
@@ -82,7 +82,7 @@ echo "MOBILE_MINING_SECRET=$(openssl rand -hex 32)" # paste into backend/.env
 
 # Frontend env
 cat > frontend/.env <<'EOF'
-REACT_APP_BACKEND_URL=https://api.thegrid.io
+REACT_APP_BACKEND_URL=https://api.sanctara.io
 EOF
 ```
 
@@ -93,11 +93,11 @@ EOF
 ## 4. Build the frontend
 
 ```bash
-cd ~/thegrid/frontend
+cd ~/sanctara/frontend
 # Use the SAME yarn version listed in package.json
 corepack enable
 yarn install --frozen-lockfile
-yarn build       # → outputs to /home/grid/thegrid/frontend/build
+yarn build       # → outputs to /home/grid/sanctara/frontend/build
 ```
 
 The `build/` folder is what Nginx/Caddy serves statically.
@@ -107,7 +107,7 @@ The `build/` folder is what Nginx/Caddy serves statically.
 ## 5. Install backend Python deps & run with systemd
 
 ```bash
-cd ~/thegrid/backend
+cd ~/sanctara/backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -117,16 +117,16 @@ deactivate
 Create a systemd unit:
 
 ```ini
-# /etc/systemd/system/thegrid-backend.service
+# /etc/systemd/system/sanctara-backend.service
 [Unit]
-Description=THE GRID FastAPI backend
+Description=SANCTARA FastAPI backend
 After=network.target
 
 [Service]
 User=grid
-WorkingDirectory=/home/grid/thegrid/backend
-EnvironmentFile=/home/grid/thegrid/backend/.env
-ExecStart=/home/grid/thegrid/backend/.venv/bin/uvicorn server:app \
+WorkingDirectory=/home/grid/sanctara/backend
+EnvironmentFile=/home/grid/sanctara/backend/.env
+ExecStart=/home/grid/sanctara/backend/.venv/bin/uvicorn server:app \
     --host 127.0.0.1 --port 8001 --workers 2
 Restart=always
 RestartSec=3
@@ -138,8 +138,8 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now thegrid-backend
-sudo systemctl status thegrid-backend   # should be active (running)
+sudo systemctl enable --now sanctara-backend
+sudo systemctl status sanctara-backend   # should be active (running)
 ```
 
 ---
@@ -159,9 +159,9 @@ sudo apt-get update && sudo apt-get install -y caddy
 
 ```caddy
 # /etc/caddy/Caddyfile
-thegrid.io, www.thegrid.io {
+sanctara.io, www.sanctara.io {
     encode zstd gzip
-    root * /home/grid/thegrid/frontend/build
+    root * /home/grid/sanctara/frontend/build
     try_files {path} /index.html
     file_server
     @apk path *.apk
@@ -169,7 +169,7 @@ thegrid.io, www.thegrid.io {
     header @apk Content-Disposition "attachment"
 }
 
-api.thegrid.io {
+api.sanctara.io {
     encode zstd gzip
     reverse_proxy 127.0.0.1:8001
 }
@@ -185,8 +185,8 @@ sudo systemctl reload caddy
 # /etc/nginx/sites-available/thegrid
 server {
     listen 80;
-    server_name thegrid.io www.thegrid.io;
-    root /home/grid/thegrid/frontend/build;
+    server_name sanctara.io www.sanctara.io;
+    root /home/grid/sanctara/frontend/build;
     index index.html;
 
     location / {
@@ -202,7 +202,7 @@ server {
 
 server {
     listen 80;
-    server_name api.thegrid.io;
+    server_name api.sanctara.io;
 
     location / {
         proxy_pass http://127.0.0.1:8001;
@@ -229,7 +229,7 @@ server {
 sudo ln -s /etc/nginx/sites-available/thegrid /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 sudo snap install --classic certbot
-sudo certbot --nginx -d thegrid.io -d www.thegrid.io -d api.thegrid.io
+sudo certbot --nginx -d sanctara.io -d www.sanctara.io -d api.sanctara.io
 ```
 
 ---
@@ -249,10 +249,10 @@ Either:
 Verify:
 
 ```bash
-curl -I https://thegrid.io/grid-worker-light.apk
+curl -I https://sanctara.io/grid-worker-light.apk
 # → HTTP/2 200, Content-Type: application/vnd.android.package-archive
 
-curl -s https://api.thegrid.io/api/apk/dual-version | python3 -m json.tool
+curl -s https://api.sanctara.io/api/apk/dual-version | python3 -m json.tool
 # → should list both APKs with size + sha256 + flavor metadata
 ```
 
@@ -262,16 +262,16 @@ curl -s https://api.thegrid.io/api/apk/dual-version | python3 -m json.tool
 
 ```bash
 # Basic
-curl -s https://api.thegrid.io/api/                 # → {"message": "Hello World"}
-curl -s https://api.thegrid.io/api/health 2>/dev/null || echo "no /health route"
-curl -s https://api.thegrid.io/api/apk/version | python3 -m json.tool
-curl -s https://api.thegrid.io/api/apk/dual-version | python3 -m json.tool
+curl -s https://api.sanctara.io/api/                 # → {"message": "Hello World"}
+curl -s https://api.sanctara.io/api/health 2>/dev/null || echo "no /health route"
+curl -s https://api.sanctara.io/api/apk/version | python3 -m json.tool
+curl -s https://api.sanctara.io/api/apk/dual-version | python3 -m json.tool
 
 # AdMob runtime config (must return ad_mode='test' until you flip TEST_MODE)
-curl -s https://api.thegrid.io/api/admob/config | python3 -m json.tool
+curl -s https://api.sanctara.io/api/admob/config | python3 -m json.tool
 
 # Scarcity counter (live, no fake inflation)
-curl -s https://api.thegrid.io/api/network/scarcity-progress | python3 -m json.tool
+curl -s https://api.sanctara.io/api/network/scarcity-progress | python3 -m json.tool
 ```
 
 ---
@@ -289,7 +289,7 @@ When ready to switch from Google test IDs to real production IDs:
    ADMOB_ANDROID_APP_ID=ca-app-pub-XXX~YYY
    ADMOB_REWARDED_AD_UNIT_ID=ca-app-pub-XXX/YYY
    ```
-4. `sudo systemctl restart thegrid-backend`
+4. `sudo systemctl restart sanctara-backend`
 5. Verify: `curl … /api/admob/config` → `ad_mode: production`.
 
 > The Light APK reads this at boot — no app update needed.
@@ -317,7 +317,7 @@ The backend creates indexes lazily, but for production you SHOULD pre-create:
 
 ```js
 // In mongosh on Atlas:
-use thegrid_prod;
+use sanctara_prod;
 db.users.createIndex({ "email": 1 }, { unique: true });
 db.devices.createIndex({ "device_id": 1 }, { unique: true });
 db.devices.createIndex({ "user_id": 1 });
@@ -339,7 +339,7 @@ Atlas auto-backups every 24h on M10+. On M0 (free tier) you must run
 
 ```bash
 sudo crontab -e
-# 0 3 * * *  mongodump --uri="$MONGO_URL" --archive=/var/backups/thegrid-$(date +\%F).gz --gzip
+# 0 3 * * *  mongodump --uri="$MONGO_URL" --archive=/var/backups/sanctara-$(date +\%F).gz --gzip
 ```
 
 ---
@@ -348,7 +348,7 @@ sudo crontab -e
 
 - **Sentry**: free 5K events/month. Add `SENTRY_DSN` to backend `.env`
   and wrap FastAPI middleware (5 lines).
-- **UptimeRobot**: free uptime monitor → ping `https://api.thegrid.io/api/`.
+- **UptimeRobot**: free uptime monitor → ping `https://api.sanctara.io/api/`.
 - **BetterStack / Papertrail**: stream `/var/log/syslog` + journald for log
   aggregation.
 
@@ -373,7 +373,7 @@ sudo crontab -e
 
 ## 15. Help & support
 
-- THE GRID protocol issues: open a GitHub issue against the repo.
+- SANCTARA protocol issues: open a GitHub issue against the repo.
 - Emergent platform / fork support: support@emergent.sh.
 - Trust & Safety re-review (if your account was previously banned):
   email `support@emergent.sh` with your Job ID and a description of the

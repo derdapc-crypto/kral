@@ -2,7 +2,7 @@ import React from "react";
 import LegalLayout, { Section, Callout } from "../components/LegalLayout";
 
 /**
- * THE GRID NETWORK — TERMS OF SERVICE
+ * SANCTARA NETWORK — TERMS OF SERVICE
  *
  * Production-ready ToS designed to clear:
  *   - Google Play App Content review
@@ -12,7 +12,7 @@ import LegalLayout, { Section, Callout } from "../components/LegalLayout";
  * Mandatory disclosures retained verbatim:
  *   - Light is store-safe / no device-side mining
  *   - Node Pro is direct-download / opt-in / device resource usage disclosed
- *   - TGC is a contribution-receipt unit and carries NO investment guarantee
+ *   - SANCT is a contribution-receipt unit and carries NO investment guarantee
  *   - Buyback programs are conditional, no enforceable claim
  *
  * Operators MUST replace bracketed [PLACEHOLDERS] before going live.
@@ -20,16 +20,16 @@ import LegalLayout, { Section, Callout } from "../components/LegalLayout";
 export default function Terms() {
   return (
     <LegalLayout
-      title="THE GRID NETWORK — TERMS OF SERVICE"
+      title="SANCTARA NETWORK — TERMS OF SERVICE"
       lastUpdated="May 21, 2026"
     >
       <p>
         These Terms of Service (the “Terms”) govern your access to and use of
-        THE GRID Network and its associated websites, web applications, mobile
-        clients (<strong>THE GRID Light</strong> and{" "}
-        <strong>THE GRID Node Pro</strong>), APIs, and related services
+        SANCTARA Network and its associated websites, web applications, mobile
+        clients (<strong>SANCTARA Light</strong> and{" "}
+        <strong>SANCTARA Node Pro</strong>), APIs, and related services
         (collectively, the “Service”), operated by [LEGAL_ENTITY_NAME]
-        (“THE GRID”, “we”, “us”, or “our”). By accessing or using the Service
+        (“SANCTARA”, “we”, “us”, or “our”). By accessing or using the Service
         you agree to be bound by these Terms.
       </p>
 
@@ -41,13 +41,13 @@ export default function Terms() {
 
       <Section n={1} title="The Two Clients">
         <p>
-          THE GRID is distributed through two distinct mobile clients with
+          SANCTARA is distributed through two distinct mobile clients with
           materially different functionality. By installing one, you accept
           the additional terms specific to that client described below.
         </p>
         <ul className="list-disc pl-6 space-y-2">
           <li>
-            <strong>THE GRID Light</strong> — the official store-safe cloud
+            <strong>SANCTARA Light</strong> — the official store-safe cloud
             client distributed through app stores. It provides account
             management, dashboards, the contribution-receipt ledger, the
             Daily Grid Calibration feature gated by Google AdMob rewarded
@@ -57,7 +57,7 @@ export default function Terms() {
             battery optimisation exemption.</em>
           </li>
           <li>
-            <strong>THE GRID Node Pro</strong> — an optional direct-download
+            <strong>SANCTARA Node Pro</strong> — an optional direct-download
             advanced client distributed only through our official website.
             By downloading and explicitly activating Node Pro you opt in to
             allowing your device’s compute resources to perform verifiable
@@ -71,7 +71,7 @@ export default function Terms() {
 
       <Section n={2} title="Device Resource Usage Disclosure (Node Pro)">
         <Callout tone="amber">
-          THE GRID NODE PRO MAY USE DEVICE COMPUTE RESOURCES WHILE ACTIVE.
+          SANCTARA NODE PRO MAY USE DEVICE COMPUTE RESOURCES WHILE ACTIVE.
           This includes CPU cycles, battery, thermal envelope, and network
           bandwidth. Only run Node Pro if you understand and accept device
           resource usage. You can disengage at any time using the in-app
@@ -105,17 +105,17 @@ export default function Terms() {
         </p>
       </Section>
 
-      <Section n={5} title="Total Grid Contribution (TGC)">
+      <Section n={5} title="Total Sanctara Contribution (SANCT)">
         <p>
-          “TGC” means <em>Total Grid Contribution</em>, an internal contribution-receipt
+          “SANCT” means <em>Total Sanctara Contribution</em>, an internal contribution-receipt
           ledger unit on the Service representing recognised contribution to
           the protocol.
         </p>
         <Callout tone="amber">
-          TGC IS NOT A REGULATED SECURITY, NOT A CURRENCY, NOT LEGAL TENDER,
+          SANCT IS NOT A REGULATED SECURITY, NOT A CURRENCY, NOT LEGAL TENDER,
           AND NOT AN INVESTMENT INSTRUMENT. WE MAKE NO PROMISE, REPRESENTATION,
           GUARANTEE OR COMMITMENT OF ANY MARKET VALUE, REDEMPTION RIGHT,
-          PAYOUT, LISTING, OR FINANCIAL RETURN OF ANY KIND FOR TGC. Any
+          PAYOUT, LISTING, OR FINANCIAL RETURN OF ANY KIND FOR SANCT. Any
           decision to participate is made entirely at your own risk.
         </Callout>
         <p>
@@ -127,12 +127,12 @@ export default function Terms() {
 
       <Section n={6} title="Foundation Buyback Program">
         <p>
-          Any “Foundation Buyback” program operated by THE GRID is conditional,
+          Any “Foundation Buyback” program operated by SANCTARA is conditional,
           discretionary, may have eligibility caps, may be paused or cancelled
-          at any time, and creates no enforceable claim against THE GRID or any
+          at any time, and creates no enforceable claim against SANCTARA or any
           affiliated entity. Participation in a buyback window confers no right
           to any future buyback window. Buyback economics, thresholds and
-          windows are determined by THE GRID and may change without notice.
+          windows are determined by SANCTARA and may change without notice.
         </p>
       </Section>
 
@@ -166,7 +166,7 @@ export default function Terms() {
           <li>Interfere with, disrupt, overload or impair the Service or
               its supporting infrastructure;</li>
           <li>Distribute modified or unsigned builds of the mobile clients
-              under THE GRID brand.</li>
+              under SANCTARA brand.</li>
         </ul>
       </Section>
 
@@ -205,7 +205,7 @@ export default function Terms() {
 
       <Section n={12} title="Intellectual Property">
         <p>
-          THE GRID and all related logos, trademarks, software, designs and
+          SANCTARA and all related logos, trademarks, software, designs and
           documentation are owned by [LEGAL_ENTITY_NAME] or its licensors.
           Subject to your compliance with these Terms, we grant you a
           limited, non-exclusive, non-transferable, revocable licence to use
@@ -227,7 +227,7 @@ export default function Terms() {
       <Section n={14} title="Limitation of Liability">
         <p className="uppercase font-mono text-[12px] leading-[1.85]">
           TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT
-          SHALL THE GRID, ITS AFFILIATES, OFFICERS, EMPLOYEES, AGENTS OR
+          SHALL SANCTARA, ITS AFFILIATES, OFFICERS, EMPLOYEES, AGENTS OR
           LICENSORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
           CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS,
           REVENUE, DATA, GOODWILL OR OTHER INTANGIBLE LOSSES, ARISING OUT
@@ -241,7 +241,7 @@ export default function Terms() {
 
       <Section n={15} title="Indemnification">
         <p>
-          You agree to indemnify and hold harmless THE GRID and its
+          You agree to indemnify and hold harmless SANCTARA and its
           affiliates from and against any third-party claims, damages,
           liabilities, costs and expenses (including reasonable legal fees)
           arising from your use of the Service, your violation of these
@@ -274,7 +274,7 @@ export default function Terms() {
           Questions about these Terms should be addressed to:
         </p>
         <p className="font-mono text-[13px]">
-          THE GRID Network<br/>
+          SANCTARA Network<br/>
           [LEGAL_ENTITY_NAME]<br/>
           [REGISTERED_ADDRESS]<br/>
           Email: [LEGAL_CONTACT_EMAIL]

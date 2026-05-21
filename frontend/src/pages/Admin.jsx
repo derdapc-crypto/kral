@@ -120,12 +120,12 @@ export default function Admin() {
     catch (e) { setMsg(formatApiError(e)); }
   };
   const approveBuyback = async (id, tgc) => {
-    if (!window.confirm(`Approve buyback?\n${Number(tgc || 0).toFixed(2)} TGC will be PERMANENTLY burned from the contributor's ledger.`)) return;
+    if (!window.confirm(`Approve buyback?\n${Number(tgc || 0).toFixed(2)} SANCT will be PERMANENTLY burned from the contributor's ledger.`)) return;
     try { await api.post(`/admin/buybacks/${id}/approve`); load(); }
     catch (e) { setMsg(formatApiError(e)); }
   };
   const rejectBuyback = async (id) => {
-    if (!window.confirm("Reject this buyback application? No TGC will be deducted.")) return;
+    if (!window.confirm("Reject this buyback application? No SANCT will be deducted.")) return;
     try { await api.post(`/admin/buybacks/${id}/reject`); load(); }
     catch (e) { setMsg(formatApiError(e)); }
   };
@@ -413,7 +413,7 @@ export default function Admin() {
 
         {tab === "ledger" && ledger && (
           <div className="space-y-6">
-            {/* v1.6.2 — Public TGC Ledger Health (real aggregations) */}
+            {/* v1.6.2 — Public SANCT Ledger Health (real aggregations) */}
             <div className="rounded-3xl glass-strong p-8 border border-[#00ff88]/[0.18]" data-testid="admin-ledger-health">
               <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-[#00ff88]/85 mb-3">
                 // tgc_ledger_health · network_wide_aggregations
@@ -560,7 +560,7 @@ export default function Admin() {
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-[0.25em] text-white/40 border-b border-white/5">
                   <th className="py-3">Name</th><th>Email</th><th>Role</th>
-                  <th className="text-right">TGC Balance</th>
+                  <th className="text-right">SANCT Balance</th>
                   <th className="text-right">USDT Balance</th>
                   <th>Status</th><th></th>
                 </tr>
@@ -755,7 +755,7 @@ export default function Admin() {
               <Gift className="w-6 h-6 text-[#00ff88]" />
               <div className="flex-1 min-w-[240px]">
                 <div className="font-display text-xl font-bold">Foundation · Buyback Approvals</div>
-                <div className="text-sm text-white/50">Approving an application <span className="text-red-400">permanently burns</span> the contributor's eligibility TGC. Settlement is off-platform.</div>
+                <div className="text-sm text-white/50">Approving an application <span className="text-red-400">permanently burns</span> the contributor's eligibility SANCT. Settlement is off-platform.</div>
               </div>
               <div className="text-right">
                 <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">Pending</div>
@@ -793,8 +793,8 @@ export default function Admin() {
                       <div className="text-right">
                         <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">TGC at apply</div>
                         <div className="font-mono-num text-[#00ff88] text-lg">{Number(b.tgc_balance_at_apply || 0).toFixed(2)}</div>
-                        <div className="text-[10px] text-white/40">burn on approve: <span className="text-red-300">−{Number(b.target_tgc || 0).toFixed(0)} TGC</span></div>
-                        {b.burned_tgc ? <div className="text-[10px] text-red-300 mt-1">burned: {Number(b.burned_tgc).toFixed(2)} TGC</div> : null}
+                        <div className="text-[10px] text-white/40">burn on approve: <span className="text-red-300">−{Number(b.target_tgc || 0).toFixed(0)} SANCT</span></div>
+                        {b.burned_tgc ? <div className="text-[10px] text-red-300 mt-1">burned: {Number(b.burned_tgc).toFixed(2)} SANCT</div> : null}
                       </div>
                     </div>
                     {isPending && (

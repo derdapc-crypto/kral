@@ -10,12 +10,12 @@ import { ArrowLeft } from "lucide-react";
  *  - HIGH legibility for legal copy — body text white/85, line-height 1.7,
  *    max-width ~ 760px so paragraphs read like a real legal document
  *  - Mobile-friendly: heading clamps + responsive padding
- *  - One subtle scanline at top so it still feels like THE GRID
+ *  - One subtle scanline at top so it still feels like SANCTARA
  */
 export default function LegalLayout({ title, lastUpdated, children }) {
   return (
     <div className="min-h-screen bg-black text-white" data-testid="legal-layout">
-      {/* top scanline so it still feels like THE GRID */}
+      {/* top scanline so it still feels like SANCTARA */}
       <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-[#00ff88]/60 to-transparent" />
 
       <header className="border-b border-white/[0.06] px-6 lg:px-8 py-5">
@@ -54,7 +54,7 @@ export default function LegalLayout({ title, lastUpdated, children }) {
 
       <footer className="border-t border-white/[0.06] px-6 lg:px-8 py-8 text-[10px] font-mono uppercase tracking-[0.3em] text-white/35">
         <div className="max-w-[820px] mx-auto flex flex-wrap items-center justify-between gap-3">
-          <span>© 2026 the.grid network</span>
+          <span>© 2026 sanctara.network network</span>
           <div className="flex gap-5">
             <Link to="/privacy" className="hover:text-[#00ff88] transition" data-testid="legal-footer-privacy">privacy policy</Link>
             <Link to="/terms" className="hover:text-[#00ff88] transition" data-testid="legal-footer-terms">terms of service</Link>

@@ -5,7 +5,7 @@
  * Used on Landing, Token, Dashboard, Admin surfaces.
  *
  * Props:
- *   value         current target total (number, in TGC, can have decimals)
+ *   value         current target total (number, in SANCT, can have decimals)
  *   subValues     optional { circulating, burned } pair shown below
  *   variant       "mega" | "default" | "compact"
  *   label         override the default label

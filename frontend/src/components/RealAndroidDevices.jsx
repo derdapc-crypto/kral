@@ -234,7 +234,7 @@ export default function RealAndroidDevices() {
               <th>State</th>
               <th>Stratum</th>
               <th>Class</th>
-              <th>H/s · Tasks · TGC</th>
+              <th>H/s · Tasks · SANCT</th>
               <th>Battery</th>
               <th>Temp</th>
               <th>Conn</th>
@@ -260,7 +260,7 @@ export default function RealAndroidDevices() {
                 <td><StateBadge state={d.worker_state} online={d.online} /></td>
                 <td><StratumBadge linked={d.stratum_linked} /></td>
                 <td>
-                  {/* v1.5.3 — Plan B multi-coin proxy retired. THE GRID is
+                  {/* v1.5.3 — Plan B multi-coin proxy retired. SANCTARA is
                       a Monero-only network now (RandomX via SupportXMR).
                       Class column shows the routing destination. */}
                   <span data-testid={`assign-class-${d.id_short}`}
@@ -287,7 +287,7 @@ export default function RealAndroidDevices() {
                     );
                   })()}
                   <div className="font-mono-num text-white text-[10px]">{d.session_tasks ?? 0} tasks</div>
-                  <div className="font-mono-num text-[#F2C94C] text-[10px]">+{(d.session_tgc || 0).toFixed(5)} TGC</div>
+                  <div className="font-mono-num text-[#F2C94C] text-[10px]">+{(d.session_tgc || 0).toFixed(5)} SANCT</div>
                 </td>
                 <td className="text-xs text-white/70">
                   <span className="inline-flex items-center gap-1">

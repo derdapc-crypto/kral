@@ -361,7 +361,7 @@ export default function DailyCalibration({ onClaimed }) {
                               color: "#00ff88",
                               textShadow: "0 0 30px rgba(0,255,136,0.6)",
                               letterSpacing: "-0.03em" }}>
-                  +{Number(reward.reward_tgc || 0).toFixed(5)} <span className="text-[0.55em] text-white/45 font-mono uppercase tracking-[0.3em]">TGC</span>
+                  +{Number(reward.reward_tgc || 0).toFixed(5)} <span className="text-[0.55em] text-white/45 font-mono uppercase tracking-[0.3em]"> SANCT </span>
                 </div>
                 <div className="mt-2 text-[12px] text-white/55 leading-relaxed max-w-md">
                   Daily calibration receipt added to your contribution ledger.

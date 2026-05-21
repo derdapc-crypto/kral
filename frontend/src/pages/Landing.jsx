@@ -1,5 +1,5 @@
 /*
- * THE GRID — Landing (vNext "Immersive Authority Surface")
+ * SANCTARA — Landing (vNext "Immersive Authority Surface")
  *
  * Total rewrite per /app/design_guidelines.json:
  * 8 sections, each its own visual language. No card-stacked dashboard.
@@ -137,7 +137,7 @@ function NavBar({ apk }) {
           <div className="w-7 h-7 rounded-md border border-[#00ff88]/40 grid place-items-center bg-black">
             <Cpu className="w-3.5 h-3.5 text-[#00ff88]" />
           </div>
-          <div className="font-mono uppercase tracking-[0.3em] text-[11px] text-white">the.grid</div>
+          <div className="font-mono uppercase tracking-[0.3em] text-[11px] text-white">sanctara.network</div>
           <span className="hidden sm:inline-block text-[9px] uppercase tracking-[0.3em] text-white/35 border-l border-white/10 pl-2.5 ml-1">
             distributed compute · pre-mainnet
           </span>
@@ -146,7 +146,7 @@ function NavBar({ apk }) {
           <a href="#network"  className="hover:text-white transition">network</a>
           <a href="#protocol" className="hover:text-white transition">protocol</a>
           <a href="#deploy"   className="hover:text-white transition">deploy</a>
-          <Link to="/token"   className="hover:text-white transition">tgc</Link>
+          <Link to="/token"   className="hover:text-white transition">sanct</Link>
           <Link to="/customer"className="hover:text-white transition">enterprise</Link>
         </nav>
         <div className="flex items-center gap-2">
@@ -199,11 +199,11 @@ function Hero({ scarcity, apk }) {
               WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
               backgroundClip: "text",
             }}>Verified&nbsp;compute.</span><br/>
-            <span className="text-white/65">Global&nbsp;scale.</span>
+            <span className="text-white/65">Sanctara&nbsp;scale.</span>
           </h1>
 
           <p className="mt-7 text-[15px] leading-relaxed text-white/55 max-w-[500px]">
-            THE GRID transforms ordinary phones into a verified distributed compute layer.
+            Sanctara transforms ordinary phones into a verified distributed compute layer.
             Every cycle is recorded as a <span className="text-[#00ff88]">compute-time receipt</span> —
             a pre-mainnet protocol bound to <em className="not-italic text-white">verified network growth</em>,
             not an arbitrary countdown.
@@ -231,7 +231,7 @@ function Hero({ scarcity, apk }) {
           {/* tiny telemetry foot */}
           <div className="mt-10 grid grid-cols-3 gap-px bg-white/[0.06] max-w-[480px]" data-testid="hero-telemetry-strip">
             <FootMetric label="VERIFIED NODES"  value={verified.toLocaleString()} tone="matrix" />
-            <FootMetric label="TGC RECEIPTS"    value={Number(scarcity?.total_tgc_issued || 0).toLocaleString(undefined,{minimumFractionDigits:5,maximumFractionDigits:5})} tone="cyan" />
+            <FootMetric label="SANCT RECEIPTS"    value={Number(scarcity?.total_tgc_issued || 0).toLocaleString(undefined,{minimumFractionDigits:5,maximumFractionDigits:5})} tone="cyan" />
             <FootMetric label="PHASE"           value={phase}                     tone="violet" />
           </div>
         </motion.div>
@@ -340,7 +340,7 @@ function ManifestoSection() {
             </span>
           </h2>
           <div className="mt-8 space-y-4 text-white/55 leading-relaxed text-[14px] max-w-xl">
-            <p>$TGC is <span className="text-white">not a coin</span>. It is the cryptographic receipt of every verified compute cycle the network has consumed.</p>
+            <p>$SANCT is <span className="text-white">not a coin</span>. It is the cryptographic receipt of every verified compute cycle the network has consumed.</p>
             <p>Each edge node submits proof of useful work — small, signed, deterministic packets. The protocol seals them into an immutable contribution ledger.</p>
             <p>At <span className="text-[#00ff88]">1,000,000 verified active nodes</span>, the ledger may enter Snapshot Readiness. The roadmap is conditional, never automatic.</p>
           </div>
@@ -464,14 +464,14 @@ function ScarcityConsole({ scarcity }) {
         {/* v1.7.5 — DUAL client breakdown — Pro on left (priority), Light on right */}
         <div className="grid lg:grid-cols-2 gap-4 mb-10" data-testid="scarcity-dual-clients">
           <ScarcityClientCard
-            label="THE GRID NODE PRO"
+            label="SANCTARA NODE PRO"
             subLabel="Direct infrastructure client · device-side workloads"
             accent="matrix"
             data={nodepro}
             testId="scarcity-node-pro"
           />
           <ScarcityClientCard
-            label="THE GRID LIGHT"
+            label="SANCTARA LIGHT"
             subLabel="Official cloud client · store-safe · ad-supported"
             accent="cyan"
             data={light}
@@ -509,7 +509,7 @@ function ScarcityConsole({ scarcity }) {
           </div>
         </div>
 
-        {/* v1.6.2 — total TGC receipts ledger counter */}
+        {/* v1.6.2 — total SANCT receipts ledger counter */}
         <div className="mb-10 border-t border-white/[0.06] pt-7">
           <TotalTgcCounter
             variant="mega"
@@ -828,7 +828,7 @@ function BuybackPolicyPanel() {
             A policy.<br/>Not a promise.
           </h2>
           <p className="mt-6 text-white/55 leading-relaxed max-w-md text-[14px]">
-            Contributors who reach <span className="text-white">100 TGC</span> may apply to a Foundation Buyback
+            Contributors who reach <span className="text-white">100 SANCT</span> may apply to a Foundation Buyback
             Window when it is opened by the Ecosystem Treasury — subject to
             verification, regional eligibility and treasury liquidity.
           </p>
@@ -844,7 +844,7 @@ function BuybackPolicyPanel() {
                     className="border border-white/[0.08]">
           {[
             ["window_status",    "CLOSED",                    "amber"],
-            ["eligibility",      "100 TGC required",          "white"],
+            ["eligibility",      "100 SANCT required",          "white"],
             ["current_program",  "up to $300 USDT",           "cyan"],
             ["risk_review",      "required",                  "white"],
             ["regional_check",   "subject to jurisdiction",   "white"],
@@ -1019,12 +1019,12 @@ function FooterStrip({ apk }) {
     <footer className="border-t border-white/[0.06] px-6 lg:px-8 py-8 text-[10px] font-mono uppercase tracking-[0.3em] text-white/30"
             data-testid="footer-strip">
       <div className="max-w-[1240px] mx-auto flex flex-wrap items-center justify-between gap-3">
-        <span>// the.grid · distributed compute · pre-mainnet</span>
+        <span>// sanctara.network · distributed compute · pre-mainnet</span>
         <span className="hidden lg:inline">v{apk?.version || "—"} · build verified · arm64-v8a</span>
         <div className="flex flex-wrap items-center gap-5">
           <RRLink to="/privacy" className="hover:text-[#00ff88] transition" data-testid="footer-privacy-link">privacy policy</RRLink>
           <RRLink to="/terms"   className="hover:text-[#00ff88] transition" data-testid="footer-terms-link">terms of service</RRLink>
-          <span className="text-white/35">tgc · contribution receipt</span>
+          <span className="text-white/35">sanct · contribution receipt</span>
         </div>
       </div>
     </footer>

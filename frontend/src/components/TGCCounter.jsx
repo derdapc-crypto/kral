@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 
 /**
- * High-quality TGC counter that ticks UP slowly but steadily toward `value`.
+ * High-quality SANCT counter that ticks UP slowly but steadily toward `value`.
  * Emphasises the high value of each unit by displaying 1 decimal place by default.
  */
 export default function TGCCounter({ value = 0, decimals = 1, className = "", testId = "tgc-counter" }) {

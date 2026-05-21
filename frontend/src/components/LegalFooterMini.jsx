@@ -13,7 +13,7 @@ export default function LegalFooterMini({ testIdPrefix = "" }) {
          data-testid={`${p}legal-footer-mini`}>
       <div className="max-w-[1240px] mx-auto flex flex-wrap items-center justify-between gap-3
                       font-mono text-[10px] uppercase tracking-[0.3em] text-white/35">
-        <span>// the.grid · pre-mainnet</span>
+        <span>// sanctara.network · pre-mainnet</span>
         <div className="flex flex-wrap items-center gap-5">
           <Link to="/privacy" className="hover:text-[#00ff88] transition"
                 data-testid={`${p}legal-privacy-link`}>privacy</Link>

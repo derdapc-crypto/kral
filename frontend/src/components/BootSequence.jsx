@@ -14,7 +14,7 @@ const STAGES = [
   { ms: 520,  icon: Network,     label: "ESTABLISHING NEURAL LINK",    sub: "11 compute pool nodes · armed", tone: "cyan" },
   { ms: 480,  icon: Cpu,         label: "ENGAGING COMPUTE ENGINE",     sub: "node rx/0 · grid mesh · live", tone: "matrix" },
   { ms: 380,  icon: ShieldCheck, label: "BIOMETRIC HANDSHAKE OK",      sub: "operator: GRID · clearance Σ", tone: "cyan" },
-  { ms: 320,  icon: Zap,         label: "GRID ARMED · STANDING BY",    sub: "v1.5.7 · the.grid",           tone: "matrix" },
+  { ms: 320,  icon: Zap,         label: "GRID ARMED · STANDING BY",    sub: "v1.5.7 · sanctara.network",           tone: "matrix" },
 ];
 
 export default function BootSequence({ children, skip = false, persistKey = "grid_boot_seen" }) {
@@ -62,7 +62,7 @@ export default function BootSequence({ children, skip = false, persistKey = "gri
         <div className="flex items-center gap-3 mb-8">
           <div className="w-3 h-3 rounded-full bg-[#00ffe1] cyan-glow neural-pulse" />
           <div className="font-mono-term text-[11px] tracking-[0.4em] text-[#00ffe1]/80 uppercase">
-            THE GRID · BOOT SEQUENCE · v1.3.5
+            SANCTARA · BOOT SEQUENCE · v1.3.5
           </div>
         </div>
 

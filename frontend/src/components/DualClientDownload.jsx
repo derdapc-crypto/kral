@@ -52,7 +52,7 @@ export default function DualClientDownload({ origin = "" }) {
             </div>
             <h3 className="mt-4 font-display font-bold text-white"
                 style={{ fontSize: "clamp(24px, 2.4vw, 34px)", letterSpacing: "-0.03em" }}>
-              THE GRID Light
+              SANCTARA Light
             </h3>
             <p className="mt-3 text-white/55 leading-relaxed text-[13px] max-w-md">
               Store-safe dashboard, ledger, calibration and participation
@@ -88,7 +88,7 @@ export default function DualClientDownload({ origin = "" }) {
             </div>
             <h3 className="mt-4 font-display font-bold text-white"
                 style={{ fontSize: "clamp(24px, 2.4vw, 34px)", letterSpacing: "-0.03em" }}>
-              THE GRID Node Pro
+              SANCTARA Node Pro
             </h3>
             <p className="mt-3 text-white/55 leading-relaxed text-[13px] max-w-md">
               Advanced client for users who <span className="text-white">explicitly opt into device-side workloads</span>.

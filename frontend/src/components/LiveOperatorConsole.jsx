@@ -110,7 +110,7 @@ export default function LiveOperatorConsole({ height = 280 }) {
         <div className="flex items-center gap-2 font-mono-cyber">
           <Terminal className="w-4 h-4 cyan-text" />
           <span className="cyan-text text-sm font-bold">live_operator_console</span>
-          <span className="text-[10px] text-white/40">/var/log/the.grid</span>
+          <span className="text-[10px] text-white/40">/var/log/sanctara.network</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="cyber-pill" data-testid="console-state">

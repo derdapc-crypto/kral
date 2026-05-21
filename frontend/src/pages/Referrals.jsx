@@ -105,7 +105,7 @@ export default function Referrals() {
                     className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-[#F2C94C] to-[#B8860B] text-black font-semibold text-xs tracking-wide">
                     <Share2 className="w-3.5 h-3.5" /> Download Card
                   </a>
-                  <a href={`https://twitter.com/intent/tweet?text=I'm earning USDT on THE GRID. Use my code ${data.referral_code} to join.&url=${encodeURIComponent(link)}`}
+                  <a href={`https://twitter.com/intent/tweet?text=I'm earning USDT on SANCTARA. Use my code ${data.referral_code} to join.&url=${encodeURIComponent(link)}`}
                     target="_blank" rel="noreferrer" data-testid="ref-share-twitter"
                     className="px-4 py-2.5 rounded-full border gold-border text-[#F2C94C] text-xs tracking-wide">
                     Tweet

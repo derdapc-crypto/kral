@@ -2,7 +2,7 @@ import React from "react";
 import LegalLayout, { Section, Callout } from "../components/LegalLayout";
 
 /**
- * THE GRID NETWORK — PRIVACY POLICY
+ * SANCTARA NETWORK — PRIVACY POLICY
  *
  * Production-ready privacy policy designed to clear:
  *   - Google Play Data Safety review
@@ -10,8 +10,8 @@ import LegalLayout, { Section, Callout } from "../components/LegalLayout";
  *   - GDPR / CCPA general disclosure baseline
  *
  * Important compliance affirmations (verbatim required by Trust & Safety):
- *   - THE GRID Light does NOT perform cryptocurrency mining on user devices.
- *   - THE GRID Node Pro is an OPTIONAL direct-download advanced client that
+ *   - SANCTARA Light does NOT perform cryptocurrency mining on user devices.
+ *   - SANCTARA Node Pro is an OPTIONAL direct-download advanced client that
  *     uses device compute resources only AFTER explicit user opt-in.
  *
  * Operators MUST replace bracketed [PLACEHOLDERS] (contact email, jurisdiction,
@@ -20,32 +20,32 @@ import LegalLayout, { Section, Callout } from "../components/LegalLayout";
 export default function Privacy() {
   return (
     <LegalLayout
-      title="THE GRID NETWORK — PRIVACY POLICY"
+      title="SANCTARA NETWORK — PRIVACY POLICY"
       lastUpdated="May 21, 2026"
     >
       <p>
-        This Privacy Policy describes how THE GRID Network (“THE GRID”, “we”,
+        This Privacy Policy describes how SANCTARA Network (“SANCTARA”, “we”,
         “us”, or “our”) collects, uses, stores and shares information when you
         use our websites, web applications, mobile clients
-        (<strong>THE GRID Light</strong> and <strong>THE GRID Node Pro</strong>),
+        (<strong>SANCTARA Light</strong> and <strong>SANCTARA Node Pro</strong>),
         APIs and related services (collectively, the “Service”).
       </p>
 
       <Callout tone="matrix">
-        THE GRID LIGHT IS A STORE-SAFE CLOUD CLIENT.
+        SANCTARA LIGHT IS A STORE-SAFE CLOUD CLIENT.
         It does NOT perform cryptocurrency mining on user devices, does NOT
         include any native RandomX engine, and does NOT execute CPU-intensive
-        background compute. THE GRID Node Pro is an optional, direct-download
+        background compute. SANCTARA Node Pro is an optional, direct-download
         advanced client that may use device compute resources ONLY AFTER the
         operator has explicitly opted in.
       </Callout>
 
       <Section n={1} title="Who We Are">
         <p>
-          THE GRID is operated by [LEGAL_ENTITY_NAME], a [JURISDICTION] entity
+          SANCTARA is operated by [LEGAL_ENTITY_NAME], a [JURISDICTION] entity
           providing a distributed contribution-receipt ledger and compute
-          coordination layer in a pre-mainnet state. Any reference to “TGC”
-          throughout this Policy refers to <em>Total Grid Contribution</em>, an
+          coordination layer in a pre-mainnet state. Any reference to “SANCT”
+          throughout this Policy refers to <em>Total Sanctara Contribution</em>, an
           internal contribution-receipt unit on the Service, and is NOT a
           regulated security, currency or investment instrument.
         </p>
@@ -58,7 +58,7 @@ export default function Privacy() {
         </p>
         <ul className="list-disc pl-6 space-y-2">
           <li>
-            <strong>THE GRID Light</strong> (<code>io.thegrid.light</code>) — the
+            <strong>SANCTARA Light</strong> (<code>io.thegrid.light</code>) — the
             official cloud client distributed through app stores. It provides
             account management, dashboards, the contribution-receipt ledger,
             the Daily Grid Calibration feature, and lightweight network
@@ -66,7 +66,7 @@ export default function Privacy() {
             RandomX engine, and does NOT run any device-side compute service.
           </li>
           <li>
-            <strong>THE GRID Node Pro</strong> (<code>io.thegrid.nodepro</code>)
+            <strong>SANCTARA Node Pro</strong> (<code>io.thegrid.nodepro</code>)
             — an optional direct-download advanced client distributed only via
             our official website. When activated by the operator with an
             explicit opt-in, Node Pro may use device compute resources to
@@ -93,7 +93,7 @@ export default function Privacy() {
           <li>
             <strong>App activity</strong> — login events, dashboard views,
             APK download events, Daily Grid Calibration claims and the
-            corresponding TGC ledger entries, contributor drop participation,
+            corresponding SANCT ledger entries, contributor drop participation,
             referral activity, and customer-portal usage.
           </li>
           <li>
@@ -117,8 +117,8 @@ export default function Privacy() {
         <p>
           We do NOT knowingly collect: contact lists, SMS, microphone audio,
           camera images, photo libraries, precise GPS location, biometric data,
-          or call history. THE GRID Light does NOT request battery
-          optimisation exemption. THE GRID Node Pro requests battery
+          or call history. SANCTARA Light does NOT request battery
+          optimisation exemption. SANCTARA Node Pro requests battery
           optimisation exemption only when the operator engages the node.
         </p>
       </Section>
@@ -128,7 +128,7 @@ export default function Privacy() {
         <ul className="list-disc pl-6 space-y-2">
           <li>Operate and maintain the Service, including account
               authentication and authorisation;</li>
-          <li>Process contribution receipts in the TGC ledger and prevent
+          <li>Process contribution receipts in the SANCT ledger and prevent
               double-issuance, double-claims and Sybil attacks;</li>
           <li>Run the Daily Grid Calibration feature including server-side
               weighted reward calculation;</li>
@@ -143,7 +143,7 @@ export default function Privacy() {
 
       <Section n={5} title="Google AdMob & Advertising">
         <p>
-          THE GRID Light displays Google AdMob rewarded ads as part of the
+          SANCTARA Light displays Google AdMob rewarded ads as part of the
           Daily Grid Calibration flow. AdMob may collect device advertising
           identifiers, ad interaction events, and limited diagnostic data to
           serve ads. Operators can review and reset their advertising ID via
@@ -151,7 +151,7 @@ export default function Privacy() {
           policies.google.com/privacy.
         </p>
         <p>
-          THE GRID Node Pro does NOT contain any advertising SDK and does NOT
+          SANCTARA Node Pro does NOT contain any advertising SDK and does NOT
           serve ads of any kind.
         </p>
       </Section>
@@ -191,13 +191,13 @@ export default function Privacy() {
 
       <Section n={9} title="No Guaranteed Financial Return">
         <Callout tone="amber">
-          TGC IS NOT A REGULATED SECURITY, NOT A CURRENCY, AND NOT AN
+          SANCT IS NOT A REGULATED SECURITY, NOT A CURRENCY, AND NOT AN
           INVESTMENT INSTRUMENT. We make no promise, representation, guarantee
           or commitment of any market value, redemption right, payout,
-          buyback, listing, or financial return of any kind for TGC.
+          buyback, listing, or financial return of any kind for SANCT.
           Foundation programs such as buyback windows are conditional, may be
           paused or cancelled at any time, and create no enforceable claim
-          against THE GRID or any affiliated entity.
+          against SANCTARA or any affiliated entity.
         </Callout>
       </Section>
 
@@ -263,7 +263,7 @@ export default function Privacy() {
           should be addressed to:
         </p>
         <p className="font-mono text-[13px]">
-          THE GRID Network<br/>
+          SANCTARA Network<br/>
           [LEGAL_ENTITY_NAME]<br/>
           [REGISTERED_ADDRESS]<br/>
           Email: [PRIVACY_CONTACT_EMAIL]

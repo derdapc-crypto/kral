@@ -1,8 +1,8 @@
 /*
- * THE GRID — /token (vNext "Immersive Authority Surface")
+ * SANCTARA — /token (vNext "Immersive Authority Surface")
  *
  * Total rewrite per /app/design_guidelines.json — 7 sections, manifesto style.
- *   1. Brutalist Hero  "TGC is not a coin"
+ *   1. Brutalist Hero  "SANCT is not a coin"
  *   2. Compute-Time Receipt  technical flow diagram
  *   3. Network Scarcity     locked-slot grid
  *   4. Radical Scarcity     drip curve graph
@@ -73,7 +73,7 @@ function TokenNav() {
           <div className="w-7 h-7 rounded-md border border-[#00ff88]/40 grid place-items-center bg-black">
             <Cpu className="w-3.5 h-3.5 text-[#00ff88]" />
           </div>
-          <div className="font-mono uppercase tracking-[0.3em] text-[11px]">the.grid <span className="text-white/40">/ tgc.protocol</span></div>
+          <div className="font-mono uppercase tracking-[0.3em] text-[11px]">sanctara.network <span className="text-white/40">/ tgc.protocol</span></div>
         </Link>
         <Link to="/" className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/55 hover:text-white">← back to overview</Link>
       </div>
@@ -94,7 +94,7 @@ function BrutalistHero() {
           </div>
           <h1 className="font-display text-white"
               style={{ fontSize: "clamp(40px, 6vw, 96px)", letterSpacing: "-0.05em", lineHeight: 0.9, fontWeight: 700 }}>
-            TGC is<br/>
+            SANCT is<br/>
             <span className="text-white/35">not a coin.</span><br/>
             <span style={{
               background:"linear-gradient(96deg, #00ff88, #00d9ff)",
@@ -257,7 +257,7 @@ function DripCurve() {
         </h2>
         <p className="mt-5 text-white/55 max-w-[560px] text-[14px]">
           Per-device daily contribution is capped between
-          <span className="text-white"> 0.05 – 0.30 TGC</span>. As the network expands, the curve
+          <span className="text-white"> 0.05 – 0.30 SANCT</span>. As the network expands, the curve
           tightens — radical scarcity by design.
         </p>
         <div className="mt-10 border border-white/[0.08] p-5 bg-black/40">
@@ -322,7 +322,7 @@ function BuybackTerminal() {
           <div className="grid lg:grid-cols-2 gap-px bg-white/[0.06]">
             {[
               ["window_status",   "CLOSED",                       "amber"],
-              ["eligibility",     "100 TGC required",             "white"],
+              ["eligibility",     "100 SANCT required",             "white"],
               ["current_program", "up to $300 USDT",              "cyan"],
               ["risk_review",     "required",                     "white"],
               ["regional_check",  "subject to jurisdiction",      "white"],
@@ -404,9 +404,9 @@ function RoadmapTimeline() {
 /* ============================================================ */
 function RiskClarity() {
   const clauses = [
-    "TGC is not currently a cryptocurrency.",
-    "TGC is a pre-mainnet contribution receipt.",
-    "Future market value of TGC is not guaranteed.",
+    "SANCT is not currently a cryptocurrency.",
+    "SANCT is a pre-mainnet contribution receipt.",
+    "Future market value of SANCT is not guaranteed.",
     "Buyback windows are conditional and may be closed at any time.",
     "Mainnet candidacy is conditional on community, legal, technical and ecosystem readiness.",
     "No guaranteed exchange listing.",

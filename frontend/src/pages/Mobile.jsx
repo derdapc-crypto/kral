@@ -11,19 +11,19 @@ import DailyCalibration from "../components/DailyCalibration";
 import LegalFooterMini from "../components/LegalFooterMini";
 
 /**
- * Mobile.jsx — v1.4.9 "Cloud Compute Node" + new TGC economy.
+ * Mobile.jsx — v1.4.9 "Cloud Compute Node" + new SANCT economy.
  *
  *  Core rules (per Operator decree):
- *    • Primary value on Compute Node = TGC, USDT only as small estimate
- *    • 1000 TGC = $10 USDT (1 TGC = $0.01)
- *    • Payout unlocks at 1000 TGC
- *    • TGC ledger is server-side PERSISTENT — disengage/refresh does NOT reset
+ *    • Primary value on Compute Node = SANCT, USDT only as small estimate
+ *    • 1000 SANCT = $10 USDT (1 SANCT = $0.01)
+ *    • Payout unlocks at 1000 SANCT
+ *    • SANCT ledger is server-side PERSISTENT — disengage/refresh does NOT reset
  *    • Drip = backend /node/drip call every 30s while engaged (state-aware)
  *    • Advanced tab is vocab-pure: no mining/RandomX/share/hashrate/H/s
  *    • Single ENGAGE NODE button + Smart Battery toggle (Eco Mode)
  */
 
-const TGC_TO_USDT = 0.01;        // 1 TGC = $0.01 USDT
+const TGC_TO_USDT = 0.01;        // 1 SANCT = $0.01 USDT
 const PAYOUT_THRESHOLD_TGC = 1000;
 const DRIP_INTERVAL_MS = 30000;  // 30s server drip cadence
 const TABS = [
@@ -40,9 +40,9 @@ function nativeBridge() {
 function safeJSON(fn, fallback = {}) {
   try { const s = fn(); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
 }
-// v1.5.5 — crypto-style precision: show 5 decimals (0.00012 TGC) so users
+// v1.5.5 — crypto-style precision: show 5 decimals (0.00012 SANCT) so users
 // see balance ticking up live like a real on-chain token rather than rounded
-// to "0.49 TGC" which feels static.
+// to "0.49 SANCT" which feels static.
 function fmtTGC(n) { return Number(n || 0).toFixed(5); }
 function fmtUSDT(n) { return Number(n || 0).toFixed(2); }
 
@@ -416,7 +416,7 @@ export default function Mobile() {
               {err && <div className="mt-2 text-xs text-red-400" data-testid="mobile-err">{err}</div>}
             </div>
 
-            {/* TGC Session card — primary value is TGC */}
+            {/* SANCT Session card — primary value is TGC */}
             <div className="mt-7 rounded-3xl border border-[#00ff88]/25 bg-black/55 p-5 relative overflow-hidden"
                  data-testid="session-tgc-card">
               <div className="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-[#00ff88]/15 blur-3xl" />
@@ -427,11 +427,11 @@ export default function Mobile() {
                 <div className="mt-2 flex items-baseline gap-2">
                   <div className="text-4xl font-mono-cyber font-black matrix-text font-mono-num"
                        data-testid="session-tgc-value">
-                    +{sessionEstimatedTGC.toFixed(5)} <span className="text-white/55 text-sm">TGC</span>
+                    +{sessionEstimatedTGC.toFixed(5)} <span className="text-white/55 text-sm"> SANCT </span>
                   </div>
                 </div>
                 <div className="text-[10px] text-white/40 mt-1">
-                  Today {todayTGC.toFixed(5)} TGC · pre-mainnet contribution receipt
+                  Today {todayTGC.toFixed(5)} SANCT · pre-mainnet contribution receipt
                 </div>
               </div>
             </div>
@@ -446,22 +446,22 @@ export default function Mobile() {
                                  tgcBalance={tgcBalance}
                                  isNative={isNative} />
 
-            {/* TGC Balance + Payout Progress */}
+            {/* SANCT Balance + Payout Progress */}
             <div className="mt-3 rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="tgc-balance-card">
               <div className="flex items-baseline justify-between">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">TGC Balance</div>
+                  <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">SANCT Balance</div>
                   <div className="mt-1 font-mono-cyber font-black text-3xl cyan-text" data-testid="tgc-balance-value">
-                    {fmtTGC(tgcBalance)} <span className="text-white/55 text-sm">TGC</span>
+                    {fmtTGC(tgcBalance)} <span className="text-white/55 text-sm"> SANCT </span>
                   </div>
                   <div className="text-[10px] text-white/45 mt-0.5">
-                Pre-mainnet · contribution receipt · Lifetime {fmtTGC(lifetimeTGC)} TGC
+                Pre-mainnet · contribution receipt · Lifetime {fmtTGC(lifetimeTGC)} SANCT
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">Payout Progress</div>
                   <div className="mt-1 font-mono-cyber font-black text-sm matrix-text" data-testid="payout-progress-text">
-                    {fmtTGC(progressTGC)} / {PAYOUT_THRESHOLD_TGC} TGC
+                    {fmtTGC(progressTGC)} / {PAYOUT_THRESHOLD_TGC} SANCT
                   </div>
                   <div className="text-[10px] text-white/40">{progressPct.toFixed(1)}%</div>
                 </div>
@@ -471,7 +471,7 @@ export default function Mobile() {
                      style={{ width: `${progressPct}%` }} data-testid="payout-progress-bar" />
               </div>
               <div className="mt-2 text-[10px] text-white/45">
-                Next Milestone · Drop Ticket every 100 lifetime TGC
+                Next Milestone · Drop Ticket every 100 lifetime SANCT
               </div>
             </div>
 
@@ -481,7 +481,7 @@ export default function Mobile() {
               <Row k="Node State" v={statusLabel.short} accent={statusLabel.tone} testId="row-node-state" />
               <Row k="Safety" v={engaged ? "Protected" : "Idle"} testId="row-safety" />
               <Row k="Network" v={isNative ? "Connected · Native" : "Connected · Web"} testId="row-network" />
-              <Row k="Reward Sync" v="TGC ledger synced" testId="row-reward-sync" />
+              <Row k="Reward Sync" v="SANCT ledger synced" testId="row-reward-sync" />
             </div>
 
             {/* Smart Battery */}
@@ -525,28 +525,28 @@ export default function Mobile() {
         {/* legacy rewards renderer kept for ref */}
         {false && tab === "rewards" && (
           <div className="mt-6 space-y-3" data-testid="rewards-tab-content">
-            {/* Hero TGC balance */}
+            {/* Hero SANCT balance */}
             <div className="rounded-2xl bg-black/40 border border-white/10 p-5" data-testid="rewards-balance-card">
-              <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">TGC Balance</div>
+              <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">SANCT Balance</div>
               <div className="mt-1 font-mono-cyber font-black text-4xl cyan-text" data-testid="rewards-tgc-balance">
-                {fmtTGC(tgcBalance)} <span className="text-white/55 text-sm">TGC</span>
+                {fmtTGC(tgcBalance)} <span className="text-white/55 text-sm"> SANCT </span>
               </div>
               <div className="text-[11px] text-white/45 mt-1">
-                Estimated Value ≈ ${(tgcBalance * TGC_TO_USDT).toFixed(2)} USDT · Lifetime {fmtTGC(lifetimeTGC)} TGC
+                Estimated Value ≈ ${(tgcBalance * TGC_TO_USDT).toFixed(2)} USDT · Lifetime {fmtTGC(lifetimeTGC)} SANCT
               </div>
             </div>
 
             {/* Pending vs Available */}
             <div className="grid grid-cols-2 gap-3">
-              <Box label="Pending Verification" value={`${fmtTGC(pendingTGC)} TGC`} sub="awaiting validation" testId="rewards-pending" />
-              <Box label="Available TGC" value={`${fmtTGC(availableTGC)} TGC`} sub="contribution receipt" testId="rewards-available" />
+              <Box label="Pending Verification" value={`${fmtTGC(pendingTGC)} SANCT`} sub="awaiting validation" testId="rewards-pending" />
+              <Box label="Available SANCT" value={`${fmtTGC(availableTGC)} SANCT`} sub="contribution receipt" testId="rewards-available" />
             </div>
 
             {/* Monthly forecast */}
             <div className="rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="monthly-forecast-card">
               <div className="text-[10px] uppercase tracking-[0.3em] cyan-text">Monthly Forecast (Node Tier · {tierLabel})</div>
               <div className="mt-1.5 font-mono-cyber font-black text-2xl matrix-text" data-testid="monthly-forecast-tgc">
-                ~{Math.round(monthlyForecastTGC)} TGC <span className="text-white/55 text-sm">/ month</span>
+                ~{Math.round(monthlyForecastTGC)} SANCT <span className="text-white/55 text-sm">/ month</span>
               </div>
               <div className="text-[11px] text-white/45 mt-1" data-testid="monthly-forecast-usdt">
                 ≈ ${monthlyForecastUSDT.toFixed(2)} estimated
@@ -560,14 +560,14 @@ export default function Mobile() {
             <div className="rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="payout-card">
               <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">Payout Progress</div>
               <div className="mt-1 font-mono-cyber font-black text-lg cyan-text" data-testid="payout-progress-rewards">
-                {fmtTGC(progressTGC)} / {PAYOUT_THRESHOLD_TGC} TGC
+                {fmtTGC(progressTGC)} / {PAYOUT_THRESHOLD_TGC} SANCT
               </div>
               <div className="mt-2 w-full h-2 bg-white/5 rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-[#00ffe1] to-[#00ff88]"
                      style={{ width: `${progressPct}%` }} />
               </div>
               <div className="text-[11px] text-white/45 mt-2">
-                Next Drop Ticket · <span className="cyan-text">every 100 lifetime TGC</span>
+                Next Drop Ticket · <span className="cyan-text">every 100 lifetime SANCT</span>
               </div>
               <button
                 onClick={requestPayout}
@@ -582,7 +582,7 @@ export default function Mobile() {
                   <span className="inline-flex items-center gap-2">
                     Apply for Buyback <ArrowUpRight className="w-3.5 h-3.5" />
                   </span>
-                ) : `Buyback eligibility unlocks at ${PAYOUT_THRESHOLD_TGC} TGC`}
+                ) : `Buyback eligibility unlocks at ${PAYOUT_THRESHOLD_TGC} SANCT`}
               </button>
               <div className="text-[10px] text-white/35 mt-2 leading-relaxed">
                 Foundation Buyback Program is conditional on treasury availability, verification and regional eligibility.
@@ -755,7 +755,7 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
             <span className="ml-auto text-[9px] uppercase tracking-[0.25em] text-amber-200/60 font-mono-term">PRE-MAINNET · ACCUMULATING</span>
           </div>
           <div className="text-[12px] text-white/75 leading-relaxed">
-            100 TGC eşiğine ulaşan contributor'lar, Foundation Buyback Window
+            100 SANCT eşiğine ulaşan contributor'lar, Foundation Buyback Window
             açıldığında bakiyelerini USDT karşılığı geri alım programına sunabilir.
             Program; dönemsel bütçe, doğrulama, risk kontrolü ve treasury
             likiditesine bağlıdır — <span className="text-amber-300">garanti değildir</span>.
@@ -765,21 +765,21 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
 
       {/* TGC hero */}
       <div className="rounded-2xl bg-black/40 border border-white/10 p-5" data-testid="rewards-balance-card">
-        <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">TGC Balance</div>
+        <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">SANCT Balance</div>
         <div className="mt-1 font-mono-cyber font-black text-4xl cyan-text" data-testid="rewards-tgc-balance">
-          {tgcBalance.toFixed(5)} <span className="text-white/55 text-sm">TGC</span>
+          {tgcBalance.toFixed(5)} <span className="text-white/55 text-sm"> SANCT </span>
         </div>
         <div className="text-[11px] text-white/45 mt-1">
           {wallet?.redemption_locked
-            ? `Pre-mainnet · contribution receipt · Lifetime ${lifetimeTGC.toFixed(5)} TGC`
-            : `Estimated Value ≈ $${(tgcBalance * TGC_TO_USDT).toFixed(2)} USDT · Lifetime ${lifetimeTGC.toFixed(5)} TGC`}
+            ? `Pre-mainnet · contribution receipt · Lifetime ${lifetimeTGC.toFixed(5)} SANCT`
+            : `Estimated Value ≈ $${(tgcBalance * TGC_TO_USDT).toFixed(2)} USDT · Lifetime ${lifetimeTGC.toFixed(5)} SANCT`}
         </div>
       </div>
 
       {/* Pending vs Available */}
       <div className="grid grid-cols-2 gap-3">
-        <Box label="Pending Verification" value={`${pendingTGC.toFixed(2)} TGC`} sub={`≈ $${(pendingTGC * TGC_TO_USDT).toFixed(2)}`} testId="rewards-pending" />
-        <Box label="Available TGC" value={`${availableTGC.toFixed(2)} TGC`} sub={`≈ $${(availableTGC * TGC_TO_USDT).toFixed(2)}`} testId="rewards-available" />
+        <Box label="Pending Verification" value={`${pendingTGC.toFixed(2)} SANCT`} sub={`≈ $${(pendingTGC * TGC_TO_USDT).toFixed(2)}`} testId="rewards-pending" />
+        <Box label="Available SANCT" value={`${availableTGC.toFixed(2)} SANCT`} sub={`≈ $${(availableTGC * TGC_TO_USDT).toFixed(2)}`} testId="rewards-available" />
       </div>
 
       {/* ===== Monthly Contributor Drop ===== */}
@@ -803,7 +803,7 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
           <div className="mt-4">
             <div className="flex justify-between text-[10px] uppercase tracking-widest text-white/45 mb-1.5">
               <span>Next Ticket</span>
-              <span className="cyan-text" data-testid="next-ticket-in-tgc">{nextTicketIn.toFixed(1)} TGC kaldı</span>
+              <span className="cyan-text" data-testid="next-ticket-in-tgc">{nextTicketIn.toFixed(1)} SANCT kaldı</span>
             </div>
             <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden">
               <div className="h-full bg-gradient-to-r from-[#00ffe1] to-[#00ff88]"
@@ -869,7 +869,7 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
             </div>
           )}
           <div className="mt-4 text-[10px] text-white/40 leading-relaxed" data-testid="drop-compliance-text">
-            Grid Tickets earn from lifetime TGC milestones (every 100 TGC = 1 ticket). Your TGC balance is not spent. Tickets cannot be purchased.
+            Grid Tickets earn from lifetime SANCT milestones (every 100 SANCT = 1 ticket). Your SANCT balance is not spent. Tickets cannot be purchased.
           </div>
         </div>
       </div>
@@ -908,7 +908,7 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
       <div className="rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="monthly-forecast-card">
         <div className="text-[10px] uppercase tracking-[0.3em] cyan-text">Monthly Forecast (Node Tier · {tierLabel})</div>
         <div className="mt-1.5 font-mono-cyber font-black text-2xl matrix-text" data-testid="monthly-forecast-tgc">
-          ~{Math.round(monthlyForecastTGC)} TGC <span className="text-white/55 text-sm">/ month</span>
+          ~{Math.round(monthlyForecastTGC)} SANCT <span className="text-white/55 text-sm">/ month</span>
         </div>
         <div className="text-[11px] text-white/45 mt-1" data-testid="monthly-forecast-usdt">
           ≈ ${monthlyForecastUSDT.toFixed(2)} estimated
@@ -919,7 +919,7 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
       <div className="rounded-2xl bg-black/40 border border-white/10 p-4" data-testid="payout-card">
         <div className="text-[10px] uppercase tracking-[0.25em] text-white/45">Payout Progress</div>
         <div className="mt-1 font-mono-cyber font-black text-lg cyan-text" data-testid="payout-progress-rewards">
-          {progressTGC.toFixed(2)} / {PAYOUT_THRESHOLD_TGC} TGC
+          {progressTGC.toFixed(2)} / {PAYOUT_THRESHOLD_TGC} SANCT
         </div>
         <div className="mt-2 w-full h-2 bg-white/5 rounded-full overflow-hidden">
           <div className="h-full bg-gradient-to-r from-[#00ffe1] to-[#00ff88]" style={{ width: `${progressPct}%` }} />
@@ -929,7 +929,7 @@ function RewardsTab({ wallet, walletAddr, setWalletAddr, walletNet, setWalletNet
                   canWithdraw ? "bg-gradient-to-r from-[#00ff88] to-[#00d4ff] text-black"
                               : "bg-white/5 text-white/40 border border-white/10 cursor-not-allowed"
                 }`}>
-          {canWithdraw ? "Request $10 USDT Payout" : `Payout unlocks at ${PAYOUT_THRESHOLD_TGC} TGC`}
+          {canWithdraw ? "Request $10 USDT Payout" : `Payout unlocks at ${PAYOUT_THRESHOLD_TGC} SANCT`}
         </button>
       </div>
 
@@ -1159,14 +1159,14 @@ function TerminalActivityLog({ engaged, batteryExempt, verifiedOutputs, tgcBalan
     lastOutputs.current = verifiedOutputs;
   }, [verifiedOutputs]);
 
-  // TGC ledger sync (every meaningful balance bump)
+  // SANCT ledger sync (every meaningful balance bump)
   useEffect(() => {
     if (tgcBalance > lastBalance.current + 0.0001 && lastBalance.current > 0) {
       const ts = new Date().toLocaleTimeString("en-GB", { hour12: false });
       const delta = (tgcBalance - lastBalance.current).toFixed(5);
       setLines((l) => [
         { ts, tag: "SYNC", color: "#00d9ff",
-          text: `TGC_LEDGER_UPDATED · +${delta} TGC`, id: Math.random() },
+          text: `TGC_LEDGER_UPDATED · +${delta} SANCT`, id: Math.random() },
         ...l,
       ].slice(0, 12));
     }

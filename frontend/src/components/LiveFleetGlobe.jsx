@@ -79,7 +79,7 @@ export default function LiveFleetGlobe({ devices = [], testId = "live-fleet-glob
           <div className="landing-pill info mb-2"><Globe2 className="w-3 h-3" /> Live Network</div>
           <h2 className="font-grotesk font-semibold text-white text-[20px]">Live Compute Fleet</h2>
           <p className="text-[12.5px] text-white/45 mt-1 font-sans-saas max-w-md">
-            Your devices are connected to THE GRID's distributed compute layer.
+            Your devices are connected to SANCTARA's distributed compute layer.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-[10.5px] tracking-widest uppercase font-mono-tech">

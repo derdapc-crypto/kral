@@ -34,13 +34,13 @@ export default function Navbar() {
             <Cpu className="w-4 h-4 text-black" strokeWidth={2.4} />
           </div>
           <span className="font-grotesk font-bold text-[17px] tracking-tight text-white">
-            THE GRID
+            SANCTARA
           </span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-7">
           <Link to="/" className={linkCls("/")} data-testid="nav-home">Platform</Link>
-          <Link to="/token" className={linkCls("/token")} data-testid="nav-token">$TGC Token</Link>
+          <Link to="/token" className={linkCls("/token")} data-testid="nav-token">$SANCT Token</Link>
           <a href="/#how" className="text-[13px] font-medium font-sans-saas text-white/55 hover:text-white transition-colors" data-testid="nav-how">How it works</a>
           <a href="/#pillars" className="text-[13px] font-medium font-sans-saas text-white/55 hover:text-white transition-colors" data-testid="nav-pillars">Product</a>
           <a href="/#safety" className="text-[13px] font-medium font-sans-saas text-white/55 hover:text-white transition-colors" data-testid="nav-safety">Safety</a>

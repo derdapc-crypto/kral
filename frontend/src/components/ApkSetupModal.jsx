@@ -37,7 +37,7 @@ export default function ApkSetupModal({ open, onClose }) {
             {[
               { n: "01", icon: Download, title: "Download the APK", desc: `Tap below. Allow installs from unknown sources if prompted. Real signed APK · v2+v3 schemes · min Android ${meta?.min_android || "7.0"}+.` },
               { n: "02", icon: Shield, title: "Install & Authorize", desc: "Open the file. Grant compute permission — required for Golden Rule compliance." },
-              { n: "03", icon: BatteryCharging, title: "Connect While Charging", desc: "Plug in. Connect Wi-Fi. Sign in with your Grid credentials. Your device starts earning TGC immediately." },
+              { n: "03", icon: BatteryCharging, title: "Connect While Charging", desc: "Plug in. Connect Wi-Fi. Sign in with your Grid credentials. Your device starts earning SANCT immediately." },
             ].map((s) => (
               <div key={s.n} className="flex gap-4 p-4 rounded-2xl bg-black/40 border border-white/10">
                 <div className="font-display font-black text-2xl gold-text font-mono-num w-12">{s.n}</div>

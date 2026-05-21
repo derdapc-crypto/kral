@@ -415,7 +415,7 @@ export default function NetworkTopology({ className = "" }) {
 
       {/* ============ CORNER HUD LABELS ============ */}
       <div className="absolute top-3 left-4 text-[9px] font-mono uppercase tracking-[0.35em] text-[#00ff88]/70 pointer-events-none">
-        // grid.topology
+        // sanctara.topology
       </div>
       <div className="absolute top-3 right-4 text-[9px] font-mono uppercase tracking-[0.35em] pointer-events-none flex items-center gap-2"
            style={{ color: awaitingState ? "#fbbf24cc" : "#00ff88cc" }}>

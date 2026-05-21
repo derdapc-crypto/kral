@@ -247,7 +247,7 @@ export default function ComputeOrchestrator() {
         </p>
       </div>
 
-      {/* Admin Shield · TGC Drip Throttle */}
+      {/* Admin Shield · SANCT Drip Throttle */}
       <div className="rounded-3xl glass p-6" data-testid="admin-shield-panel">
         <div className="flex flex-wrap justify-between items-start gap-4">
           <div className="flex items-start gap-3">
@@ -255,9 +255,9 @@ export default function ComputeOrchestrator() {
               <ShieldCheckIcon className="w-5 h-5 text-[#F2C94C]" />
             </div>
             <div>
-              <div className="font-display font-bold text-base">Admin Shield · TGC Drip Throttle</div>
+              <div className="font-display font-bold text-base">Admin Shield · SANCT Drip Throttle</div>
               <div className="text-xs text-white/50 mt-0.5 max-w-lg">
-                Auto-throttles TGC drip rate when verification difficulty rises. Preserves the 30% admin profit margin via the 7:5 arbitrage rule (Pool ID {shield?.admin_binance_id}).
+                Auto-throttles SANCT drip rate when verification difficulty rises. Preserves the 30% admin profit margin via the 7:5 arbitrage rule (Pool ID {shield?.admin_binance_id}).
               </div>
             </div>
           </div>
@@ -298,7 +298,7 @@ export default function ComputeOrchestrator() {
             </div>
           </div>
           <div className="p-3 rounded-xl bg-black/40 border border-white/10">
-            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">User TGC Paid · USDT</div>
+            <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">User SANCT Paid · USDT</div>
             <div className="mt-1 text-xl font-display font-black text-white font-mono-num">
               ${shield ? shield.tgc_paid_to_users_usdt.toFixed(4) : "—"}
             </div>

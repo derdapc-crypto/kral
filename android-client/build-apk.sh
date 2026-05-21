@@ -45,8 +45,8 @@ mkdir -p build/classes build/gen
 # v1.7.5 — write a flavor-aware AndroidManifest.xml each build so both APKs
 # can co-exist on the same device with distinct package names.
 VERSION_CODE="$(echo "$VERSION" | awk -F. '{ printf "%d%02d%02d", $1, $2, $3 }')"
-APP_LABEL_LIGHT="THE GRID Light"
-APP_LABEL_NODEPRO="THE GRID Node Pro"
+APP_LABEL_LIGHT="Sanctara Light"
+APP_LABEL_NODEPRO="Sanctara Node Pro"
 case "$FLAVOR" in light) LABEL="$APP_LABEL_LIGHT" ;; *) LABEL="$APP_LABEL_NODEPRO" ;; esac
 
 # Use a templated manifest if present, otherwise patch the existing one in-place.
