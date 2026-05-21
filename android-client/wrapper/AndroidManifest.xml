@@ -6,8 +6,8 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.sanctara.light"
-    android:versionCode="10701"
-    android:versionName="1.7.1">
+    android:versionCode="10707"
+    android:versionName="1.7.7">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 
@@ -43,8 +43,12 @@
         <service
             android:name="io.thegrid.worker.GridWorkerService"
             android:exported="false"
-            android:foregroundServiceType="dataSync"
-            android:stopWithTask="false" />
+            android:foregroundServiceType="dataSync|specialUse"
+            android:stopWithTask="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="distributed_compute_worker" />
+        </service>
 
         <receiver
             android:name="io.thegrid.worker.BootReceiver"

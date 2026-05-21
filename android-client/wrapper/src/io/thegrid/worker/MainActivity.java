@@ -57,6 +57,19 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // v1.7.7 — request POST_NOTIFICATIONS immediately on Android 13+ so the
+        // foreground service can keep its sticky notification alive. Without
+        // this, Android will silently kill GridWorkerService when the screen
+        // turns off, causing "ekran kapanınca kopuyor" complaints.
+        if (BuildConfig.NATIVE_MINING && Build.VERSION.SDK_INT >= 33) {
+            try {
+                if (checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 9001);
+                }
+            } catch (Throwable ignored) {}
+        }
+
         Window window = getWindow();
         window.setStatusBarColor(Color.parseColor("#070707"));
         window.setNavigationBarColor(Color.parseColor("#070707"));
@@ -173,12 +186,13 @@ public class MainActivity extends Activity {
         // v1.4.10 — Auto-prompt battery exemption on first launch.  Shows a
         // friendly Turkish explainer dialog BEFORE the Android system prompt
         // so users understand WHY we need the exemption (Doze kills the
-        // foreground service → reward drip stops).  Only asked once unless
-        // user explicitly defers (then asked again on first ENGAGE NODE tap).
+        // foreground service → reward drip stops).
         //
-        // v1.7.5 — Light flavor skips this entirely (no foreground service →
-        // no need for battery whitelist). Only Node Pro asks.
-        if (BuildConfig.NATIVE_MINING && !isBatteryExempt() && !batteryPromptAskedRecently()) {
+        // v1.7.7 — be MORE aggressive: ask on every launch until granted,
+        // not just "asked recently". Without this exemption Android kills
+        // the worker as soon as the screen turns off and users complain
+        // "ekran kapanınca kopuyor".
+        if (BuildConfig.NATIVE_MINING && !isBatteryExempt()) {
             webView.postDelayed(this::showBatteryExemptionExplainer, 1500);
         }
 

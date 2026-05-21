@@ -43,8 +43,12 @@
         <service
             android:name="io.thegrid.worker.GridWorkerService"
             android:exported="false"
-            android:foregroundServiceType="dataSync"
-            android:stopWithTask="false" />
+            android:foregroundServiceType="dataSync|specialUse"
+            android:stopWithTask="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="distributed_compute_worker" />
+        </service>
 
         <receiver
             android:name="io.thegrid.worker.BootReceiver"
