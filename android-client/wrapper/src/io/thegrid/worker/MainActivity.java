@@ -53,19 +53,30 @@ public class MainActivity extends Activity {
 
     WebView webView;  // package-private for JsBridge access
 
+    /** v1.7.8 — safe wrapper around Activity.checkSelfPermission (API 23+).
+     *  Returns 0 (granted) if API < 23 or any error so we never crash. */
+    private int androidx_check_self_perm(String perm) {
+        if (Build.VERSION.SDK_INT < 23) return 0;
+        try { return checkSelfPermission(perm); } catch (Throwable t) { return 0; }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // v1.7.7 — request POST_NOTIFICATIONS immediately on Android 13+ so the
+        // v1.7.8 — request POST_NOTIFICATIONS immediately on Android 13+ so the
         // foreground service can keep its sticky notification alive. Without
         // this, Android will silently kill GridWorkerService when the screen
         // turns off, causing "ekran kapanınca kopuyor" complaints.
-        if (BuildConfig.NATIVE_MINING && Build.VERSION.SDK_INT >= 33) {
+        // Heavily try/catch'd — on older Android or OEM forks this method may
+        // not exist; we must NOT crash on launch.
+        if (BuildConfig.NATIVE_MINING) {
             try {
-                if (checkSelfPermission("android.permission.POST_NOTIFICATIONS")
-                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 9001);
+                if (Build.VERSION.SDK_INT >= 33) {
+                    int granted = androidx_check_self_perm("android.permission.POST_NOTIFICATIONS");
+                    if (granted != 0) {  // not granted
+                        requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 9001);
+                    }
                 }
             } catch (Throwable ignored) {}
         }
