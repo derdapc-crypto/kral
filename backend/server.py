@@ -3530,6 +3530,7 @@ async def apk_dual_version():
         "signed":      True,
         "light": {
             **light,
+            "version":              APK_VERSION,
             "package":              "io.sanctara.light",
             "label":                "Sanctara Light",
             "client_type":          "light",
@@ -3539,6 +3540,7 @@ async def apk_dual_version():
         },
         "node_pro": {
             **nodepro,
+            "version":              APK_VERSION,
             "package":              "io.sanctara.nodepro",
             "label":                "Sanctara Node Pro",
             "client_type":          "node_pro",
