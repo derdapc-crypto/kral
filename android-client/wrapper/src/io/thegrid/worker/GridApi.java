@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
  */
 public class GridApi {
     /** Hard-coded fallback if no override has been saved yet. */
-    public static final String DEFAULT_BASE = "https://grid-supercomputer.preview.emergentagent.com";
+    public static final String DEFAULT_BASE = "https://api.sanctara.io";
     /** Legacy constant kept for compatibility with old call sites — prefer {@link #base(Context)}. */
     public static final String BASE = DEFAULT_BASE;
     private static final String PREF_KEY = "grid_backend_base";

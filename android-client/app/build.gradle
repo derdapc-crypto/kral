@@ -28,9 +28,9 @@ android {
 
         // Hard-coded backend URL. No manual setup for end users.
         buildConfigField "String", "GRID_API_BASE",
-            '"https://grid-supercomputer.preview.emergentagent.com/api"'
+            '"https://api.sanctara.io/api"'
         buildConfigField "String", "GRID_WS_URL",
-            '"wss://grid-supercomputer.preview.emergentagent.com/api/ws"'
+            '"wss://api.sanctara.io/api/ws"'
         buildConfigField "String", "GRID_MASTER_ID", '"117423210"'
     }
 
