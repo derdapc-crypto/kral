@@ -5,9 +5,9 @@
   with different package names.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="io.sanctara.nodepro"
-    android:versionCode="10700"
-    android:versionName="1.7.0">
+    package="io.sanctara.light"
+    android:versionCode="10701"
+    android:versionName="1.7.1">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 
@@ -22,7 +22,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
-        android:label="Sanctara Node Pro"
+        android:label="Sanctara Light"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/AppTheme"

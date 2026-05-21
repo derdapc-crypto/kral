@@ -5,7 +5,7 @@
  * should not be modified by hand.
  */
 
-package io.sanctara.nodepro;
+package io.sanctara.light;
 
 public final class R {
     public static final class attr {

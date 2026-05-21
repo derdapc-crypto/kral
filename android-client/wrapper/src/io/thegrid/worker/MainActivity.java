@@ -39,8 +39,17 @@ public class MainActivity extends Activity {
 
     static final String DEFAULT_GRID_URL_PATH = "/mobile";
 
-    /** Build the WebView entry URL from the currently-configured backend base. */
-    private String gridUrl() { return GridApi.base(this) + DEFAULT_GRID_URL_PATH; }
+    /** Build the WebView entry URL from the currently-configured backend base.
+     *  v1.7.1: API runs on `api.<domain>`, but the WebView must load the
+     *  user-facing /mobile page from the BARE domain. We strip the leading
+     *  "api." subdomain when present so a single Backend URL setting
+     *  (e.g. https://api.sanctara.io) routes both API and WebView correctly. */
+    private String gridUrl() {
+        String base = GridApi.base(this);
+        // strip "api." subdomain for the WebView host
+        String webBase = base.replace("://api.", "://");
+        return webBase + DEFAULT_GRID_URL_PATH;
+    }
 
     WebView webView;  // package-private for JsBridge access
 
