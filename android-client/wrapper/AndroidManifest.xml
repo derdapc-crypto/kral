@@ -5,7 +5,7 @@
   with different package names.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="io.thegrid.nodepro"
+    package="io.sanctara.nodepro"
     android:versionCode="10705"
     android:versionName="1.7.5">
 
@@ -22,7 +22,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
-        android:label="THE GRID Node Pro"
+        android:label="Sanctara Node Pro"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/AppTheme"

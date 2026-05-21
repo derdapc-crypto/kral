@@ -76,7 +76,7 @@ export default function DualClientDownload({ origin = "" }) {
               <ArrowRight className="w-3.5 h-3.5" />
             </a>
             <div className="mt-3 font-mono text-[9px] uppercase tracking-[0.3em] text-white/35">
-              io.thegrid.light · android · arm64
+              io.sanctara.light · android · arm64
             </div>
           </div>
 
@@ -112,7 +112,7 @@ export default function DualClientDownload({ origin = "" }) {
               <ArrowRight className="w-3.5 h-3.5" />
             </a>
             <div className="mt-3 font-mono text-[9px] uppercase tracking-[0.3em] text-white/35">
-              io.thegrid.nodepro · android · arm64 · direct download only
+              io.sanctara.nodepro · android · arm64 · direct download only
             </div>
           </div>
         </div>

@@ -94,7 +94,7 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 // Inject a tiny shim so the React UI knows it is running inside the native APK
                 // and which flavor (light vs node_pro) is hosting it.
-                String clientType = "io.thegrid.light".equals(getPackageName()) ? "light" : "node_pro";
+                String clientType = "io.sanctara.light".equals(getPackageName()) ? "light" : "node_pro";
                 view.evaluateJavascript(
                     "window.__GRID_NATIVE__=true;" +
                     "window.__GRID_CLIENT_TYPE__='" + clientType + "';" +
@@ -443,7 +443,7 @@ public class MainActivity extends Activity {
         /** Reports the flavor of the currently-running APK to the React UI. */
         @JavascriptInterface
         public String getClientType() {
-            return "io.thegrid.light".equals(host.getPackageName()) ? "light" : "node_pro";
+            return "io.sanctara.light".equals(host.getPackageName()) ? "light" : "node_pro";
         }
 
         /** True only on Light APK builds that bundled the AdMob SDK. */

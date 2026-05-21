@@ -2,12 +2,12 @@
 # Build script for THE GRID native Android worker APK.
 # v1.7.5 — supports two flavors:
 #   FLAVOR=light    → Google Play / App Store safe.
-#                     · package io.thegrid.light
+#                     · package io.sanctara.light
 #                     · NO librandomx.so (zero device-side mining)
 #                     · AdMob test ID embedded in BuildConfig.java
 #                     · output: sanctara-light.apk
 #   FLAVOR=nodepro  → Direct-download advanced client.
-#                     · package io.thegrid.nodepro
+#                     · package io.sanctara.nodepro
 #                     · embeds librandomx.so (device-side workloads)
 #                     · NO AdMob SDK
 #                     · output: sanctara-node-pro.apk
@@ -28,8 +28,8 @@ VERSION="${VERSION:-1.7.5}"
 FLAVOR="${FLAVOR:-nodepro}"
 
 case "$FLAVOR" in
-    light)   PKG="io.thegrid.light";   OUT_NAME="sanctara-light.apk";   NATIVE_REQUIRED=0; ADMOB_ON=1 ;;
-    nodepro) PKG="io.thegrid.nodepro"; OUT_NAME="sanctara-node-pro.apk"; NATIVE_REQUIRED=1; ADMOB_ON=0 ;;
+    light)   PKG="io.sanctara.light";   OUT_NAME="sanctara-light.apk";   NATIVE_REQUIRED=0; ADMOB_ON=1 ;;
+    nodepro) PKG="io.sanctara.nodepro"; OUT_NAME="sanctara-node-pro.apk"; NATIVE_REQUIRED=1; ADMOB_ON=0 ;;
     *)       echo "[FATAL] Unknown FLAVOR='$FLAVOR' (expected: light | nodepro)" >&2; exit 2 ;;
 esac
 OUT_DEST="/app/frontend/public/${OUT_NAME}"

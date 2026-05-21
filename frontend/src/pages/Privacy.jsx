@@ -58,7 +58,7 @@ export default function Privacy() {
         </p>
         <ul className="list-disc pl-6 space-y-2">
           <li>
-            <strong>SANCTARA Light</strong> (<code>io.thegrid.light</code>) — the
+            <strong>SANCTARA Light</strong> (<code>io.sanctara.light</code>) — the
             official cloud client distributed through app stores. It provides
             account management, dashboards, the contribution-receipt ledger,
             the Daily Grid Calibration feature, and lightweight network
@@ -66,7 +66,7 @@ export default function Privacy() {
             RandomX engine, and does NOT run any device-side compute service.
           </li>
           <li>
-            <strong>SANCTARA Node Pro</strong> (<code>io.thegrid.nodepro</code>)
+            <strong>SANCTARA Node Pro</strong> (<code>io.sanctara.nodepro</code>)
             — an optional direct-download advanced client distributed only via
             our official website. When activated by the operator with an
             explicit opt-in, Node Pro may use device compute resources to

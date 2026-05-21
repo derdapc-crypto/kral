@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    THE GRID — Worker Native Client
+    SANCTARA — Worker Native Client
     Native AndroidManifest for a real signed APK build.
     Drop this into your Android Studio project under app/src/main/.
 -->

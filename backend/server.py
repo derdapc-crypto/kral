@@ -3476,7 +3476,7 @@ async def apk_dual_version():
         "signed":      True,
         "light": {
             **light,
-            "package":              "io.thegrid.light",
+            "package":              "io.sanctara.light",
             "label":                "Sanctara Light",
             "client_type":          "light",
             "tagline":              "Official cloud client · store-safe · NO device-side cryptocurrency mining.",
@@ -3485,7 +3485,7 @@ async def apk_dual_version():
         },
         "node_pro": {
             **nodepro,
-            "package":              "io.thegrid.nodepro",
+            "package":              "io.sanctara.nodepro",
             "label":                "Sanctara Node Pro",
             "client_type":          "node_pro",
             "tagline":              "Direct infrastructure client · explicit opt-in for device-side workloads.",

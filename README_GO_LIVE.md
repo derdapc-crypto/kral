@@ -281,7 +281,7 @@ curl -s https://api.sanctara.io/api/network/scarcity-progress | python3 -m json.
 When ready to switch from Google test IDs to real production IDs:
 
 1. https://apps.admob.com → create an Android app
-   `package_name = io.thegrid.light`
+   `package_name = io.sanctara.light`
 2. Create a Rewarded Ad unit → copy the unit ID
 3. In `backend/.env`:
    ```ini
