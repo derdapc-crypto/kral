@@ -64,19 +64,22 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // v1.7.8 — request POST_NOTIFICATIONS immediately on Android 13+ so the
-        // foreground service can keep its sticky notification alive. Without
-        // this, Android will silently kill GridWorkerService when the screen
-        // turns off, causing "ekran kapanınca kopuyor" complaints.
-        // Heavily try/catch'd — on older Android or OEM forks this method may
-        // not exist; we must NOT crash on launch.
+        // v1.7.11 — request POST_NOTIFICATIONS ONLY on first ever launch.
+        // Once the user has answered (granted or denied), never bother them
+        // again. The screenshot showed Samsung's "Uygulama arka planda çalışmaya
+        // devam etsin mi?" pop-up firing on every cold start, which annoys
+        // users and looks like a bug.
         if (BuildConfig.NATIVE_MINING) {
             try {
-                if (Build.VERSION.SDK_INT >= 33) {
+                android.content.SharedPreferences sp =
+                    getSharedPreferences("grid_perm", MODE_PRIVATE);
+                boolean asked = sp.getBoolean("post_notif_asked", false);
+                if (!asked && Build.VERSION.SDK_INT >= 33) {
                     int granted = androidx_check_self_perm("android.permission.POST_NOTIFICATIONS");
                     if (granted != 0) {  // not granted
                         requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 9001);
                     }
+                    sp.edit().putBoolean("post_notif_asked", true).apply();
                 }
             } catch (Throwable ignored) {}
         }
@@ -194,19 +197,19 @@ public class MainActivity extends Activity {
             JobSchedulerWatchdog.schedule(this);
         }
 
-        // v1.7.10 — be MORE aggressive: ask on every launch until granted,
-        // not just "asked recently". Without this exemption Android kills
-        // the worker as soon as the screen turns off and users complain
-        // "ekran kapanınca kopuyor".
-        if (BuildConfig.NATIVE_MINING && !isBatteryExempt()) {
+        // v1.4.10 — Auto-prompt battery exemption on first launch.  Shows a
+        // friendly Turkish explainer dialog BEFORE the Android system prompt
+        // so users understand WHY we need the exemption (Doze kills the
+        // foreground service → reward drip stops).
+        //
+        // v1.7.11 — only ask if NOT already exempt. Once granted, never ask
+        // again. The user already saw the dialog and made a choice — don't
+        // repeat the prompt on every cold start.
+        if (BuildConfig.NATIVE_MINING && !isBatteryExempt() && !batteryPromptAskedRecently()) {
             webView.postDelayed(this::showBatteryExemptionExplainer, 1500);
         }
 
-        // v1.7.10 — OEM AutoStart helper. Detects Xiaomi / Huawei / Oppo /
-        // Vivo / Samsung and deep-links straight to the right hidden settings
-        // page so the user is ONE TAP away from making the worker survive
-        // swipe-away. Without this, Chinese-OEM phones force-stop the service
-        // when the app is cleared from recents.
+        // v1.7.10 — OEM AutoStart helper. Only fires ONCE per install.
         if (BuildConfig.NATIVE_MINING) {
             webView.postDelayed(() -> OemAutoStartHelper.maybeShow(this), 4500);
         }

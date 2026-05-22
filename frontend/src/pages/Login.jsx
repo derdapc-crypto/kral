@@ -30,8 +30,8 @@ export default function Login() {
         <div className="flex items-center gap-3 mb-6">
           <Hexagon className="w-7 h-7 cyan-text" />
           <div className="font-mono-cyber font-black text-xl">
-            <span className="cyan-text">THE</span>{" "}
-            <span className="matrix-text">GRID</span>
+            <span className="cyan-text">SANCTARA</span>{" "}
+            <span className="matrix-text">NETWORK</span>
           </div>
         </div>
         <div className="cyber-card-strong rounded-3xl p-10" data-testid="login-form">
@@ -39,7 +39,7 @@ export default function Login() {
             <Terminal className="w-3 h-3" /> ./auth · classified
           </div>
           <h1 className="font-mono-cyber text-3xl font-black tracking-tight">
-            <span className="cyan-text">enter_the_grid</span><span className="text-white/30">()</span>
+            <span className="cyan-text">enter_sanctara</span><span className="text-white/30">()</span>
           </h1>
           <p className="text-xs text-white/55 mt-2 font-mono-term tracking-wider caret-blink">
             biometric handshake required
