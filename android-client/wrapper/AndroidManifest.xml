@@ -6,8 +6,8 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.sanctara.light"
-    android:versionCode="10714"
-    android:versionName="1.7.14">
+    android:versionCode="10800"
+    android:versionName="1.8.0">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 

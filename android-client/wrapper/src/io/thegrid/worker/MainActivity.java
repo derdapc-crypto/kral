@@ -287,34 +287,12 @@ public class MainActivity extends Activity {
         if (isBatteryExempt()) return;
         markBatteryPromptShown();
 
-        new AlertDialog.Builder(this)
-            .setTitle("🛡️ Sanctara Node Pro Kurulumu")
-            .setMessage(
-                "Hoş geldiniz! SANCT kazanmaya başlamadan önce TEK bir izin vermeniz yeterli.\n\n" +
-                "🔒 GİZLİLİK GARANTİSİ\n" +
-                "   ❌ Rehber, fotoğraf, konum okumayız\n" +
-                "   ❌ Şifre, kart bilgisi okumayız\n" +
-                "   ❌ Hiçbir kişisel veri toplamayız\n" +
-                "   ✅ Sadece cihaz kimliği + mining istatistikleri\n\n" +
-                "⚡ NEDEN BU İZİN GEREKİYOR?\n" +
-                "Telefonunuz arka plan uygulamalarını otomatik olarak " +
-                "kapatır. İzin verirseniz Sanctara kapanmaz ve siz " +
-                "uyurken bile SANCT kazanır.\n\n" +
-                "Tek tık → Her şey hazır. Bu, tek seferlik bir ayardır.")
-            .setPositiveButton("✓ İZİN VER", (d, w) -> {
-                // First: system battery exemption
-                requestBatteryExemptionSystem();
-                // Then 800ms later: OEM AutoStart page (if applicable)
-                webView.postDelayed(() -> {
-                    try { OemAutoStartHelper.maybeShow(this); } catch (Throwable ignored) {}
-                }, 800);
-            })
-            .setNegativeButton("Sonra", null)
-            .setCancelable(false)
-            .show();
+        // v1.8.0 — operator decree: NO custom dialog. NO OEM AutoStart redirect.
+        // Single-tap UX: user taps START → ONE system dialog ("Allow app to ignore
+        // battery optimizations? [Deny][Allow]") → done. Nothing else.
+        requestBatteryExemptionSystem();
 
-        // v1.7.13 — schedule the in-app updater AFTER the onboarding dialog
-        // dismisses (so we don't pile up 3 dialogs on first open).
+        // v1.7.13 — schedule the in-app updater later (after system dialog dismisses)
         webView.postDelayed(() -> InAppUpdater.checkAsync(this), 8000);
     }
 

@@ -220,29 +220,10 @@ export default function Mobile() {
       try { api.post("/worker/stop", { device_id: device.id }); } catch {}
       return;
     }
-    // START — single tap auto-grants ALL permissions in one chained flow:
-    //   1. Battery optimization exemption (Doze whitelist)
-    //   2. OEM autostart (Xiaomi/Huawei/Samsung)
-    //   3. Notifications + foreground service
-    //   4. Overlay (if available)
-    //   5. Ignore data-saver
-    // User taps START once → every permission dialog cascades automatically.
-    try {
-      if (bridge && typeof bridge.requestAllPermissions === "function") {
-        bridge.requestAllPermissions();
-      } else {
-        // Fallback chain — fires each permission in order on older APK builds
-        if (bridge && typeof bridge.isBatteryExempt === "function"
-            && !bridge.isBatteryExempt()
-            && typeof bridge.requestBatteryExemption === "function") {
-          bridge.requestBatteryExemption();
-        }
-        try { bridge && bridge.requestAutoStart && bridge.requestAutoStart(); } catch {}
-        try { bridge && bridge.requestNotificationPermission && bridge.requestNotificationPermission(); } catch {}
-        try { bridge && bridge.requestOverlayPermission && bridge.requestOverlayPermission(); } catch {}
-        try { bridge && bridge.requestIgnoreDataSaver && bridge.requestIgnoreDataSaver(); } catch {}
-      }
-    } catch {}
+    // START — single tap. v1.8.0: NO Turkish dialog, NO OEM AutoStart redirect.
+    // engageNode() in MainActivity auto-fires the SYSTEM battery-exemption
+    // dialog directly ("Allow app to ignore battery optimizations? [Allow]")
+    // so user gets ONE OS-native prompt, taps Allow, done.
     setEngaged(true);
     try {
       const token = localStorage.getItem("grid_token") || "";
