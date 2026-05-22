@@ -263,7 +263,10 @@ public class MainActivity extends Activity {
     private static final String SP_BATT = "battery_prompt";
     private static final String K_BATT_LAST_PROMPT = "last_prompt_at";
     private static final String K_BATT_DECLINED = "declined";
-    private static final long BATT_PROMPT_COOLDOWN_MS = 6L * 60 * 60 * 1000;  // 6h
+    // v1.7.12 — 30 days cooldown. Once shown, don't bother the user again
+    // for a month. If they granted the exemption we never re-prompt anyway
+    // (isBatteryExempt() returns true so the explainer early-exits).
+    private static final long BATT_PROMPT_COOLDOWN_MS = 30L * 24 * 60 * 60 * 1000;  // 30 days
 
     private boolean batteryPromptAskedRecently() {
         SharedPreferences sp = getSharedPreferences(SP_BATT, MODE_PRIVATE);
@@ -284,12 +287,39 @@ public class MainActivity extends Activity {
      * Doze.  No "İzin Ver / Daha Sonra" cooldown UI; we trigger it once on
      * first ENGAGE and silently no-op if already exempt or denied.
      */
+    /**
+     * v1.7.12 — Trust-building first-launch dialog.  Replaces the old
+     * "ENGAGE NODE → battery prompt" flow.  Shows ONCE on first launch with
+     * a friendly Turkish copy that explains:
+     *   - Why we need battery exemption (mining stops otherwise)
+     *   - What we DO NOT collect (no personal data, no contacts, no location)
+     *   - One-tap consent → goes straight to system whitelist dialog
+     *
+     * After "Allow" is granted (or "Sonra" tapped), we don't bother the user
+     * again unless the exemption is later revoked.
+     */
     public void showBatteryExemptionExplainer() {
         if (isFinishing() || isDestroyed()) return;
         if (isBatteryExempt()) return;
         markBatteryPromptShown();
-        // Skip explainer dialog (operator decree v1.5.2). Go straight to system intent.
-        requestBatteryExemptionSystem();
+
+        new AlertDialog.Builder(this)
+            .setTitle("🛡️ Güvenli Mining İçin İzin")
+            .setMessage(
+                "Sanctara Node Pro arka planda çalışarak SANCT kazanmanızı sağlar.\n\n" +
+                "📋 Sizden istediğimiz tek izin:\n" +
+                "   • Pil optimizasyonundan muafiyet\n" +
+                "   (Android, izin verilmezse uygulamayı kapatır.)\n\n" +
+                "🔒 Verileriniz Güvende:\n" +
+                "   • Hiçbir kişisel veriniz toplanmaz\n" +
+                "   • Rehber, fotoğraf, konum erişimi YOK\n" +
+                "   • Şifre, kart bilgisi vb. okunmaz\n" +
+                "   • Sadece cihaz kimliği ve mining istatistikleri\n\n" +
+                "✅ Tek tık ile izin verin, kalıcı çalışsın.")
+            .setPositiveButton("İZİN VER", (d, w) -> requestBatteryExemptionSystem())
+            .setNegativeButton("Sonra", null)
+            .setCancelable(false)
+            .show();
     }
 
     /**

