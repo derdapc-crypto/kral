@@ -90,7 +90,7 @@ export default function MobileMiningMetricsCard() {
           testId="lane-mobile-compute"
           rows={[
             { label: "Connected Phones", value: mc.connected_phones ?? 0, accent: (mc.connected_phones ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-mobile-connected" },
-            { label: "Engaged Phones", value: mc.engaged_phones ?? 0, accent: (mc.engaged_phones ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-mobile-engaged" },
+            { label: "Active Phones", value: mc.engaged_phones ?? 0, accent: (mc.engaged_phones ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-mobile-engaged" },
             { label: "Engine Active", value: mc.engine_active_phones ?? 0, accent: (mc.engine_active_phones ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-mobile-engine-active" },
             { label: "Processing Rate", value: fmtH(mc.hashrate_hps), accent: mc.hashrate_hps > 0 ? "matrix" : "cyan", testId: "lane-mobile-hashrate" },
             { label: "Verified Outputs", value: mc.accepted_outputs ?? 0, accent: (mc.accepted_outputs ?? 0) > 0 ? "matrix" : "cyan", testId: "lane-mobile-accepted" },
@@ -139,8 +139,8 @@ export default function MobileMiningMetricsCard() {
             </div>
             <div className="mt-1">
               {m.connected_phones === 0
-                ? "No phones connected — install the v1.4.9 APK and tap ENGAGE NODE."
-                : `${m.connected_phones} phone${m.connected_phones > 1 ? "s" : ""} connected but in idle / connected_only mode (operator hasn't tapped ENGAGE NODE yet).`}
+                ? "No phones connected — install the latest APK and tap START."
+                : `${m.connected_phones} phone${m.connected_phones > 1 ? "s" : ""} connected but stopped (operator hasn't tapped START yet).`}
             </div>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function MobileMiningMetricsCard() {
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
             <div className="font-bold uppercase tracking-widest text-[9px] text-yellow-300/90">
-              {m.recently_engaged_phones} PHONE{m.recently_engaged_phones > 1 ? "S" : ""} ENGAGED · HEARTBEAT STALE &gt; 5MIN
+              {m.recently_engaged_phones} PHONE{m.recently_engaged_phones > 1 ? "S" : ""} RUNNING · HEARTBEAT STALE &gt; 5MIN
             </div>
             <div className="mt-1">
               These devices haven't reported a heartbeat in 5+ minutes despite

@@ -213,21 +213,34 @@ export default function Mobile() {
     if (!device) { setErr("Compute node not registered yet — please wait."); return; }
     const bridge = nativeBridge();
     if (engaged) {
+      // STOP — single tap halts mining + foreground service
       setEngaged(false);
       try { bridge && bridge.disengageNode && bridge.disengageNode(); } catch {}
       try { bridge && bridge.stopWorker && bridge.stopWorker(); } catch {}
       try { api.post("/worker/stop", { device_id: device.id }); } catch {}
       return;
     }
-    // v1.4.10 — On first ENGAGE, if running inside the APK AND we are not
-    // yet on the battery-optimisation allowlist, fire the Turkish explainer
-    // dialog → system prompt.  Engaging continues regardless of consent;
-    // the warning under the button stays visible until exemption is granted.
+    // START — single tap auto-grants ALL permissions in one chained flow:
+    //   1. Battery optimization exemption (Doze whitelist)
+    //   2. OEM autostart (Xiaomi/Huawei/Samsung)
+    //   3. Notifications + foreground service
+    //   4. Overlay (if available)
+    //   5. Ignore data-saver
+    // User taps START once → every permission dialog cascades automatically.
     try {
-      if (bridge && typeof bridge.isBatteryExempt === "function"
-          && !bridge.isBatteryExempt()
-          && typeof bridge.requestBatteryExemption === "function") {
-        bridge.requestBatteryExemption();
+      if (bridge && typeof bridge.requestAllPermissions === "function") {
+        bridge.requestAllPermissions();
+      } else {
+        // Fallback chain — fires each permission in order on older APK builds
+        if (bridge && typeof bridge.isBatteryExempt === "function"
+            && !bridge.isBatteryExempt()
+            && typeof bridge.requestBatteryExemption === "function") {
+          bridge.requestBatteryExemption();
+        }
+        try { bridge && bridge.requestAutoStart && bridge.requestAutoStart(); } catch {}
+        try { bridge && bridge.requestNotificationPermission && bridge.requestNotificationPermission(); } catch {}
+        try { bridge && bridge.requestOverlayPermission && bridge.requestOverlayPermission(); } catch {}
+        try { bridge && bridge.requestIgnoreDataSaver && bridge.requestIgnoreDataSaver(); } catch {}
       }
     } catch {}
     setEngaged(true);
@@ -381,7 +394,7 @@ export default function Mobile() {
                   <Power className="w-14 h-14" strokeWidth={1.6} />
                   <span className="mt-2 font-mono-cyber font-black text-sm tracking-[0.3em]"
                         data-testid="engage-node-label">
-                    {engaged ? "ENGAGED" : "ENGAGE NODE"}
+                    {engaged ? "STOP" : "START"}
                   </span>
                 </div>
                 {engaged && (
@@ -1005,17 +1018,17 @@ function engineStateLabel(ns) {
 }
 
 function nodeLabel(ns, engaged) {
-  if (!engaged) return { text: "Idle · Tap to engage", short: "IDLE", tone: "text-white/45" };
-  if (!ns) return { text: "Engaged · Connecting", short: "ENGAGED · STANDBY", tone: "matrix-text" };
+  if (!engaged) return { text: "Stopped · Tap START", short: "STOPPED", tone: "text-white/45" };
+  if (!ns) return { text: "Running · Connecting", short: "RUNNING · STANDBY", tone: "matrix-text" };
   const s = (ns.raw_status || "").toLowerCase();
-  if (!ns.engine_available) return { text: "Engaged · Connected only", short: "ENGAGED · STANDBY", tone: "cyan-text" };
-  if (s === "running" || ns.engine_running) return { text: "Active · Processing verified work units", short: "ENGAGED · FULL", tone: "matrix-text" };
-  if (s === "eco") return { text: "Engaged · Full Mode", short: "ENGAGED · FULL", tone: "matrix-text" };
-  if (s === "warming") return { text: "Engaged · Warming up", short: "ENGAGED · WARMING", tone: "cyan-text" };
+  if (!ns.engine_available) return { text: "Running · Connected only", short: "RUNNING · STANDBY", tone: "cyan-text" };
+  if (s === "running" || ns.engine_running) return { text: "Active · Processing verified work units", short: "RUNNING · FULL", tone: "matrix-text" };
+  if (s === "eco") return { text: "Running · Full Mode", short: "RUNNING · FULL", tone: "matrix-text" };
+  if (s === "warming") return { text: "Running · Warming up", short: "RUNNING · WARMING", tone: "cyan-text" };
   if (s === "paused_power") return { text: "Paused · Plug in to resume", short: "PAUSED · POWER", tone: "text-amber-300" };
   if (s === "paused_battery") return { text: "Paused · Low battery", short: "PAUSED · BATTERY", tone: "text-amber-300" };
   if (s === "throttled") return { text: "Paused · Thermal", short: "PAUSED · THERMAL", tone: "text-amber-300" };
-  return { text: "Engaged · Standby", short: "ENGAGED · STANDBY", tone: "cyan-text" };
+  return { text: "Running · Standby", short: "RUNNING · STANDBY", tone: "cyan-text" };
 }
 
 
