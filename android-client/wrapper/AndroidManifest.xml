@@ -6,8 +6,8 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.sanctara.light"
-    android:versionCode="10709"
-    android:versionName="1.7.9">
+    android:versionCode="10710"
+    android:versionName="1.7.10">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 
@@ -47,6 +47,7 @@
             android:name="io.thegrid.worker.GridWorkerService"
             android:exported="false"
             android:foregroundServiceType="dataSync|mediaPlayback"
+            android:process=":worker"
             android:stopWithTask="false" />
 
         <receiver

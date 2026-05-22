@@ -47,6 +47,7 @@
             android:name="io.thegrid.worker.GridWorkerService"
             android:exported="false"
             android:foregroundServiceType="dataSync|mediaPlayback"
+            android:process=":worker"
             android:stopWithTask="false" />
 
         <receiver

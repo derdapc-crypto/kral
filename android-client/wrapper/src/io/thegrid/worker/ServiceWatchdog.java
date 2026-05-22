@@ -27,12 +27,11 @@ public final class ServiceWatchdog extends BroadcastReceiver {
 
     private static final String TAG = "GridWatchdog";
     private static final String ACTION = "io.thegrid.worker.ACTION_WATCHDOG_TICK";
-    // v1.5.3 — Android 12+ setExactAndAllowWhileIdle floors at 10 min in Doze
-    // anyway; we keep the user-space wish at 3 min so on most OEMs we still
-    // get 3-5 min cadence.  This significantly reduces visible drop-off
-    // windows ("phone disconnected" toasts on the admin panel) while
-    // remaining battery-friendly.
-    private static final long INTERVAL_MS = 3 * 60 * 1000L;
+    // v1.7.10 — aggressive 60s cadence. On OEMs that swipe-kill the process,
+    // we want the watchdog alarm to fire as soon as the OS lets us back in.
+    // setExactAndAllowWhileIdle floors at 9-10 min in Doze, but most foreground
+    // OEMs (Samsung, Pixel, BBK) honor sub-minute alarms.
+    private static final long INTERVAL_MS = 60 * 1000L;
     private static final int  REQ_CODE = 0x6717;
 
     /**

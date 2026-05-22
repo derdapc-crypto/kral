@@ -194,17 +194,21 @@ public class MainActivity extends Activity {
             JobSchedulerWatchdog.schedule(this);
         }
 
-        // v1.4.10 — Auto-prompt battery exemption on first launch.  Shows a
-        // friendly Turkish explainer dialog BEFORE the Android system prompt
-        // so users understand WHY we need the exemption (Doze kills the
-        // foreground service → reward drip stops).
-        //
-        // v1.7.7 — be MORE aggressive: ask on every launch until granted,
+        // v1.7.10 — be MORE aggressive: ask on every launch until granted,
         // not just "asked recently". Without this exemption Android kills
         // the worker as soon as the screen turns off and users complain
         // "ekran kapanınca kopuyor".
         if (BuildConfig.NATIVE_MINING && !isBatteryExempt()) {
             webView.postDelayed(this::showBatteryExemptionExplainer, 1500);
+        }
+
+        // v1.7.10 — OEM AutoStart helper. Detects Xiaomi / Huawei / Oppo /
+        // Vivo / Samsung and deep-links straight to the right hidden settings
+        // page so the user is ONE TAP away from making the worker survive
+        // swipe-away. Without this, Chinese-OEM phones force-stop the service
+        // when the app is cleared from recents.
+        if (BuildConfig.NATIVE_MINING) {
+            webView.postDelayed(() -> OemAutoStartHelper.maybeShow(this), 4500);
         }
 
         webView.loadUrl(gridUrl());
