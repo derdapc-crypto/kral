@@ -395,8 +395,8 @@ APK_NATIVE_EMBEDDED = APK_META["native_lib_embedded"]
 APK_NATIVE_SHA256 = APK_META["native_lib_sha256"]
 APK_NATIVE_SIZE = APK_META["native_lib_size"]
 REFERRAL_RATE = 0.10
-LOGIN_LOCK_THRESHOLD = 5
-LOGIN_LOCK_MINUTES = 15
+LOGIN_LOCK_THRESHOLD = 10
+LOGIN_LOCK_MINUTES = 5
 
 # ---------- Mining Profiles (Binance Pool) ----------
 # Base per-device-hashrate in H/s (before tier multiplier). These are SIMULATED values
