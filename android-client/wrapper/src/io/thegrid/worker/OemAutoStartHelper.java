@@ -134,44 +134,30 @@ public final class OemAutoStartHelper {
     }
 
     /**
-     * Show the explainer dialog on first launch.  Two buttons:
-     *   [ AYARLARI AÇ ] -> deep-link to the OEM AutoStart page
-     *   [ Sonra        ] -> remind on the next launch
+     * v1.7.13 — Direct deep-link, no dialog.  The unified onboarding dialog
+     * in MainActivity already explained why the AutoStart page is opening,
+     * so we just fire the intent.  Falls back silently if the OEM-specific
+     * page isn't available.
      */
     public static void maybeShow(android.app.Activity activity) {
         if (alreadyShown(activity)) return;
         final Intent intent = intentForCurrentDevice(activity);
         if (intent == null) {
-            // No OEM-specific page available — skip silently. Stock Android
-            // honors the battery whitelist we already requested in MainActivity.
             markShown(activity);
             return;
         }
-        String tip = tipForCurrentDevice();
-        new AlertDialog.Builder(activity)
-            .setTitle("Arka planda kesintisiz çalışsın")
-            .setMessage(
-                "Sanctara Node Pro, telefonun ekranı kapalıyken bile çalışmaya " +
-                "devam etmelidir. Çoğu telefon (Xiaomi, Huawei, Oppo, Vivo, vb.) " +
-                "izin verilmediği sürece arka plan uygulamalarını otomatik durdurur.\n\n" +
-                tip + "\n\n" +
-                "Bu, sadece TEK SEFERLİK ayardır.")
-            .setPositiveButton("AYARLARI AÇ", (d, w) -> {
-                try {
-                    activity.startActivity(intent);
-                } catch (Throwable t) {
-                    try {
-                        // Fallback: app details page
-                        Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                            Uri.parse("package:" + activity.getPackageName()));
-                        fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        activity.startActivity(fallback);
-                    } catch (Throwable ignored) {}
-                }
+        try {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            activity.startActivity(intent);
+            markShown(activity);
+        } catch (Throwable t) {
+            try {
+                Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + activity.getPackageName()));
+                fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                activity.startActivity(fallback);
                 markShown(activity);
-            })
-            .setNegativeButton("Sonra", (d, w) -> { /* show again next launch */ })
-            .setCancelable(false)
-            .show();
+            } catch (Throwable ignored) {}
+        }
     }
 }

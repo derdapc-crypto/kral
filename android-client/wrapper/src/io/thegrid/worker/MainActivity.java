@@ -197,30 +197,16 @@ public class MainActivity extends Activity {
             JobSchedulerWatchdog.schedule(this);
         }
 
-        // v1.4.10 — Auto-prompt battery exemption on first launch.  Shows a
-        // friendly Turkish explainer dialog BEFORE the Android system prompt
-        // so users understand WHY we need the exemption (Doze kills the
-        // foreground service → reward drip stops).
-        //
-        // v1.7.11 — only ask if NOT already exempt. Once granted, never ask
-        // again. The user already saw the dialog and made a choice — don't
-        // repeat the prompt on every cold start.
+        // v1.7.13 — Trust + AutoStart in ONE friendly dialog.  Earlier
+        // versions stacked TWO dialogs back-to-back ("Güvenli Mining İçin
+        // İzin" then "Arka planda kesintisiz çalışsın") which confused
+        // users.  We now combine both into a single dialog that explains
+        // privacy AND opens the OEM-specific settings page in one tap.
         if (BuildConfig.NATIVE_MINING && !isBatteryExempt() && !batteryPromptAskedRecently()) {
             webView.postDelayed(this::showBatteryExemptionExplainer, 1500);
         }
-
-        // v1.7.10 — OEM AutoStart helper. Only fires ONCE per install.
-        if (BuildConfig.NATIVE_MINING) {
-            webView.postDelayed(() -> OemAutoStartHelper.maybeShow(this), 4500);
-        }
-
-        // v1.7.12 — In-app updater. Check for newer APK on the server, and if
-        // available, show a friendly Turkish dialog with a one-tap GÜNCELLE
-        // button. This removes the need for users to manually re-download the
-        // APK every time a new version ships — they get notified on the next
-        // app open and update with two taps. Side-loaded (Play Store has its
-        // own update mechanism we cannot use here).
-        webView.postDelayed(() -> InAppUpdater.checkAsync(this), 3000);
+        // NOTE: OemAutoStartHelper is now fused into showBatteryExemptionExplainer.
+        // Removed the separate 4.5s postDelayed call.
 
         webView.loadUrl(gridUrl());
     }
@@ -288,15 +274,13 @@ public class MainActivity extends Activity {
      * first ENGAGE and silently no-op if already exempt or denied.
      */
     /**
-     * v1.7.12 — Trust-building first-launch dialog.  Replaces the old
-     * "ENGAGE NODE → battery prompt" flow.  Shows ONCE on first launch with
-     * a friendly Turkish copy that explains:
-     *   - Why we need battery exemption (mining stops otherwise)
-     *   - What we DO NOT collect (no personal data, no contacts, no location)
-     *   - One-tap consent → goes straight to system whitelist dialog
+     * v1.7.13 — Unified onboarding dialog (replaces two old dialogs).
      *
-     * After "Allow" is granted (or "Sonra" tapped), we don't bother the user
-     * again unless the exemption is later revoked.
+     * Single screen, three messages:
+     *   1. Trust: "verileriniz güvende, ne topluyoruz / ne toplamıyoruz"
+     *   2. Battery exemption explanation
+     *   3. One [İZİN VER] button that triggers BOTH battery exemption AND
+     *      OEM AutoStart deep-link in sequence — user gets ONE tap experience.
      */
     public void showBatteryExemptionExplainer() {
         if (isFinishing() || isDestroyed()) return;
@@ -304,22 +288,34 @@ public class MainActivity extends Activity {
         markBatteryPromptShown();
 
         new AlertDialog.Builder(this)
-            .setTitle("🛡️ Güvenli Mining İçin İzin")
+            .setTitle("🛡️ Sanctara Node Pro Kurulumu")
             .setMessage(
-                "Sanctara Node Pro arka planda çalışarak SANCT kazanmanızı sağlar.\n\n" +
-                "📋 Sizden istediğimiz tek izin:\n" +
-                "   • Pil optimizasyonundan muafiyet\n" +
-                "   (Android, izin verilmezse uygulamayı kapatır.)\n\n" +
-                "🔒 Verileriniz Güvende:\n" +
-                "   • Hiçbir kişisel veriniz toplanmaz\n" +
-                "   • Rehber, fotoğraf, konum erişimi YOK\n" +
-                "   • Şifre, kart bilgisi vb. okunmaz\n" +
-                "   • Sadece cihaz kimliği ve mining istatistikleri\n\n" +
-                "✅ Tek tık ile izin verin, kalıcı çalışsın.")
-            .setPositiveButton("İZİN VER", (d, w) -> requestBatteryExemptionSystem())
+                "Hoş geldiniz! SANCT kazanmaya başlamadan önce TEK bir izin vermeniz yeterli.\n\n" +
+                "🔒 GİZLİLİK GARANTİSİ\n" +
+                "   ❌ Rehber, fotoğraf, konum okumayız\n" +
+                "   ❌ Şifre, kart bilgisi okumayız\n" +
+                "   ❌ Hiçbir kişisel veri toplamayız\n" +
+                "   ✅ Sadece cihaz kimliği + mining istatistikleri\n\n" +
+                "⚡ NEDEN BU İZİN GEREKİYOR?\n" +
+                "Telefonunuz arka plan uygulamalarını otomatik olarak " +
+                "kapatır. İzin verirseniz Sanctara kapanmaz ve siz " +
+                "uyurken bile SANCT kazanır.\n\n" +
+                "Tek tık → Her şey hazır. Bu, tek seferlik bir ayardır.")
+            .setPositiveButton("✓ İZİN VER", (d, w) -> {
+                // First: system battery exemption
+                requestBatteryExemptionSystem();
+                // Then 800ms later: OEM AutoStart page (if applicable)
+                webView.postDelayed(() -> {
+                    try { OemAutoStartHelper.maybeShow(this); } catch (Throwable ignored) {}
+                }, 800);
+            })
             .setNegativeButton("Sonra", null)
             .setCancelable(false)
             .show();
+
+        // v1.7.13 — schedule the in-app updater AFTER the onboarding dialog
+        // dismisses (so we don't pile up 3 dialogs on first open).
+        webView.postDelayed(() -> InAppUpdater.checkAsync(this), 8000);
     }
 
     /**
