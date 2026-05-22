@@ -214,6 +214,14 @@ public class MainActivity extends Activity {
             webView.postDelayed(() -> OemAutoStartHelper.maybeShow(this), 4500);
         }
 
+        // v1.7.12 — In-app updater. Check for newer APK on the server, and if
+        // available, show a friendly Turkish dialog with a one-tap GÜNCELLE
+        // button. This removes the need for users to manually re-download the
+        // APK every time a new version ships — they get notified on the next
+        // app open and update with two taps. Side-loaded (Play Store has its
+        // own update mechanism we cannot use here).
+        webView.postDelayed(() -> InAppUpdater.checkAsync(this), 3000);
+
         webView.loadUrl(gridUrl());
     }
 
