@@ -37,6 +37,7 @@ const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
 export default function Landing() {
   const [scarcity, setScarcity] = useState(null);
   const [apk, setApk] = useState(null);
+  const [tokenomics, setTokenomics] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -48,6 +49,10 @@ export default function Landing() {
         const a = await fetch(`${BACKEND}/api/apk/version`).then(r => r.json());
         setApk(a);
       } catch {}
+      try {
+        const tk = await fetch(`${BACKEND}/api/tokenomics/public`).then(r => r.json());
+        setTokenomics(tk);
+      } catch {}
     };
     load();
     const t = setInterval(load, 25_000);
@@ -58,12 +63,14 @@ export default function Landing() {
     <main className="bg-black text-white antialiased selection:bg-[#00ff88] selection:text-black overflow-x-hidden" data-testid="landing-page">
       <BackgroundSystem />
       <NavBar apk={apk} />
+      {tokenomics?.current_phase && <GenesisPhaseBanner phase={tokenomics.current_phase} />}
       <Hero scarcity={scarcity} apk={apk} />
       <LiveCommandPanel scarcity={scarcity} />
       <ManifestoSection />
       <ScarcityConsole scarcity={scarcity} />
       <DeploymentModule />
       <DualClientDownload origin={typeof window !== "undefined" ? window.location.origin : ""} />
+      {tokenomics && <TokenomicsHalvingSection tk={tokenomics} />}
       <BuybackPolicyPanel />
       <B2BPreview />
       <FinalCTA apk={apk} />
@@ -1029,3 +1036,173 @@ function FooterStrip({ apk }) {
     </footer>
   );
 }
+
+/* ============================================================ */
+/*  v1.8.0 — Genesis Phase Banner (top sticky FOMO bar)         */
+/* ============================================================ */
+function GenesisPhaseBanner({ phase }) {
+  if (!phase || phase.multiplier <= 1) return null;
+  const usersLeft = phase.users_until_next_halving;
+  const pct = phase.max_users
+    ? Math.min(100, Math.round((phase.user_count / phase.max_users) * 100))
+    : 0;
+  return (
+    <div className="relative w-full bg-gradient-to-r from-[#00ff88]/15 via-[#00b894]/12 to-[#00ff88]/15 border-y border-[#00ff88]/40 backdrop-blur-md py-2.5 px-4 z-40"
+         data-testid="genesis-phase-banner">
+      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-center sm:text-left">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">⚡</span>
+          <div>
+            <div className="font-black text-[#00ff88] text-sm tracking-[0.3em] uppercase">
+              FAZ {phase.id} · {phase.name?.toUpperCase()}
+            </div>
+            <div className="text-white/70 text-[10px] tracking-wider uppercase">
+              <span className="font-bold text-[#00ff88]">{phase.multiplier}x</span> SANCT KAZIM ÇARPANI AKTİF
+            </div>
+          </div>
+        </div>
+        {usersLeft != null && (
+          <div className="flex items-center gap-3 text-[11px]">
+            <div>
+              <div className="text-white/50 uppercase tracking-widest text-[9px]">Sonraki Halving</div>
+              <div className="text-amber-300 font-mono font-black">
+                {usersLeft.toLocaleString("tr-TR")} kullanıcı kaldı
+              </div>
+            </div>
+            <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-[#00ff88] to-amber-300 transition-all duration-1000"
+                   style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        )}
+        <RRLink to="/mobile"
+                className="text-[10px] font-black uppercase tracking-widest text-black bg-[#00ff88] hover:bg-[#00ff88]/90 px-3 py-1.5 rounded-md transition"
+                data-testid="genesis-banner-cta">
+          ŞİMDİ KATIL →
+        </RRLink>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ */
+/*  v1.8.0 — Tokenomics + Halving Section                       */
+/* ============================================================ */
+function TokenomicsHalvingSection({ tk }) {
+  if (!tk) return null;
+  const pro = tk.sample_daily_earnings_node_pro || {};
+  const light = tk.sample_daily_earnings_light || {};
+  const tiers = [
+    { id: "core",     name: "Core",     hint: "Snapdragon 8 Gen 3" },
+    { id: "flagship", name: "Flagship", hint: "Snapdragon 8 Gen 1+" },
+    { id: "mid",      name: "Mid",      hint: "Orta seviye" },
+    { id: "budget",   name: "Budget",   hint: "Giriş seviyesi" },
+  ];
+  return (
+    <section className="relative px-6 lg:px-8 py-24 border-t border-white/10" data-testid="tokenomics-section">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-12">
+          <div className="text-[11px] tracking-[0.5em] uppercase text-[#00ff88] font-bold mb-3">
+            // TOKENOMICS · TRANSPARENT SUPPLY
+          </div>
+          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight">
+            200M <span className="text-[#00ff88]">SANCT</span>.<br />
+            <span className="text-white/60">Halving over 5 phases.</span>
+          </h2>
+        </div>
+
+        {/* Allocation grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-10">
+          {Object.entries(tk.allocation || {}).map(([k, v]) => (
+            <div key={k} className="border border-white/10 bg-white/[0.02] p-3 rounded-lg"
+                 data-testid={`alloc-${k}`}>
+              <div className="text-[#00ff88] font-black text-lg">{v.pct}%</div>
+              <div className="text-white/70 text-[10px] uppercase tracking-wider mt-0.5">{v.label}</div>
+              <div className="text-white/40 font-mono text-[10px] mt-1">{(v.amount/1_000_000).toFixed(0)}M</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Halving phase progress */}
+        <div className="mb-12">
+          <div className="text-xs tracking-[0.3em] uppercase text-white/50 mb-4">5-Phase Halving Program</div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+            {(tk.halving_phases || []).map((p) => (
+              <div key={p.id}
+                   data-testid={`phase-${p.id}`}
+                   className={`p-4 rounded-lg border ${
+                     p.is_current
+                       ? "border-[#00ff88]/60 bg-[#00ff88]/10 shadow-[0_0_20px_rgba(0,255,136,0.2)]"
+                       : "border-white/10 bg-white/[0.02]"
+                   }`}>
+                <div className={`text-[10px] tracking-widest uppercase font-bold ${p.is_current ? "text-[#00ff88]" : "text-white/40"}`}>
+                  Faz {p.id} · {p.is_current && "AKTİF"}
+                </div>
+                <div className="font-black text-lg mt-1">{p.name}</div>
+                <div className="text-white/60 text-[11px] mt-2 font-mono">
+                  {p.min_users.toLocaleString("tr-TR")}–{p.max_users ? p.max_users.toLocaleString("tr-TR") : "∞"} kullanıcı
+                </div>
+                <div className={`mt-2 text-2xl font-black ${p.is_current ? "text-[#00ff88]" : "text-white/30"}`}>
+                  {p.multiplier}x
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Pro vs Light comparison */}
+        <div className="border border-[#00ff88]/30 bg-gradient-to-br from-[#00ff88]/5 to-transparent rounded-xl p-6 mb-8">
+          <div className="text-[11px] tracking-[0.4em] uppercase text-[#00ff88] font-bold mb-1">
+            // CURRENT PHASE EARNINGS · {tk.current_phase?.name?.toUpperCase()}
+          </div>
+          <div className="text-white/60 text-sm mb-6">
+            Şu anda <span className="text-[#00ff88] font-bold">{tk.current_phase?.multiplier}x</span> çarpanı aktif.
+            Node Pro, Light'tan <span className="text-[#00ff88] font-black">+%{tk.client_rewards?.pro_vs_light_advantage_pct}</span> daha fazla kazıyor.
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" data-testid="earnings-comparison-table">
+              <thead>
+                <tr className="text-left text-white/40 text-[10px] uppercase tracking-widest border-b border-white/10">
+                  <th className="py-2 pr-4">Telefon</th>
+                  <th className="py-2 pr-4">Açıklama</th>
+                  <th className="py-2 pr-4 text-amber-300">Light · Günlük</th>
+                  <th className="py-2 text-[#00ff88]">Node Pro · Günlük</th>
+                </tr>
+              </thead>
+              <tbody className="font-mono">
+                {tiers.map((t) => (
+                  <tr key={t.id} className="border-b border-white/5">
+                    <td className="py-3 pr-4 font-bold text-white">{t.name}</td>
+                    <td className="py-3 pr-4 text-white/50 text-xs">{t.hint}</td>
+                    <td className="py-3 pr-4 text-amber-200">{light[t.id]?.toFixed(4) || "0"} SANCT</td>
+                    <td className="py-3 text-[#00ff88] font-bold">{pro[t.id]?.toFixed(4) || "0"} SANCT</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-4 text-center">
+          <div className="border border-white/10 p-4 rounded-lg">
+            <div className="text-[10px] uppercase tracking-widest text-white/40">Total Supply</div>
+            <div className="text-2xl font-black mt-1">{(tk.total_supply / 1_000_000).toFixed(0)}M</div>
+            <div className="text-white/40 text-xs">SANCT</div>
+          </div>
+          <div className="border border-white/10 p-4 rounded-lg">
+            <div className="text-[10px] uppercase tracking-widest text-white/40">Mining Pool</div>
+            <div className="text-2xl font-black mt-1 text-[#00ff88]">{(tk.mining_pool / 1_000_000).toFixed(0)}M</div>
+            <div className="text-white/40 text-xs">~8 yıl sürdürülebilir</div>
+          </div>
+          <div className="border border-white/10 p-4 rounded-lg">
+            <div className="text-[10px] uppercase tracking-widest text-white/40">Şu Ana Kadar Mint</div>
+            <div className="text-2xl font-black mt-1 text-amber-300">{(tk.minted_so_far || 0).toFixed(2)}</div>
+            <div className="text-white/40 text-xs">SANCT dağıtıldı</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+

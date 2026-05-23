@@ -407,6 +407,51 @@ export default function Mobile() {
                   </div>
                 </button>
               )}
+              {/* v1.8.0 — Pro upgrade incentive banner shown ONLY to Light APK users.
+                  Detection: native bridge present but RandomX engine NOT available
+                  → user is on Light flavor → show 4x earnings upgrade banner. */}
+              {isNative && nodeStatus?.engine_available === false && (
+                <a
+                  href="/sanctara-node-pro.apk"
+                  download
+                  onClick={() => { try { fetch(`${process.env.REACT_APP_BACKEND_URL}/api/apk/track-download`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({flavor:"node_pro_from_light_upsell"}), keepalive:true }).catch(()=>{}); } catch {} }}
+                  data-testid="light-to-pro-upsell"
+                  className="mt-3 px-4 py-3 rounded-2xl border-2 border-[#00ff88]/60 bg-gradient-to-br from-[#00ff88]/15 to-[#00b894]/10 hover:from-[#00ff88]/25 hover:to-[#00b894]/20 transition-all flex flex-col items-start gap-1.5 max-w-xs shadow-[0_0_20px_rgba(0,255,136,0.2)]">
+                  <div className="flex items-center gap-2 w-full">
+                    <span className="text-xl">⚡</span>
+                    <div className="flex-1">
+                      <div className="font-black text-[#00ff88] text-xs tracking-widest uppercase">
+                        NODE PRO'YA GEÇ
+                      </div>
+                      <div className="text-[10px] text-white/60 uppercase tracking-wider">
+                        {forecast?.client_rewards?.pro_advantage_pct
+                          ? `+%${forecast.client_rewards.pro_advantage_pct} DAHA FAZLA SANCT`
+                          : "+%300 DAHA FAZLA SANCT"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-white/80 leading-snug">
+                    Şu anda <span className="text-amber-300 font-bold">Light</span> kullanıyorsun.{" "}
+                    <span className="cyan-text font-bold">Node Pro</span> 4 kat hızlı kazıyor —
+                    aynı telefon, aynı süre, <span className="text-[#00ff88] font-black">4x SANCT</span>.
+                  </div>
+                  {forecast?.client_rewards && (
+                    <div className="mt-1 grid grid-cols-2 gap-1.5 w-full text-[10px]">
+                      <div className="bg-amber-400/10 border border-amber-400/30 rounded-lg p-1.5">
+                        <div className="text-amber-300 font-bold uppercase tracking-wider text-[9px]">Light (Şu an)</div>
+                        <div className="text-amber-100 font-mono">{forecast.client_rewards.light.daily_tgc} SANCT/gün</div>
+                      </div>
+                      <div className="bg-[#00ff88]/15 border border-[#00ff88]/40 rounded-lg p-1.5">
+                        <div className="text-[#00ff88] font-bold uppercase tracking-wider text-[9px]">Pro (Yeni)</div>
+                        <div className="text-[#00ff88] font-mono font-bold">{forecast.client_rewards.node_pro.daily_tgc} SANCT/gün</div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="text-[10px] text-[#00ff88] font-bold uppercase tracking-widest mt-1">
+                    → APK'YI İNDİR
+                  </div>
+                </a>
+              )}
               {err && <div className="mt-2 text-xs text-red-400" data-testid="mobile-err">{err}</div>}
             </div>
 

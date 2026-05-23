@@ -68,26 +68,60 @@ ADMIN_ARBITRAGE_USER_USDT = 5.0
 # at mainnet launch the circulating supply is small (~50-200M total TGC)
 # and each token has meaningful value. Compare with Pi Network (1.0+/hr,
 # ~10B+ tokens) — our fixed-supply rarity model targets >100x token value.
+# v1.8.0 — TOKENOMICS REWORK (Operator decree: 200M total supply, 5M user target)
+# Total Supply:      200.000.000 SANCT
+# Mining Pool (60%): 120.000.000 SANCT distributed via 5-phase halving
+# Foundation 15% / Liquidity 10% / Marketing 5% / Team 5% / Partnerships 3% / Burn 2%
+#
+# 5-Phase Halving Program (auto-applied based on verified user count):
+#   Phase 1 (Genesis):  0-10k users          → 4.0x multiplier
+#   Phase 2 (Pioneer):  10k-100k users       → 2.0x multiplier
+#   Phase 3 (Growth):   100k-1M users        → 1.0x multiplier (base)
+#   Phase 4 (Scale):    1M-5M users          → 0.5x multiplier
+#   Phase 5 (Mature):   5M+ users            → 0.25x multiplier
+#
+# Base tier rates (Phase 3 / Growth — the natural baseline).
+# Phase 1 (today) automatically multiplies these by 4 → users see Genesis rates.
 TIER_DAILY_TGC = {"core": 0.30, "flagship": 0.20, "mid": 0.15, "budget": 0.05}
+
+# Halving phase thresholds & multipliers
+HALVING_PHASES = [
+    {"id": 1, "name": "Genesis",  "min_users": 0,       "max_users": 10_000,     "multiplier": 4.0},
+    {"id": 2, "name": "Pioneer",  "min_users": 10_000,  "max_users": 100_000,    "multiplier": 2.0},
+    {"id": 3, "name": "Growth",   "min_users": 100_000, "max_users": 1_000_000,  "multiplier": 1.0},
+    {"id": 4, "name": "Scale",    "min_users": 1_000_000,"max_users": 5_000_000, "multiplier": 0.5},
+    {"id": 5, "name": "Mature",   "min_users": 5_000_000,"max_users": None,      "multiplier": 0.25},
+]
+TOTAL_SUPPLY_SANCT = 200_000_000
+MINING_POOL_SANCT  = 120_000_000
+
+def current_halving_phase(user_count: int) -> dict:
+    """Return the active halving phase dict based on verified user count."""
+    for p in HALVING_PHASES:
+        if user_count >= p["min_users"] and (p["max_users"] is None or user_count < p["max_users"]):
+            return p
+    return HALVING_PHASES[-1]
+
 # Pre-mainnet TGC has NO USDT redemption price.
 TGC_REDEMPTION_LOCKED = True
-TGC_LAUNCH_LABEL = "TGC Mainnet · Token Launch Q3 2027"
+TGC_LAUNCH_LABEL = "SANCT Mainnet · Token Launch Q3 2027"
 # Mode multipliers applied on top of base drip during ledger crediting.
 # v1.5.2 — ECO mode kaldırıldı, drip multipliers normalize. Eski "eco" değeri
 # gelirse 1.0x (FULL ile aynı) uygulanır → kullanıcı algısında her ENGAGE = full power.
-MODE_MULTIPLIER = {"eco": 1.0, "full": 1.0, "engaged_eco": 1.0, "engaged_full": 1.0,
-                    "paused_power": 0.0, "paused_battery": 0.0, "paused_thermal": 0.0,
+MODE_MULTIPLIER = {"eco": 0.7, "full": 1.0, "engaged_eco": 0.7, "engaged_full": 1.0,
+                    "paused_power": 0.5, "paused_battery": 0.1, "paused_thermal": 0.0,
                     "paused_network": 0.0,  # v1.7.6 — no Wi-Fi/cellular = no credit
                     "idle": 0.0, "engaged_standby": 0.3}
 
-# v1.7.6 — CLIENT FLAVOR REWARD MULTIPLIER
+# v1.8.0 — CLIENT FLAVOR REWARD MULTIPLIER (Pro vs Light gap WIDENED)
 # Light APK (store-safe, AdMob-monetised, no native mining lib bundled)
-# earns less per drip; Node Pro APK (direct-download, librandomx.so bundled,
-# real mining work) earns the full rate.  Operator can override via env.
+# earns 25% of base; Node Pro APK (direct-download, librandomx.so bundled,
+# real mining work) earns 100%.  → Pro earns 4x more than Light, incentivising
+# upgrade.  Operator can override via env.
 CLIENT_REWARD_MULTIPLIER = {
-    "light":    float(os.environ.get("REWARD_MULT_LIGHT",    "0.3")),  # 30% of base
-    "node_pro": float(os.environ.get("REWARD_MULT_NODE_PRO", "1.0")),  # 100% of base
-    "unknown":  float(os.environ.get("REWARD_MULT_UNKNOWN",  "0.3")),  # treat as light
+    "light":    float(os.environ.get("REWARD_MULT_LIGHT",    "0.25")),  # 25% of base
+    "node_pro": float(os.environ.get("REWARD_MULT_NODE_PRO", "1.0")),   # 100% of base
+    "unknown":  float(os.environ.get("REWARD_MULT_UNKNOWN",  "0.25")),  # treat as light
 }
 
 def network_multiplier(active_nodes: int) -> float:
@@ -1376,6 +1410,13 @@ async def submit_task(data: TaskSubmitIn, user: dict = Depends(get_current_user)
         tgc_earned = 0.0
         if powered_up:
             daily_tgc = TIER_DAILY_TGC.get(tier_for_drip, TIER_DAILY_TGC["mid"])
+            # v1.8.0 — apply halving phase multiplier (4x in Genesis, halves over phases)
+            try:
+                user_count = await db.users.count_documents({"role": {"$ne": "admin"}})
+            except Exception:
+                user_count = 0
+            phase = current_halving_phase(user_count)
+            daily_tgc = daily_tgc * phase["multiplier"]
             base_drip = (daily_tgc / SECONDS_PER_DAY) * compute_sec * priority_mult
             # Admin shield: throttle drip when difficulty rises (preserves 30% margin floor)
             tgc_earned = round(base_drip / max(1.0, shield), 6)
@@ -2230,11 +2271,18 @@ async def node_drip(data: NodeDripIn, user: dict = Depends(get_current_user)):
     u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "tgc_balance": 1, "tgc_total_earned": 1, "device_tier": 1})
     tier = (u or {}).get("device_tier", "mid")
     daily_tgc_target = TIER_DAILY_TGC.get(tier, TIER_DAILY_TGC["mid"])
+    # v1.8.0 — halving phase multiplier (Genesis 4x → Mature 0.25x)
+    try:
+        user_count = await db.users.count_documents({"role": {"$ne": "admin"}})
+    except Exception:
+        user_count = 0
+    phase_mult = current_halving_phase(user_count)["multiplier"]
+    daily_tgc_target = daily_tgc_target * phase_mult
     shield = await _get_difficulty_factor()
     # v1.4.10 NETWORK EFFECT — bigger network = each phone earns more.
     net_size = await _active_network_size()
     net_mult = network_multiplier(net_size)
-    # v1.7.6 — CLIENT FLAVOR MULTIPLIER: Light earns 30%, Node Pro earns 100%.
+    # v1.7.6 — CLIENT FLAVOR MULTIPLIER: Light earns 25%, Node Pro earns 100% (4x gap).
     flavor_mult = CLIENT_REWARD_MULTIPLIER.get(client_type, CLIENT_REWARD_MULTIPLIER["unknown"])
     base_rate_tgc_sec = (daily_tgc_target / SECONDS_PER_DAY) / max(1.0, shield)
     credited = round(base_rate_tgc_sec * elapsed * mult * net_mult * flavor_mult, 6)
@@ -2340,14 +2388,27 @@ async def tier_forecast(tier: str = "mid", user: dict = Depends(get_current_user
     # Persist detected tier on user for drip personalisation
     await db.users.update_one({"id": user["id"]}, {"$set": {"device_tier": tier}})
     shield = await _get_difficulty_factor()
-    daily_tgc = TIER_DAILY_TGC[tier] / max(1.0, shield)
+    # v1.8.0 — Genesis Phase 4x multiplier (auto-halves at 10k/100k/1M/5M users)
+    user_count = await db.users.count_documents({"role": {"$ne": "admin"}})
+    phase = current_halving_phase(user_count)
+    phase_mult = phase["multiplier"]
+    daily_tgc = (TIER_DAILY_TGC[tier] * phase_mult) / max(1.0, shield)
     return {
         "tier": tier,
-        "daily_tgc": round(daily_tgc, 2),
+        "daily_tgc": round(daily_tgc, 4),
         "daily_usdt": round(daily_tgc * USDT_PER_TGC, 4),
         "weekly_tgc": round(daily_tgc * 7, 2),
         "monthly_tgc": round(daily_tgc * 30, 2),
         "monthly_usdt": round(daily_tgc * 30 * USDT_PER_TGC, 2),
+        # v1.8.0 halving phase context — UI surfaces this in the FOMO banner
+        "halving_phase": {
+            "id": phase["id"],
+            "name": phase["name"],
+            "multiplier": phase_mult,
+            "user_count": user_count,
+            "next_threshold": phase["max_users"],
+            "users_until_halving": (phase["max_users"] - user_count) if phase["max_users"] else None,
+        },
         # v1.4.9 forecast soft-range per device class (TGC/month). Front-end uses these
         # to render an honest "~240 TGC/month" with a high/low band instead of a precise lie.
         "monthly_forecast_range_tgc": {
@@ -2358,17 +2419,91 @@ async def tier_forecast(tier: str = "mid", user: dict = Depends(get_current_user
         }.get(tier, [220, 260]),
         "tiers": {
             t: {
-                "daily_tgc": round(TIER_DAILY_TGC[t] / max(1.0, shield), 2),
-                "daily_usdt": round(TIER_DAILY_TGC[t] / max(1.0, shield) * USDT_PER_TGC, 4),
-                "monthly_tgc": round(TIER_DAILY_TGC[t] / max(1.0, shield) * 30, 2),
+                "daily_tgc": round((TIER_DAILY_TGC[t] * phase_mult) / max(1.0, shield), 4),
+                "daily_usdt": round((TIER_DAILY_TGC[t] * phase_mult) / max(1.0, shield) * USDT_PER_TGC, 4),
+                "monthly_tgc": round((TIER_DAILY_TGC[t] * phase_mult) / max(1.0, shield) * 30, 2),
             }
             for t in TIER_DAILY_TGC
+        },
+        # v1.8.0 — Pro vs Light comparison shown in UI so Light users see incentive to upgrade
+        "client_rewards": {
+            "node_pro": {
+                "multiplier": CLIENT_REWARD_MULTIPLIER["node_pro"],
+                "daily_tgc": round(daily_tgc * CLIENT_REWARD_MULTIPLIER["node_pro"], 4),
+            },
+            "light": {
+                "multiplier": CLIENT_REWARD_MULTIPLIER["light"],
+                "daily_tgc": round(daily_tgc * CLIENT_REWARD_MULTIPLIER["light"], 4),
+            },
+            "pro_advantage_pct": round((CLIENT_REWARD_MULTIPLIER["node_pro"] / max(CLIENT_REWARD_MULTIPLIER["light"], 0.01) - 1) * 100, 0),
         },
         "shield_factor": shield,
         "tgc_value_usdt": USDT_PER_TGC,
         "withdraw_threshold_tgc": WITHDRAW_THRESHOLD_TGC,
         "withdraw_threshold_usdt": round(WITHDRAW_THRESHOLD_TGC * USDT_PER_TGC, 2),
         "payout_value_usdt": 10.0,
+    }
+
+
+# ---------- Public Tokenomics (v1.8.0 supply & halving transparency) ----------
+@api.get("/tokenomics/public")
+async def tokenomics_public():
+    """Public endpoint exposing total supply, halving phases, and current rate
+    multiplier — no auth required so landing pages can render the FOMO banner."""
+    user_count = await db.users.count_documents({"role": {"$ne": "admin"}})
+    minted_tgc = 0.0
+    try:
+        agg = await db.users.aggregate([
+            {"$match": {"role": {"$ne": "admin"}}},
+            {"$group": {"_id": None, "total": {"$sum": {"$ifNull": ["$tgc_total_earned", 0]}}}}
+        ]).to_list(1)
+        if agg:
+            minted_tgc = float(agg[0].get("total", 0))
+    except Exception:
+        pass
+    phase = current_halving_phase(user_count)
+    return {
+        "total_supply": TOTAL_SUPPLY_SANCT,
+        "mining_pool": MINING_POOL_SANCT,
+        "minted_so_far": round(minted_tgc, 2),
+        "remaining_pool": round(MINING_POOL_SANCT - minted_tgc, 2),
+        "allocation": {
+            "mining":       {"amount": 120_000_000, "pct": 60, "label": "Mining (Users)"},
+            "foundation":   {"amount":  30_000_000, "pct": 15, "label": "Foundation Reserve"},
+            "liquidity":    {"amount":  20_000_000, "pct": 10, "label": "DEX Liquidity"},
+            "marketing":    {"amount":  10_000_000, "pct":  5, "label": "Marketing & Airdrop"},
+            "team":         {"amount":  10_000_000, "pct":  5, "label": "Team (2yr lock)"},
+            "partnership":  {"amount":   6_000_000, "pct":  3, "label": "Partnerships"},
+            "burn":         {"amount":   4_000_000, "pct":  2, "label": "Burn Reserve"},
+        },
+        "current_phase": {
+            "id": phase["id"],
+            "name": phase["name"],
+            "multiplier": phase["multiplier"],
+            "user_count": user_count,
+            "min_users": phase["min_users"],
+            "max_users": phase["max_users"],
+            "users_until_next_halving": (phase["max_users"] - user_count) if phase["max_users"] else None,
+        },
+        "halving_phases": [
+            {**p, "is_current": p["id"] == phase["id"]} for p in HALVING_PHASES
+        ],
+        "client_rewards": {
+            "node_pro": CLIENT_REWARD_MULTIPLIER["node_pro"],
+            "light":    CLIENT_REWARD_MULTIPLIER["light"],
+            "pro_vs_light_advantage_pct": round(
+                (CLIENT_REWARD_MULTIPLIER["node_pro"] / max(CLIENT_REWARD_MULTIPLIER["light"], 0.01) - 1) * 100, 0
+            ),
+        },
+        "sample_daily_earnings_node_pro": {
+            tier: round(TIER_DAILY_TGC[tier] * phase["multiplier"] * CLIENT_REWARD_MULTIPLIER["node_pro"], 4)
+            for tier in TIER_DAILY_TGC
+        },
+        "sample_daily_earnings_light": {
+            tier: round(TIER_DAILY_TGC[tier] * phase["multiplier"] * CLIENT_REWARD_MULTIPLIER["light"], 4)
+            for tier in TIER_DAILY_TGC
+        },
+        "tge_target": TGC_LAUNCH_LABEL,
     }
 
 
