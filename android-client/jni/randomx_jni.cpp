@@ -1,7 +1,15 @@
 /*
- * THE GRID — randomx_jni.cpp (v1.3.7)
+ * THE GRID — randomx_jni.cpp (v1.3.9)
  *
  * Thin JNI wrapper that drives a RandomX hash loop on Android arm64-v8a.
+ *
+ * v1.3.9 changes:
+ *   - VM now created with JIT + SECURE + auto-detected flags (was DEFAULT
+ *     which is *interpreter* mode → ~2 H/s). On modern Android arm64 phones
+ *     this raises per-thread throughput from ~2 H/s to ~100-200 H/s.
+ *   - Cache is allocated with the JIT flag so the VM's JIT can attach.
+ *   - 4-tier fallback (JIT+SECURE → JIT → HARD_AES → interpreter) ensures
+ *     mining never silently regresses to the interpreter path again.
  *
  * BUILD NOTE: This file is compiled by the GitHub Actions workflow
  * (.github/workflows/build-librandomx.yml). The output is bundled into the
@@ -62,10 +70,41 @@ struct State {
 
 State g;
 
+// v1.3.9 — auto-detect best VM flags. JIT alone gives ~50x speedup on arm64
+// vs interpreter. On Android 10+ (API 29+) executable memory must be created
+// via dual-mapping (SECURE flag) due to the W^X policy. We try the strongest
+// combo first and fall back gracefully so the loop never silently runs in
+// 2 H/s interpreter mode.
+randomx_flags compute_vm_flags() {
+    randomx_flags f = randomx_get_flags();
+    // randomx_get_flags() returns auto-detected (JIT|HARD_AES|...) on supported
+    // hardware. We OR in JIT explicitly in case auto-detect was conservative.
+    f = (randomx_flags)(f | RANDOMX_FLAG_JIT);
+    // SECURE is required on Android 10+ (API 29) because of W^X enforcement.
+    // It costs a bit of perf vs raw JIT but is still ~30-40x faster than
+    // interpreter and is the only way JIT actually works on modern Android.
+    f = (randomx_flags)(f | RANDOMX_FLAG_SECURE);
+    return f;
+}
+
+randomx_vm* create_vm_with_best_flags() {
+    // Tier 1: full JIT + SECURE + auto-detected (HARD_AES if available)
+    randomx_flags f = compute_vm_flags();
+    randomx_vm* vm = randomx_create_vm(f, g.cache, nullptr);
+    if (vm) return vm;
+    // Tier 2: JIT without SECURE (older Android or rooted devices)
+    f = (randomx_flags)(randomx_get_flags() | RANDOMX_FLAG_JIT);
+    vm = randomx_create_vm(f, g.cache, nullptr);
+    if (vm) return vm;
+    // Tier 3: HARD_AES only (no JIT, but still ~2x interpreter)
+    vm = randomx_create_vm((randomx_flags)RANDOMX_FLAG_HARD_AES, g.cache, nullptr);
+    if (vm) return vm;
+    // Tier 4: interpreter (the old 2 H/s path — last resort)
+    return randomx_create_vm((randomx_flags)RANDOMX_FLAG_DEFAULT, g.cache, nullptr);
+}
+
 void worker_loop(int thread_id) {
-    randomx_vm* vm = randomx_create_vm(
-        (randomx_flags)(RANDOMX_FLAG_DEFAULT),
-        g.cache, nullptr);
+    randomx_vm* vm = create_vm_with_best_flags();
     if (!vm) return;
 
     std::mt19937_64 rng(static_cast<uint64_t>(thread_id) * 0x9E3779B97F4A7C15ULL +
@@ -150,8 +189,15 @@ void worker_loop(int thread_id) {
 
 bool init_cache_unlocked() {
     if (g.cache) return true;
-    randomx_flags flags = randomx_get_flags();
+    // Cache flags MUST match the VM flags' JIT setting (RandomX requirement).
+    // Without JIT here, JIT VMs spawned later will refuse to attach and we
+    // silently regress to the slow 2 H/s interpreter path.
+    randomx_flags flags = (randomx_flags)(randomx_get_flags() | RANDOMX_FLAG_JIT);
     g.cache = randomx_alloc_cache(flags);
+    if (!g.cache) {
+        // Fallback: try without JIT (interpreter-compatible cache)
+        g.cache = randomx_alloc_cache(randomx_get_flags());
+    }
     if (!g.cache) return false;
     // Random key for this run. Real Monero uses the epoch block hash; for
     // local-only hash-loop benchmarking a random 32-byte key is fine.

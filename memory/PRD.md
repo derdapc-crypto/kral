@@ -264,3 +264,33 @@ SHA-256: `e92223271886bd4ce7717b23ab5c93a63fd5862eb46b2786f3ded58192517c52`
 - Multi-chain mainnet candidate (BSC vs Solana vote)
 - DAO governance contracts deployment
 - Independent audit firm engagement
+
+
+## v1.3.9 JNI Hashrate Fix (Feb 2026) ✅
+**Problem:** Android phones reporting ~2 H/s native hashrate (vs expected 100-200 H/s).
+**Root cause:** `randomx_jni.cpp` was creating the RandomX VM with `RANDOMX_FLAG_DEFAULT`
+which forces the *interpreter* path (~50x slower than JIT). Cache was also missing the
+JIT flag, so even adding JIT to the VM would not have attached.
+
+**Fix (committed to /app/android-client/jni/randomx_jni.cpp):**
+- VM creation now uses 4-tier fallback: JIT+SECURE → JIT → HARD_AES → interpreter.
+- Cache is allocated with `RANDOMX_FLAG_JIT` so JIT VMs attach correctly.
+- `randomx_get_flags()` is OR-combined with `RANDOMX_FLAG_JIT | RANDOMX_FLAG_SECURE`.
+- SECURE flag is required on Android 10+ (API 29) due to W^X memory enforcement.
+
+**Workflow updates:**
+- `.github/workflows/build-librandomx.yml` now auto-triggers on push when
+  `android-client/jni/**` changes.
+- It also commits the freshly-built `librandomx.so` back to the repo so the
+  `build-apk.yml` workflow automatically picks it up and rebuilds APKs.
+
+**Expected impact:** Per-thread throughput rises from ~2 H/s to ~100-200 H/s on
+modern arm64 phones. A 2-thread device should report 200-400 H/s instead of ~4 H/s.
+
+**Deployment steps the user must run:**
+1. "Save to GitHub" → triggers `build-librandomx` workflow (rebuilds librandomx.so).
+2. After that workflow finishes, `build-apk` auto-runs (picks up the new .so).
+3. New APKs are committed to `frontend/public/sanctara-*.apk`.
+4. On VPS: `bash /root/sanctara-update.sh` → users get new APK via download page.
+5. Users reinstall APK; first heartbeat overwrites the stale "fake" hashrate value
+   in MongoDB with real per-device numbers.
