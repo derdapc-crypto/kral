@@ -143,3 +143,5 @@ frontend/node_modules/.cache/default-development/38.pack
 frontend/node_modules/.cache/default-development/39.pack
 frontend/node_modules/.cache/default-development/39.pack
 frontend/public/deploy/sanctara-frontend-v5.tar.gz
+frontend/build/deploy/sanctara-frontend-v5.tar.gz
+frontend/public/deploy/sanctara-frontend-v6.tar.gz
