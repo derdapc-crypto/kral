@@ -32,7 +32,11 @@ case "$FLAVOR" in
     nodepro) PKG="io.sanctara.nodepro"; OUT_NAME="sanctara-node-pro.apk"; NATIVE_REQUIRED=1; ADMOB_ON=0 ;;
     *)       echo "[FATAL] Unknown FLAVOR='$FLAVOR' (expected: light | nodepro)" >&2; exit 2 ;;
 esac
-OUT_DEST="/app/frontend/public/${OUT_NAME}"
+# Auto-detect repo root so the same script works on the dev container (/app)
+# AND on GitHub Actions runners (/home/runner/work/<repo>/<repo>).
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+OUT_DEST="${REPO_ROOT}/frontend/public/${OUT_NAME}"
+mkdir -p "${REPO_ROOT}/frontend/public"
 
 # v1.3.7 — bundle librandomx.so when the GitHub Actions artifact is present.
 # Path: /app/android-client/wrapper/jniLibs/arm64-v8a/librandomx.so

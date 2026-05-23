@@ -61,7 +61,7 @@ jobs:
           FLAVOR: light
         run: |
           cd android-client
-          bash build-apk.sh || echo "Light build failed but continuing"
+          bash build-apk.sh
 
       - name: Build Node Pro APK
         env:
@@ -69,7 +69,7 @@ jobs:
           FLAVOR: nodepro
         run: |
           cd android-client
-          bash build-apk.sh || echo "Node Pro build failed (librandomx may be missing)"
+          bash build-apk.sh
 
       - name: List built APKs
         run: |
