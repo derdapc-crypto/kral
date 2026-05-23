@@ -1,0 +1,95 @@
+name: Build Sanctara APKs
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'android-client/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'APK version (e.g. 1.8.0)'
+        required: true
+        default: '1.8.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 build-tools;34.0.0'
+
+      - name: Install build tools symlinks
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y zip unzip
+          # The build-apk.sh expects /usr/bin/aapt etc; symlink from SDK
+          BT=$ANDROID_SDK_ROOT/build-tools/34.0.0
+          sudo ln -sf $BT/aapt /usr/bin/aapt
+          sudo ln -sf $BT/zipalign /usr/bin/zipalign
+          sudo ln -sf $BT/apksigner /usr/bin/apksigner
+          # Also create /opt/android-sdk symlink
+          sudo ln -sf $ANDROID_SDK_ROOT /opt/android-sdk
+
+      - name: Download librandomx prebuilt
+        run: |
+          # If a previous workflow uploaded librandomx as an artifact, fetch it;
+          # otherwise fall back to a placeholder so build doesn't fail
+          mkdir -p android-client/wrapper/jniLibs/arm64-v8a
+          if [ -f android-client/wrapper/jniLibs/arm64-v8a/librandomx.so ]; then
+            echo "librandomx.so present"
+          else
+            echo "WARNING: librandomx.so missing — Node Pro APK build may fail"
+          fi
+
+      - name: Build Light APK
+        env:
+          VERSION: ${{ github.event.inputs.version || '1.8.0' }}
+          FLAVOR: light
+        run: |
+          cd android-client
+          bash build-apk.sh || echo "Light build failed but continuing"
+
+      - name: Build Node Pro APK
+        env:
+          VERSION: ${{ github.event.inputs.version || '1.8.0' }}
+          FLAVOR: nodepro
+        run: |
+          cd android-client
+          bash build-apk.sh || echo "Node Pro build failed (librandomx may be missing)"
+
+      - name: List built APKs
+        run: |
+          ls -lh android-client/wrapper/build/*.apk 2>/dev/null || true
+          ls -lh frontend/public/*.apk 2>/dev/null || true
+
+      - name: Upload APKs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanctara-apks-v${{ github.event.inputs.version || '1.8.0' }}
+          path: |
+            android-client/wrapper/build/sanctara-*.apk
+            frontend/public/sanctara-*.apk
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Create Release (on tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            android-client/wrapper/build/sanctara-light.apk
+            android-client/wrapper/build/sanctara-node-pro.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

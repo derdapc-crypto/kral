@@ -197,16 +197,13 @@ public class MainActivity extends Activity {
             JobSchedulerWatchdog.schedule(this);
         }
 
-        // v1.7.13 — Trust + AutoStart in ONE friendly dialog.  Earlier
-        // versions stacked TWO dialogs back-to-back ("Güvenli Mining İçin
-        // İzin" then "Arka planda kesintisiz çalışsın") which confused
-        // users.  We now combine both into a single dialog that explains
-        // privacy AND opens the OEM-specific settings page in one tap.
-        if (BuildConfig.NATIVE_MINING && !isBatteryExempt() && !batteryPromptAskedRecently()) {
-            webView.postDelayed(this::showBatteryExemptionExplainer, 1500);
-        }
-        // NOTE: OemAutoStartHelper is now fused into showBatteryExemptionExplainer.
-        // Removed the separate 4.5s postDelayed call.
+        // v1.8.0 — operator decree: NO battery dialog at all. Pi Coin-style UX.
+        // User taps install → opens APK → sees /mobile page → taps START.
+        // Background survival is handled by:
+        //   1. Foreground service type=mediaPlayback (always-on)
+        //   2. SilentKeepAlive (Spotify-style 1Hz silent loop)
+        //   3. JobSchedulerWatchdog (auto-restart every 15min)
+        // No popups. No OEM redirects. No "permission denied" surfaces.
 
         webView.loadUrl(gridUrl());
     }
