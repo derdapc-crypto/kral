@@ -2620,7 +2620,21 @@ async def public_stats():
     except Exception:
         pass
 
-    mobile_native_hashrate = 0  # only > 0 once a real device heartbeat carries it
+    # v1.8.0 — sum real device-reported hashrates from active mobile devices.
+    # Only counts devices that are heartbeating, native_pow=true, and reporting
+    # a positive local_hashrate_hps. Browser-simulated / paused devices = 0.
+    from datetime import datetime, timezone, timedelta
+    fresh_cutoff = datetime.now(timezone.utc) - timedelta(seconds=180)
+    hp_pipeline = [
+        {"$match": {
+            "native_pow": True,
+            "local_hashrate_hps": {"$gt": 0},
+            "last_heartbeat": {"$gte": fresh_cutoff},
+        }},
+        {"$group": {"_id": None, "h": {"$sum": "$local_hashrate_hps"}}}
+    ]
+    hp_agg = await db.devices.aggregate(hp_pipeline).to_list(1)
+    mobile_native_hashrate = float(hp_agg[0]["h"]) if hp_agg and hp_agg[0].get("h") else 0.0
 
     # v1.4.10 — Network Effect Bonus surface for the public landing page.
     network_size = await _active_network_size()
@@ -4100,6 +4114,90 @@ async def admin_mining_revenue(user: dict = Depends(require_admin)):
         "monthly_usdt": round(daily_usdt * 30, 6),
         "yearly_usdt": round(daily_usdt * 365, 6),
         "nodes": stats["active_nodes"],
+    }
+
+
+@api.get("/admin/mobile-mining/metrics")
+async def admin_mobile_mining_metrics(user: dict = Depends(require_admin)):
+    """
+    v1.8.0 — Honest compute-split ledger for the admin panel.
+    Reconciles:
+      * backend_compute: server-side xmrig (currently DISABLED → always idle)
+      * mobile_compute:  live phone heartbeats with native_pow + librandomx
+      * total_compute:   sum of both lanes
+    A phone is only counted if it heartbeat'd in the last 180s.
+    """
+    from datetime import datetime, timezone, timedelta
+    fresh_cutoff = datetime.now(timezone.utc) - timedelta(seconds=180)
+
+    # -------- Mobile lane (phones) --------
+    connected_phones = await db.devices.count_documents({
+        "last_heartbeat": {"$gte": fresh_cutoff},
+    })
+    engaged_phones = await db.devices.count_documents({
+        "last_heartbeat": {"$gte": fresh_cutoff},
+        "mining_requested": True,
+    })
+    engine_active_phones = await db.devices.count_documents({
+        "last_heartbeat": {"$gte": fresh_cutoff},
+        "native_pow": True,
+        "local_hashrate_hps": {"$gt": 0},
+    })
+    hp_agg = await db.devices.aggregate([
+        {"$match": {
+            "last_heartbeat": {"$gte": fresh_cutoff},
+            "native_pow": True,
+            "local_hashrate_hps": {"$gt": 0},
+        }},
+        {"$group": {
+            "_id": None,
+            "hps": {"$sum": "$local_hashrate_hps"},
+            "accepted": {"$sum": {"$ifNull": ["$accepted_shares", 0]}},
+        }},
+    ]).to_list(1)
+    mobile_hps = float(hp_agg[0]["hps"]) if hp_agg else 0.0
+    mobile_accepted = int(hp_agg[0]["accepted"]) if hp_agg else 0
+
+    # -------- Backend lane (server xmrig — permanently disabled in v1.7+) --------
+    backend_running = False
+    backend_hashrate = 0.0
+    backend_accepted = 0
+    try:
+        import json as _json
+        rx_path = "/app/backend/miner/randomx_status.json"
+        if os.path.exists(rx_path):
+            with open(rx_path) as f:
+                rx = _json.load(f)
+            backend_running = bool(rx.get("running"))
+            backend_hashrate = float(rx.get("hashrate_hps") or 0.0)
+            backend_accepted = int(rx.get("accepted_shares") or 0)
+    except Exception:
+        pass
+
+    return {
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "backend_compute": {
+            "active": backend_running,
+            "hashrate_hps": backend_hashrate,
+            "accepted_outputs": backend_accepted,
+            "randomx_running": backend_running,
+            "sha256_running": False,
+        },
+        "mobile_compute": {
+            "active": engine_active_phones > 0,
+            "connected_phones": connected_phones,
+            "engaged_phones": engaged_phones,
+            "engine_active_phones": engine_active_phones,
+            "hashrate_hps": mobile_hps,
+            "accepted_outputs": mobile_accepted,
+        },
+        "total_compute": {
+            "active": (engine_active_phones > 0) or backend_running,
+            "hashrate_hps": backend_hashrate + mobile_hps,
+            "accepted_outputs": backend_accepted + mobile_accepted,
+            "active_workers": engine_active_phones + (1 if backend_running else 0),
+            "split_label": f"B{int(backend_hashrate)} · M{int(mobile_hps)}",
+        },
     }
 
 
