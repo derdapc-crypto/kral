@@ -25,10 +25,22 @@ else
     REMOTE_BRANCH="master"
 fi
 echo "→ Pulling origin/${REMOTE_BRANCH} (local branch: ${BRANCH})"
+# Discard runtime-only files the backend rewrites every tick — never blocks the pull.
+git checkout -- backend/miner/randomx_status.json 2>/dev/null || true
+git checkout -- backend/miner/status.json 2>/dev/null || true
+# Stash anything else the user touched locally so the pull never aborts.
+STASHED=0
+if ! git diff --quiet || ! git diff --cached --quiet; then
+    git stash push -u -m "sanctara-update-autostash-$(date +%s)" >/dev/null 2>&1 && STASHED=1 || true
+fi
 git fetch origin "${REMOTE_BRANCH}"
-git pull --rebase --autostash origin "${REMOTE_BRANCH}"
+git pull --rebase origin "${REMOTE_BRANCH}"
 # Set upstream so future plain `git pull` works
 git branch --set-upstream-to="origin/${REMOTE_BRANCH}" "${BRANCH}" 2>/dev/null || true
+# Restore any genuine local edits (best-effort; conflicts are surfaced).
+if [ "$STASHED" = "1" ]; then
+    git stash pop 2>/dev/null || echo "⚠ stash pop conflicted — your edits are still in 'git stash list'"
+fi
 
 echo ""
 echo "═══ 2. APK'ları frontend/build'e kopyala ═══"

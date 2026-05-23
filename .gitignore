@@ -28,6 +28,12 @@ next-env.d.ts
 # Production builds
 /build
 dist/
+
+# Backend runtime cache (written by miner watchdog at runtime; never commit)
+backend/miner/randomx_status.json
+backend/miner/status.json
+backend/miner/__pycache__/
+
 dist
 
 # Environment files (comprehensive coverage)
