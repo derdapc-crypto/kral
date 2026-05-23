@@ -384,9 +384,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.7.8"
-APK_PATH = "/grid-worker-v1.6.5.apk"
-APK_RELEASE_NOTES = "v1.6.5 RUNTIME-CONFIGURABLE BACKEND · APK ilk açılışta veya 'SUNUCU AYARI' butonuyla istediğin backend URL'sine bağlanır · Wi-Fi ZORUNLU DEĞİL (mobil veride de çalışır) · Admin Mining Config sekmesinden tüm fleet'i canlı yönet · v2+v3 signed"
+APK_VERSION = "1.8.0"
+APK_PATH = "/sanctara-node-pro.apk"
+APK_RELEASE_NOTES = "v1.8.0 NATIVE JIT MINING · RandomX VM artık JIT+SECURE flag'leri ile çalışıyor (interpreter yerine) — per-thread hashrate ~2 H/s → ~100-200 H/s · Sanctara Node Pro paketi · v2+v3 signed"
 
 
 def _compute_apk_meta() -> dict:
