@@ -15,7 +15,12 @@
 # Honest CLI-only pipeline — no Gradle, no Android Studio.
 set -euo pipefail
 
-cd "$(dirname "$0")/wrapper"
+# Resolve REPO_ROOT BEFORE any cd, using BASH_SOURCE so it's always the
+# script's actual location regardless of how it was invoked.
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+REPO_ROOT="$( cd "${SCRIPT_DIR}/.." && pwd )"
+
+cd "${SCRIPT_DIR}/wrapper"
 
 SDK=/opt/android-sdk
 # v1.6.5 — on ARM64 container hosts the Google-provided x86_64 build-tools
@@ -32,9 +37,7 @@ case "$FLAVOR" in
     nodepro) PKG="io.sanctara.nodepro"; OUT_NAME="sanctara-node-pro.apk"; NATIVE_REQUIRED=1; ADMOB_ON=0 ;;
     *)       echo "[FATAL] Unknown FLAVOR='$FLAVOR' (expected: light | nodepro)" >&2; exit 2 ;;
 esac
-# Auto-detect repo root so the same script works on the dev container (/app)
-# AND on GitHub Actions runners (/home/runner/work/<repo>/<repo>).
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Output goes to <repo_root>/frontend/public/ (already resolved at script top).
 OUT_DEST="${REPO_ROOT}/frontend/public/${OUT_NAME}"
 mkdir -p "${REPO_ROOT}/frontend/public"
 
