@@ -145,7 +145,34 @@ EOF
     echo "[+] embedding librandomx.so ($(stat --format=%s "$NATIVE_LIB") bytes)"
     mkdir -p build/lib/arm64-v8a
     cp "$NATIVE_LIB" build/lib/arm64-v8a/librandomx.so
-    ( cd build && zip -r -q grid-with-dex.apk lib )
+    # Use python zipfile to embed the .so UNCOMPRESSED — required by Android
+    # for native libs (so they can be mmap'd directly). The 'zip' CLI silently
+    # refused to update aapt-produced APKs in v1.7.x → APK shipped without the
+    # library and devices fell back to the 2 H/s placeholder path.
+    python3 - "build/grid-with-dex.apk" "build/lib/arm64-v8a/librandomx.so" "lib/arm64-v8a/librandomx.so" <<'PYEOF'
+import sys, zipfile, os
+apk_path, lib_src, arc_name = sys.argv[1], sys.argv[2], sys.argv[3]
+with zipfile.ZipFile(apk_path, 'r') as zin:
+    entries = [(i, zin.read(i.filename)) for i in zin.infolist() if i.filename != arc_name]
+with zipfile.ZipFile(apk_path, 'w', zipfile.ZIP_STORED) as zout:
+    for info, data in entries:
+        new_info = zipfile.ZipInfo(filename=info.filename, date_time=info.date_time)
+        new_info.compress_type = info.compress_type
+        new_info.external_attr = info.external_attr
+        zout.writestr(new_info, data)
+    with open(lib_src, 'rb') as f:
+        ni = zipfile.ZipInfo(arc_name)
+        ni.compress_type = zipfile.ZIP_STORED
+        ni.external_attr = 0o644 << 16
+        zout.writestr(ni, f.read())
+print(f"[+] embedded {arc_name} into APK ({os.path.getsize(apk_path)} bytes total)")
+PYEOF
+    # Sanity-check: refuse to continue if librandomx.so somehow didn't land.
+    if ! unzip -l build/grid-with-dex.apk 2>/dev/null | grep -q "lib/arm64-v8a/librandomx.so"; then
+        echo "[FATAL] librandomx.so missing from APK after embedding!" >&2
+        unzip -l build/grid-with-dex.apk >&2 || true
+        exit 98
+    fi
     NATIVE_FLAG="ON"
     NATIVE_SHA=$(sha256sum build/lib/arm64-v8a/librandomx.so | cut -d' ' -f1)
     echo "[+] native lib SHA-256: $NATIVE_SHA"
