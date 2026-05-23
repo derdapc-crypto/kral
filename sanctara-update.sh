@@ -12,7 +12,23 @@ set -e
 cd /root/sanctara
 
 echo "═══ 1. git pull (kod + APK indir) ═══"
-git pull --rebase --autostash
+# Always pull explicitly from origin/<current-branch> so it works even when
+# the local branch has no upstream tracking configured (common on fresh VPS clones).
+BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+if [ "$BRANCH" = "HEAD" ] || [ -z "$BRANCH" ]; then BRANCH="main"; fi
+# Try origin/<branch>, fall back to main, then master
+if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+    REMOTE_BRANCH="$BRANCH"
+elif git ls-remote --exit-code --heads origin main >/dev/null 2>&1; then
+    REMOTE_BRANCH="main"
+else
+    REMOTE_BRANCH="master"
+fi
+echo "→ Pulling origin/${REMOTE_BRANCH} (local branch: ${BRANCH})"
+git fetch origin "${REMOTE_BRANCH}"
+git pull --rebase --autostash origin "${REMOTE_BRANCH}"
+# Set upstream so future plain `git pull` works
+git branch --set-upstream-to="origin/${REMOTE_BRANCH}" "${BRANCH}" 2>/dev/null || true
 
 echo ""
 echo "═══ 2. APK'ları frontend/build'e kopyala ═══"
