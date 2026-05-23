@@ -43,27 +43,53 @@ if [ "$STASHED" = "1" ]; then
 fi
 
 echo ""
-echo "═══ 2. APK'ları frontend/build'e kopyala ═══"
-mkdir -p frontend/build
-if [ -f frontend/public/sanctara-light.apk ]; then
-    cp -f frontend/public/sanctara-light.apk frontend/build/sanctara-light.apk
-    echo "✓ Light APK güncellendi ($(stat -c%s frontend/build/sanctara-light.apk) bytes)"
-fi
-if [ -f frontend/public/sanctara-node-pro.apk ]; then
-    cp -f frontend/public/sanctara-node-pro.apk frontend/build/sanctara-node-pro.apk
-    echo "✓ Node Pro APK güncellendi ($(stat -c%s frontend/build/sanctara-node-pro.apk) bytes)"
-fi
-chmod 644 frontend/build/sanctara-*.apk 2>/dev/null
-chown -R caddy:caddy frontend/build 2>/dev/null || chown -R www-data:www-data frontend/build 2>/dev/null
+echo "═══ 2. APK'ları GitHub Releases'tan indir (tag: latest) ═══"
+mkdir -p frontend/build frontend/public
+# Repo is hardcoded here so the script doesn't depend on git remote parsing.
+REPO="derdapc-crypto/kral"
+REL_BASE="https://github.com/${REPO}/releases/latest/download"
+
+download_apk () {
+    local name="$1"
+    local url="${REL_BASE}/${name}"
+    local tmp="frontend/build/${name}.tmp"
+    local final="frontend/build/${name}"
+    echo "→ ${url}"
+    # Follow redirects; fail loudly on 404 so we don't silently keep stale files.
+    if curl -fSL --retry 3 --retry-delay 2 -o "${tmp}" "${url}"; then
+        local size
+        size=$(stat -c%s "${tmp}")
+        # Sanity-check: APKs are always at least 30 KB. Anything smaller is an
+        # HTML error page we ignored.
+        if [ "${size}" -lt 30000 ]; then
+            echo "⚠ ${name} indirilen dosya çok küçük (${size} bytes) — atlandı"
+            rm -f "${tmp}"
+            return 1
+        fi
+        mv -f "${tmp}" "${final}"
+        # Mirror to /public so /api/apk/version's disk-read can compute sha256.
+        cp -f "${final}" "frontend/public/${name}"
+        echo "✓ ${name} güncellendi (${size} bytes)"
+    else
+        echo "⚠ ${name} indirilemedi — Release yok veya erişilemez"
+        rm -f "${tmp}"
+        return 1
+    fi
+}
+
+download_apk sanctara-light.apk    || true
+download_apk sanctara-node-pro.apk || true
+
+chmod 644 frontend/build/sanctara-*.apk 2>/dev/null || true
+chown -R caddy:caddy frontend/build 2>/dev/null || chown -R www-data:www-data frontend/build 2>/dev/null || true
 
 echo ""
 echo "═══ 3. Caddy + Backend reload ═══"
-systemctl reload caddy
-# Don't restart backend unless server.py changed
-if git diff HEAD@{1} HEAD --name-only 2>/dev/null | grep -q "backend/"; then
-    echo "Backend kodu değişti → restart"
-    systemctl restart sanctara-backend
-fi
+systemctl reload caddy 2>/dev/null || true
+# Always restart backend since we don't reliably know if backend/* changed
+# after a rebase. Restart is cheap (<2s) and avoids stale-code drift.
+systemctl restart sanctara-backend 2>/dev/null || true
+sleep 2
 
 echo ""
 echo "═══ 4. Canlı URL testi ═══"

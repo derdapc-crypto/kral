@@ -34,6 +34,11 @@ backend/miner/randomx_status.json
 backend/miner/status.json
 backend/miner/__pycache__/
 
+# APKs are published to GitHub Releases (tag: latest) — never commit binaries.
+# VPS fetches them via sanctara-update.sh using gh release download.
+frontend/public/sanctara-*.apk
+frontend/public/grid-worker-*.apk
+
 dist
 
 # Environment files (comprehensive coverage)

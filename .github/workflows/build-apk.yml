@@ -86,30 +86,21 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Commit built APKs back to repo (so VPS can git pull)
+      - name: Publish APKs to GitHub Release `latest` (overwrite each build)
         if: success()
-        run: |
-          set -e
-          # Ensure the APKs are in frontend/public/ (build-apk.sh already copies them there)
-          ls -lh frontend/public/sanctara-*.apk || true
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f frontend/public/sanctara-light.apk    || true
-          git add -f frontend/public/sanctara-node-pro.apk || true
-          if git diff --cached --quiet; then
-            echo "No APK changes to commit."
-          else
-            git commit -m "ci: rebuild APKs v${{ github.event.inputs.version || '1.8.0' }} [skip ci]"
-            git push origin HEAD:${{ github.ref_name }}
-            echo "✅ APKs committed back to repo."
-          fi
-
-      - name: Create Release (on tag push)
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: latest
+          name: "Sanctara APKs (latest build)"
+          body: |
+            Auto-built APKs from commit ${{ github.sha }}.
+            **Direct download URLs (stable across builds):**
+            - Node Pro: https://github.com/${{ github.repository }}/releases/download/latest/sanctara-node-pro.apk
+            - Light:    https://github.com/${{ github.repository }}/releases/download/latest/sanctara-light.apk
           files: |
-            android-client/wrapper/build/sanctara-light.apk
-            android-client/wrapper/build/sanctara-node-pro.apk
+            frontend/public/sanctara-light.apk
+            frontend/public/sanctara-node-pro.apk
+          prerelease: false
+          make_latest: "true"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

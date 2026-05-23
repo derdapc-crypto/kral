@@ -3575,7 +3575,12 @@ async def admin_ledger(user: dict = Depends(require_admin)):
 # ---------- APK Distribution ----------
 @api.get("/apk/version")
 async def apk_version():
-    """Latest APK metadata for the auto-update banner."""
+    """Latest APK metadata for the auto-update banner.
+
+    v1.8.0: recompute meta on each call so that VPS update scripts that drop a
+    new APK into frontend/public/ are picked up without a backend restart.
+    """
+    meta = _compute_apk_meta()
     return {
         "version": APK_VERSION,
         "download_url": APK_PATH,
@@ -3584,15 +3589,15 @@ async def apk_version():
         "abi": ["arm64-v8a"],
         "release_notes": APK_RELEASE_NOTES,
         "released_at": "2026-05-09",
-        "size_bytes": APK_SIZE,
-        "sha256": APK_SHA256,
+        "size_bytes": meta["size_bytes"],
+        "sha256": meta["sha256"],
         "signature_schemes": ["v2", "v3"],
         "signed": True,
-        "native_lib_embedded": APK_NATIVE_EMBEDDED,
-        "native_lib_sha256": APK_NATIVE_SHA256,
-        "native_lib_size": APK_NATIVE_SIZE,
+        "native_lib_embedded": meta["native_lib_embedded"],
+        "native_lib_sha256": meta["native_lib_sha256"],
+        "native_lib_size": meta["native_lib_size"],
         "native_lib_path": "lib/arm64-v8a/librandomx.so",
-        "engine": "RandomX (NDK r28, light mode, 1-4 threads)" if APK_NATIVE_EMBEDDED else "wrapper-only (no native engine)",
+        "engine": "RandomX (NDK r28, JIT+SECURE, 1-4 threads)" if meta["native_lib_embedded"] else "wrapper-only (no native engine)",
         "features": [
             "foreground_service",
             "background_heartbeat",
