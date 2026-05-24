@@ -60,19 +60,14 @@ export default function Landing() {
   }, []);
 
   return (
-    <main className="bg-black text-white antialiased selection:bg-[#00ff88] selection:text-black overflow-x-hidden" data-testid="landing-page">
+    <main className="bg-black text-white antialiased selection:bg-[#ff3838] selection:text-black overflow-x-hidden" data-testid="landing-page">
       <BackgroundSystem />
       <NavBar apk={apk} />
       {tokenomics?.current_phase && <GenesisPhaseBanner phase={tokenomics.current_phase} />}
       <Hero scarcity={scarcity} apk={apk} />
-      <LiveCommandPanel scarcity={scarcity} />
-      <ManifestoSection />
-      <ScarcityConsole scarcity={scarcity} />
-      <DeploymentModule />
       <DualClientDownload origin={typeof window !== "undefined" ? window.location.origin : ""} />
       {tokenomics && <TokenomicsHalvingSection tk={tokenomics} />}
-      <BuybackPolicyPanel />
-      <B2BPreview />
+      <LiveCommandPanel scarcity={scarcity} />
       <FinalCTA apk={apk} />
       <FooterStrip apk={apk} />
     </main>
@@ -99,23 +94,27 @@ function BackgroundSystem() {
              WebkitMaskImage: "radial-gradient(ellipse at 50% 30%, black 35%, transparent 78%)",
            }} />
 
-      {/* layer 3 — radial neon glows */}
-      <div className="absolute -top-32 -left-32 w-[720px] h-[720px] rounded-full blur-[140px] opacity-[0.16]"
-           style={{ background: "radial-gradient(circle, #00ff88 0%, transparent 60%)" }} />
-      <div className="absolute top-1/3 -right-40 w-[640px] h-[640px] rounded-full blur-[140px] opacity-[0.14]"
-           style={{ background: "radial-gradient(circle, #00d9ff 0%, transparent 60%)" }} />
-      <div className="absolute bottom-0 left-1/4 w-[800px] h-[420px] rounded-full blur-[160px] opacity-[0.10]"
-           style={{ background: "radial-gradient(circle, #6c7bff 0%, transparent 60%)" }} />
+      {/* layer 3 — radioactive radial glows (Chernobyl palette) */}
+      <div className="absolute -top-32 -left-32 w-[720px] h-[720px] rounded-full blur-[140px] opacity-[0.22]"
+           style={{ background: "radial-gradient(circle, #ff3838 0%, transparent 60%)" }} />
+      <div className="absolute top-1/3 -right-40 w-[640px] h-[640px] rounded-full blur-[140px] opacity-[0.18]"
+           style={{ background: "radial-gradient(circle, #ff8800 0%, transparent 60%)" }} />
+      <div className="absolute bottom-0 left-1/4 w-[800px] h-[420px] rounded-full blur-[160px] opacity-[0.14]"
+           style={{ background: "radial-gradient(circle, #ffe000 0%, transparent 60%)" }} />
 
-      {/* layer 4 — slow moving beams */}
+      {/* layer 4 — radiation pulse beams */}
       <motion.div className="absolute top-[18%] -left-[10%] w-[60%] h-px"
-                  style={{ background: "linear-gradient(90deg, transparent, rgba(0,217,255,0.4), transparent)" }}
+                  style={{ background: "linear-gradient(90deg, transparent, rgba(255,56,56,0.5), transparent)" }}
                   animate={{ x: ["0%", "180%"] }}
                   transition={{ duration: 14, repeat: Infinity, ease: "linear" }} />
       <motion.div className="absolute top-[62%] -left-[10%] w-[55%] h-px"
-                  style={{ background: "linear-gradient(90deg, transparent, rgba(0,255,136,0.35), transparent)" }}
+                  style={{ background: "linear-gradient(90deg, transparent, rgba(255,136,0,0.45), transparent)" }}
                   animate={{ x: ["0%", "180%"] }}
                   transition={{ duration: 18, repeat: Infinity, ease: "linear", delay: 4 }} />
+      <motion.div className="absolute top-[40%] -left-[10%] w-[70%] h-px"
+                  style={{ background: "linear-gradient(90deg, transparent, rgba(255,224,0,0.3), transparent)" }}
+                  animate={{ x: ["0%", "180%"] }}
+                  transition={{ duration: 22, repeat: Infinity, ease: "linear", delay: 9 }} />
 
       {/* layer 5 — scanline + grain */}
       <div className="absolute inset-0"
