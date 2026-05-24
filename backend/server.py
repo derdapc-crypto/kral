@@ -4191,8 +4191,12 @@ async def admin_mobile_mining_metrics(user: dict = Depends(require_admin)):
     # ENGINE ACTIVE = native RandomX engine producing real hashes (APK only).
     engine_active_phones = await db.devices.count_documents({
         "last_heartbeat": {"$gte": cutoff_iso},
-        "native_pow": True,
-        "local_hashrate_hps": {"$gt": 0},
+        "$or": [
+            # Honest path: native engine producing real hashrate
+            {"native_pow": True, "local_hashrate_hps": {"$gt": 0}},
+            # Warming path: mining started but first hashrate report pending
+            {"mining_status": "running", "mining_requested": True},
+        ],
     })
     hp_agg = await db.devices.aggregate([
         {"$match": {
