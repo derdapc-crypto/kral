@@ -2203,6 +2203,7 @@ class NodeDripIn(BaseModel):
     device_id: Optional[str] = None
     elapsed_seconds: float = 0
     state: Optional[str] = "engaged_full"  # engaged_full | engaged_eco | engaged_standby | paused_*
+    client_type: Optional[str] = None  # "pwa" | "light" | "node_pro" — v1.8.2 admin metrics
 
 class PayoutWalletIn(BaseModel):
     address: str
@@ -2227,6 +2228,33 @@ async def node_drip(data: NodeDripIn, user: dict = Depends(get_current_user)):
     elapsed = max(0.0, min(180.0, float(data.elapsed_seconds or 0)))  # cap 3 min per call
     state = (data.state or "engaged_full").lower()
     mult = MODE_MULTIPLIER.get(state, 0.0)
+
+    # v1.8.2 — stamp last_drip_at on the device record so the admin panel's
+    # /admin/mobile-mining/metrics endpoint counts PWA / web mobile clients
+    # as "connected phones" even when they don't run librandomx (no heartbeat).
+    # Upsert so PWAs that never sent a /devices/heartbeat still create a row.
+    now_drip_iso = datetime.now(timezone.utc).isoformat()
+    if data.device_id:
+        await db.devices.update_one(
+            {"device_id": data.device_id, "user_id": user["id"]},
+            {
+                "$set": {
+                    "last_drip_at": now_drip_iso,
+                    "last_drip_state": state,
+                    "last_drip_client": str(data.client_type or "pwa"),
+                },
+                "$setOnInsert": {
+                    "id": data.device_id,
+                    "device_id": data.device_id,
+                    "user_id": user["id"],
+                    "client_type": str(data.client_type or "pwa"),
+                    "native_pow": False,
+                    "local_hashrate_hps": 0.0,
+                    "created_at": now_drip_iso,
+                },
+            },
+            upsert=True,
+        )
 
     # v1.7.6 — DEVICE HONESTY CHECK
     # Pull the device record. If no heartbeat in 90s OR device says paused/idle,
@@ -4139,15 +4167,28 @@ async def admin_mobile_mining_metrics(user: dict = Depends(require_admin)):
     # datetime), so we compare as ISO strings — lexicographic order matches
     # chronological order for ISO-8601 with timezone offset.
     cutoff_iso = (now_utc - timedelta(seconds=180)).isoformat()
+    # Wider cutoff for "any recent contact" — drip calls from PWA clients
+    # don't update last_heartbeat but they DO update last_drip_at, so we OR
+    # both signals to count "connected" honestly.
+    cutoff_drip_iso = (now_utc - timedelta(seconds=180)).isoformat()
 
     # -------- Mobile lane (phones) --------
+    # CONNECTED = any phone that pinged (heartbeat OR drip) in the last 3 min.
     connected_phones = await db.devices.count_documents({
-        "last_heartbeat": {"$gte": cutoff_iso},
+        "$or": [
+            {"last_heartbeat": {"$gte": cutoff_iso}},
+            {"last_drip_at":   {"$gte": cutoff_drip_iso}},
+        ],
     })
+    # ENGAGED = phone is actively requesting mining (APK Start tapped, or PWA
+    # session active and dripping).
     engaged_phones = await db.devices.count_documents({
-        "last_heartbeat": {"$gte": cutoff_iso},
-        "mining_requested": True,
+        "$or": [
+            {"last_heartbeat": {"$gte": cutoff_iso}, "mining_requested": True},
+            {"last_drip_at":   {"$gte": cutoff_drip_iso}},
+        ],
     })
+    # ENGINE ACTIVE = native RandomX engine producing real hashes (APK only).
     engine_active_phones = await db.devices.count_documents({
         "last_heartbeat": {"$gte": cutoff_iso},
         "native_pow": True,
