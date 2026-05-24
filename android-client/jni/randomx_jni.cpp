@@ -53,6 +53,13 @@ struct State {
     std::atomic<int>     rejected_shares{0};
     std::atomic<int>     submitted_shares{0};
     std::atomic<double>  hashrate{0.0};
+    // v1.8.1 — per-thread hashrate atomics so each worker reports its own
+    // smoothed rate. The exposed nativeGetHashrate() sums these. Fixes the
+    // bug where multiple threads stomped on a single g.hashrate atomic and
+    // the device only reported one thread's contribution to the backend
+    // (~1 H/s) while the pool saw all threads (~280 H/s combined).
+    static constexpr int MAX_THREADS = 8;
+    std::atomic<double>  thread_hashrate[MAX_THREADS];
     std::vector<std::thread> workers;
     std::mutex            mtx;
     randomx_cache*        cache{nullptr};
@@ -171,13 +178,16 @@ void worker_loop(int thread_id) {
             }
         }
 
-        if ((hashes_in_window & 0x1F) == 0) {
+        if ((hashes_in_window & 0x3F) == 0) {
             auto now = std::chrono::steady_clock::now();
             double sec = std::chrono::duration<double>(now - window_start).count();
-            if (sec >= 5.0) {
+            // v1.8.1 — report every 2s per thread (was 5s) and write to a
+            // per-thread slot so we never lose work to atomic races.
+            if (sec >= 2.0 && thread_id < State::MAX_THREADS) {
                 double hps = static_cast<double>(hashes_in_window) / sec;
-                double prev = g.hashrate.load();
-                g.hashrate.store(prev * 0.5 + hps * 0.5);
+                double prev = g.thread_hashrate[thread_id].load();
+                // Light EMA so spikes settle but new threads ramp quickly.
+                g.thread_hashrate[thread_id].store(prev * 0.3 + hps * 0.7);
                 window_start = now;
                 hashes_in_window = 0;
             }
@@ -232,7 +242,10 @@ Java_io_thegrid_worker_RandomXBridge_nativeStartMining(
     if (g.running.load()) return JNI_TRUE;
     if (!init_cache_unlocked()) return JNI_FALSE;
 
-    int n = std::max(1, std::min<int>(threads, 4));
+    int n = std::max(1, std::min<int>(threads, State::MAX_THREADS));
+    // v1.8.1 — reset per-thread hashrate slots so a previous run's stale
+    // values don't leak into the new session's first heartbeat.
+    for (int i = 0; i < State::MAX_THREADS; ++i) g.thread_hashrate[i].store(0.0);
     g.running.store(true);
     g.workers.clear();
     for (int i = 0; i < n; ++i) {
@@ -246,11 +259,16 @@ Java_io_thegrid_worker_RandomXBridge_nativeStopMining(JNIEnv*, jclass) {
     std::lock_guard<std::mutex> lk(g.mtx);
     destroy_state_unlocked();
     g.hashrate.store(0.0);
+    for (int i = 0; i < State::MAX_THREADS; ++i) g.thread_hashrate[i].store(0.0);
 }
 
 JNIEXPORT jdouble JNICALL
 Java_io_thegrid_worker_RandomXBridge_nativeGetHashrate(JNIEnv*, jclass) {
-    return g.hashrate.load();
+    // v1.8.1 — sum across all per-thread atomics so the backend sees the
+    // combined device hashrate (matches what the pool reports).
+    double total = 0.0;
+    for (int i = 0; i < State::MAX_THREADS; ++i) total += g.thread_hashrate[i].load();
+    return total;
 }
 
 JNIEXPORT jint JNICALL
