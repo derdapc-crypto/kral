@@ -158,7 +158,7 @@ function NavBar({ apk }) {
         <div className="flex items-center gap-2">
           <Link to="/login" className="text-[11px] uppercase tracking-[0.25em] text-white/55 hover:text-white px-2.5 py-1.5"
                 data-testid="nav-signin">sign in</Link>
-          <a href={apk?.download_url || "#deploy"}
+          <a href="#clients"
              data-testid="nav-deploy"
              className="text-[10px] font-mono uppercase tracking-[0.3em] px-3 py-1.5 rounded-md bg-[#ff8800] text-black font-bold
                         shadow-[0_0_24px_-4px_rgba(255,136,0,0.55)] hover:shadow-[0_0_36px_-4px_rgba(255,136,0,0.85)] transition">
@@ -980,12 +980,12 @@ function FinalCTA({ apk }) {
           One installer. One ENGAGE NODE. Your device becomes a verified edge node
           on a global, milestone-driven compute network.
         </p>
-        <a href={apk?.download_url || "#deploy"}
+        <a href="#clients"
            data-testid="final-cta-btn"
            className="group mt-9 inline-flex items-center gap-3 px-7 py-4 rounded-md bg-[#ff8800] text-black font-mono font-bold text-[11px] uppercase tracking-[0.4em]
                       shadow-[0_0_60px_-12px_rgba(255,136,0,0.9)] hover:shadow-[0_0_90px_-12px_rgba(255,136,0,1)] transition-all">
           <Download className="w-4 h-4" />
-          deploy node client
+          SANCTARA İNDİR
           <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
         </a>
         <div className="mt-5 font-mono uppercase tracking-[0.3em] text-[10px] text-white/30">

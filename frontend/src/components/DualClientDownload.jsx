@@ -11,6 +11,13 @@ import { Smartphone, ShieldCheck, Download, ArrowRight, Cpu } from "lucide-react
 const LIGHT_BASENAME   = "sanctara-light.apk";
 const NODEPRO_BASENAME = "sanctara-node-pro.apk";
 
+// v1.8.2 — APK'ları ARTIK direkt GitHub Releases'tan indir.
+// Bu sayede yerel /app/frontend/public/'taki eski (stale) APK kopyaları
+// hiçbir önbellek senaryosunda kullanıcıya servis edilmez.
+const RELEASE_BASE = "https://github.com/derdapc-crypto/kral/releases/latest/download";
+const LIGHT_RELEASE_URL   = `${RELEASE_BASE}/${LIGHT_BASENAME}`;
+const NODEPRO_RELEASE_URL = `${RELEASE_BASE}/${NODEPRO_BASENAME}`;
+
 const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
 
 // Fire-and-forget download counter — runs alongside the native browser download.
@@ -27,26 +34,25 @@ function trackDownload(flavor) {
   } catch { /* never block the user's download */ }
 }
 
-// Read the live APK metadata (version, size_bytes, native_lib_embedded) directly
-// from the file on disk on the backend — guarantees the front shows the truth
-// even if a stale CDN copy is cached somewhere.
-function useApkMeta(url) {
+// Read APK metadata from the backend (single source of truth). The backend
+// reads the actual APK file on disk and returns true size + version, so the
+// front shows the truth even if a CDN somewhere caches a stale binary.
+function useApkMeta(flavor) {
   const [meta, setMeta] = useState({ size: 0, version: "" });
   useEffect(() => {
+    if (!BACKEND) return;
     let aborted = false;
-    fetch(url, { method: "HEAD" }).then(r => {
-      if (aborted) return;
-      const sz = Number(r.headers.get("content-length") || 0);
-      setMeta(m => ({ ...m, size: sz }));
-    }).catch(() => {});
-    if (BACKEND) {
-      fetch(`${BACKEND}/api/apk/version`).then(r => r.json()).then(d => {
+    fetch(`${BACKEND}/api/apk/version${flavor === "light" ? "?flavor=light" : ""}`)
+      .then(r => r.json())
+      .then(d => {
         if (aborted) return;
-        setMeta(m => ({ ...m, version: d?.version || "" }));
+        setMeta({
+          size: Number(d?.size_bytes || 0),
+          version: d?.version || "",
+        });
       }).catch(() => {});
-    }
     return () => { aborted = true; };
-  }, [url]);
+  }, [flavor]);
   return meta;
 }
 
@@ -58,10 +64,12 @@ const fmtSize = (b) => {
 };
 
 export default function DualClientDownload({ origin = "" }) {
-  const lightUrl   = (origin || "") + "/" + LIGHT_BASENAME;
-  const nodeproUrl = (origin || "") + "/" + NODEPRO_BASENAME;
-  const lightMeta  = useApkMeta(lightUrl);
-  const proMeta    = useApkMeta(nodeproUrl);
+  // Always serve APKs from GitHub Releases — single source of truth, no
+  // stale cache anywhere along the CDN/preview chain.
+  const lightUrl   = LIGHT_RELEASE_URL;
+  const nodeproUrl = NODEPRO_RELEASE_URL;
+  const lightMeta  = useApkMeta("light");
+  const proMeta    = useApkMeta("node_pro");
 
   return (
     <section className="relative py-16 px-6 lg:px-8 border-t border-white/[0.06]"

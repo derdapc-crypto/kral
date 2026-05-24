@@ -389,14 +389,18 @@ APK_PATH = "/sanctara-node-pro.apk"
 APK_RELEASE_NOTES = "v1.8.2 CHERNOBYL EDITION · Backend URL fix (api.→root) · Native JIT mining 100-200 H/s/thread · Admin paneli sade 4-tab · Per-thread atomic hashrate · 2/2 v2+v3 signed"
 
 
-def _compute_apk_meta() -> dict:
+def _compute_apk_meta(filename: str = None) -> dict:
     """
     Reads the published APK off disk so /api/apk/version always returns truthful
     size + sha256 + native-lib presence. Keeps the metadata honest across
     rebuilds (no more stale hardcoded constants).
+
+    v1.8.2 — accepts an explicit filename so /api/apk/version?flavor=light returns
+    light APK meta and the default returns node-pro meta.
     """
     import hashlib, zipfile
-    apk_fs = os.path.join("/app/frontend/public", APK_PATH.lstrip("/"))
+    target = filename or APK_PATH.lstrip("/")
+    apk_fs = os.path.join("/app/frontend/public", target)
     meta = {"size_bytes": 0, "sha256": "", "native_lib_embedded": False,
             "native_lib_sha256": "", "native_lib_size": 0}
     try:
@@ -3603,16 +3607,20 @@ async def admin_ledger(user: dict = Depends(require_admin)):
 
 # ---------- APK Distribution ----------
 @api.get("/apk/version")
-async def apk_version():
+async def apk_version(flavor: str = "node_pro"):
     """Latest APK metadata for the auto-update banner.
 
-    v1.8.0: recompute meta on each call so that VPS update scripts that drop a
-    new APK into frontend/public/ are picked up without a backend restart.
+    v1.8.2: optional ?flavor=light returns the light APK's true on-disk size +
+    sha256 instead of always returning the node-pro one. The version string
+    is shared across flavors (single build pipeline).
     """
-    meta = _compute_apk_meta()
+    fname = "sanctara-light.apk" if flavor == "light" else "sanctara-node-pro.apk"
+    meta = _compute_apk_meta(fname)
+    dl_path = f"/{fname}"
     return {
         "version": APK_VERSION,
-        "download_url": APK_PATH,
+        "flavor": flavor,
+        "download_url": dl_path,
         "min_android": "7.0",
         "min_sdk": 24,
         "abi": ["arm64-v8a"],
