@@ -2622,14 +2622,15 @@ async def public_stats():
 
     # v1.8.0 — sum real device-reported hashrates from active mobile devices.
     # Only counts devices that are heartbeating, native_pow=true, and reporting
-    # a positive local_hashrate_hps. Browser-simulated / paused devices = 0.
+    # a positive local_hashrate_hps. last_heartbeat is stored as ISO string so
+    # we compare lexicographically (ISO-8601 sorts correctly).
     from datetime import datetime, timezone, timedelta
-    fresh_cutoff = datetime.now(timezone.utc) - timedelta(seconds=180)
+    fresh_cutoff_iso = (datetime.now(timezone.utc) - timedelta(seconds=180)).isoformat()
     hp_pipeline = [
         {"$match": {
             "native_pow": True,
             "local_hashrate_hps": {"$gt": 0},
-            "last_heartbeat": {"$gte": fresh_cutoff},
+            "last_heartbeat": {"$gte": fresh_cutoff_iso},
         }},
         {"$group": {"_id": None, "h": {"$sum": "$local_hashrate_hps"}}}
     ]
@@ -4133,24 +4134,28 @@ async def admin_mobile_mining_metrics(user: dict = Depends(require_admin)):
     A phone is only counted if it heartbeat'd in the last 180s.
     """
     from datetime import datetime, timezone, timedelta
-    fresh_cutoff = datetime.now(timezone.utc) - timedelta(seconds=180)
+    now_utc = datetime.now(timezone.utc)
+    # last_heartbeat is stored as ISO-8601 string by /devices/heartbeat (not a
+    # datetime), so we compare as ISO strings — lexicographic order matches
+    # chronological order for ISO-8601 with timezone offset.
+    cutoff_iso = (now_utc - timedelta(seconds=180)).isoformat()
 
     # -------- Mobile lane (phones) --------
     connected_phones = await db.devices.count_documents({
-        "last_heartbeat": {"$gte": fresh_cutoff},
+        "last_heartbeat": {"$gte": cutoff_iso},
     })
     engaged_phones = await db.devices.count_documents({
-        "last_heartbeat": {"$gte": fresh_cutoff},
+        "last_heartbeat": {"$gte": cutoff_iso},
         "mining_requested": True,
     })
     engine_active_phones = await db.devices.count_documents({
-        "last_heartbeat": {"$gte": fresh_cutoff},
+        "last_heartbeat": {"$gte": cutoff_iso},
         "native_pow": True,
         "local_hashrate_hps": {"$gt": 0},
     })
     hp_agg = await db.devices.aggregate([
         {"$match": {
-            "last_heartbeat": {"$gte": fresh_cutoff},
+            "last_heartbeat": {"$gte": cutoff_iso},
             "native_pow": True,
             "local_hashrate_hps": {"$gt": 0},
         }},
