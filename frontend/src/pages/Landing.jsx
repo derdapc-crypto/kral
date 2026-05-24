@@ -160,8 +160,8 @@ function NavBar({ apk }) {
                 data-testid="nav-signin">sign in</Link>
           <a href={apk?.download_url || "#deploy"}
              data-testid="nav-deploy"
-             className="text-[10px] font-mono uppercase tracking-[0.3em] px-3 py-1.5 rounded-md bg-[#00ff88] text-black font-bold
-                        shadow-[0_0_24px_-4px_rgba(0,255,136,0.55)] hover:shadow-[0_0_36px_-4px_rgba(0,255,136,0.85)] transition">
+             className="text-[10px] font-mono uppercase tracking-[0.3em] px-3 py-1.5 rounded-md bg-[#ff8800] text-black font-bold
+                        shadow-[0_0_24px_-4px_rgba(255,136,0,0.55)] hover:shadow-[0_0_36px_-4px_rgba(255,136,0,0.85)] transition">
             deploy node
           </a>
         </div>
@@ -186,7 +186,7 @@ function Hero({ scarcity, apk }) {
                     transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
           {/* eyebrow */}
           <div className="flex items-center gap-3 mb-8">
-            <span className="inline-block w-2 h-2 rounded-full bg-[#00ff88] shadow-[0_0_10px_2px_rgba(0,255,136,0.65)]" />
+            <span className="inline-block w-2 h-2 rounded-full bg-[#ff8800] shadow-[0_0_10px_2px_rgba(255,136,0,0.65)]" />
             <span className="font-mono uppercase tracking-[0.4em] text-[10px] text-white/65">
               global.distributed.compute / pre-mainnet
             </span>
@@ -241,7 +241,7 @@ function Hero({ scarcity, apk }) {
 }
 
 function FootMetric({ label, value, tone }) {
-  const color = tone === "matrix" ? "#00ff88" : tone === "cyan" ? "#00d9ff" : "#6c7bff";
+  const color = tone === "matrix" ? "#ff8800" : tone === "cyan" ? "#ff3838" : "#ffe000";
   return (
     <div className="bg-black px-3 py-2.5" data-testid={`foot-${label.toLowerCase().replace(/\s/g,'-')}`}>
       <div className="font-mono uppercase tracking-[0.25em] text-[9px] text-white/40">{label}</div>
@@ -262,12 +262,12 @@ function LiveCommandPanel({ scarcity }) {
     <section className="relative py-5 border-y border-white/[0.06] bg-black/80 backdrop-blur" id="network" data-testid="live-command-panel">
       {/* sweeping vertical beam */}
       <motion.div className="absolute top-0 bottom-0 w-px"
-                  style={{ background: "linear-gradient(180deg, transparent, rgba(0,255,136,0.55), transparent)" }}
+                  style={{ background: "linear-gradient(180deg, transparent, rgba(255,136,0,0.55), transparent)" }}
                   animate={{ x: [0, 1240] }}
                   transition={{ duration: 9, repeat: Infinity, ease: "linear" }} />
       <div className="max-w-[1240px] mx-auto px-6 lg:px-8">
         <div className="flex items-center gap-3 mb-3">
-          <span className="motion-telemetry-blink w-2 h-2 rounded-full bg-[#00ff88]" />
+          <span className="motion-telemetry-blink w-2 h-2 rounded-full bg-[#ff8800]" />
           <span className="font-mono uppercase tracking-[0.4em] text-[9px] text-white/45">
             // live.command.feed — verified telemetry only
           </span>
@@ -289,9 +289,9 @@ function LiveCommandPanel({ scarcity }) {
 }
 
 function RibbonCell({ label, value, tone }) {
-  const color = tone === "matrix" ? "#00ff88"
-              : tone === "cyan"   ? "#00d9ff"
-              : tone === "violet" ? "#6c7bff"
+  const color = tone === "matrix" ? "#ff8800"
+              : tone === "cyan"   ? "#ff3838"
+              : tone === "violet" ? "#ffe000"
               : tone === "amber"  ? "#fbbf24"
               : "#f5f7fa";
   return (
@@ -314,24 +314,24 @@ function ManifestoSection() {
         <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true, amount: 0.4 }}
                     transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-5">
+          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#ff8800]/85 mb-5">
             // protocol.thesis
           </div>
           <h2 className="font-display text-white"
               style={{ fontSize: "clamp(30px, 3.6vw, 54px)", lineHeight: 0.96, letterSpacing: "-0.04em", fontWeight: 600 }}>
             Useful compute,<br/>
-            <span style={{ background:"linear-gradient(96deg, #00ff88, #00d9ff)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+            <span style={{ background:"linear-gradient(96deg, #ff8800, #ff3838)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
               recorded as contribution.
             </span>
           </h2>
           <div className="mt-8 space-y-4 text-white/55 leading-relaxed text-[14px] max-w-xl">
             <p>$SANCT is <span className="text-white">not a coin</span>. It is the cryptographic receipt of every verified compute cycle the network has consumed.</p>
             <p>Each edge node submits proof of useful work — small, signed, deterministic packets. The protocol seals them into an immutable contribution ledger.</p>
-            <p>At <span className="text-[#00ff88]">1,000,000 verified active nodes</span>, the ledger may enter Snapshot Readiness. The roadmap is conditional, never automatic.</p>
+            <p>At <span className="text-[#ff8800]">1,000,000 verified active nodes</span>, the ledger may enter Snapshot Readiness. The roadmap is conditional, never automatic.</p>
           </div>
           <Link to="/token"
                 data-testid="manifesto-cta"
-                className="mt-10 inline-flex items-center gap-2 text-white/80 hover:text-[#00ff88] font-mono uppercase tracking-[0.3em] text-[11px] transition-colors">
+                className="mt-10 inline-flex items-center gap-2 text-white/80 hover:text-[#ff8800] font-mono uppercase tracking-[0.3em] text-[11px] transition-colors">
             read the full protocol page <ChevronRight className="w-3 h-3" />
           </Link>
         </motion.div>
@@ -365,7 +365,7 @@ function Receipt() {
       <div className="bg-[#06090d] border border-white/[0.08] p-6 lg:p-7 relative overflow-hidden"
            style={{ clipPath: "polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%)" }}>
         <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 mb-4">
-          <span className="text-[#00ff88] uppercase tracking-[0.3em] text-[10px]">// compute-time receipt</span>
+          <span className="text-[#ff8800] uppercase tracking-[0.3em] text-[10px]">// compute-time receipt</span>
           <span className="text-white/35 text-[10px]">v0.4</span>
         </div>
         <div className="space-y-2.5">
@@ -376,7 +376,7 @@ function Receipt() {
                         viewport={{ once: true }}
                         transition={{ duration: 0.4, delay: i * 0.08 }}>
               <span className="text-white/40 uppercase tracking-[0.2em] text-[10px]">{k}</span>
-              <span className={`tabular-nums ${k === "status" ? "text-[#00ff88]" : "text-white/85"}`}>{v}</span>
+              <span className={`tabular-nums ${k === "status" ? "text-[#ff8800]" : "text-white/85"}`}>{v}</span>
             </motion.div>
           ))}
         </div>
@@ -385,7 +385,7 @@ function Receipt() {
         </div>
       </div>
       {/* glow */}
-      <div className="absolute -inset-8 -z-10 bg-[#00ff88]/10 blur-3xl rounded-full" />
+      <div className="absolute -inset-8 -z-10 bg-[#ff8800]/10 blur-3xl rounded-full" />
     </div>
   );
 }
@@ -410,7 +410,7 @@ function ScarcityConsole({ scarcity }) {
         {/* console header */}
         <div className="flex items-baseline justify-between flex-wrap gap-4 border-b border-white/[0.08] pb-4 mb-8">
           <div>
-            <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-2">
+            <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#ff8800]/85 mb-2">
               // network.scarcity_progress
             </div>
             <h2 className="font-display text-white"
@@ -421,7 +421,7 @@ function ScarcityConsole({ scarcity }) {
           </div>
           <div className="text-right">
             <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-white/40">target</div>
-            <div className="font-display font-bold text-[32px] lg:text-[44px] tabular-nums text-[#00d9ff]" style={{ letterSpacing: "-0.04em" }}>
+            <div className="font-display font-bold text-[32px] lg:text-[44px] tabular-nums text-[#ff3838]" style={{ letterSpacing: "-0.04em" }}>
               1,000,000
             </div>
           </div>
@@ -433,11 +433,11 @@ function ScarcityConsole({ scarcity }) {
             const active = p === phase;
             return (
               <div key={p}
-                   className={`px-3 py-2.5 border ${active ? "border-[#00ff88]/70 bg-[#00ff88]/[0.06]" : "border-white/[0.08] bg-black/30"}`}>
+                   className={`px-3 py-2.5 border ${active ? "border-[#ff8800]/70 bg-[#ff8800]/[0.06]" : "border-white/[0.08] bg-black/30"}`}>
                 <div className="flex items-center gap-2">
-                  <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-[#00ff88]" : "bg-white/20"}`}
-                        style={active ? { boxShadow: "0 0 8px 1px #00ff88" } : {}} />
-                  <span className={`font-mono uppercase tracking-[0.2em] text-[9px] ${active ? "text-[#00ff88]" : "text-white/35"} truncate`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-[#ff8800]" : "bg-white/20"}`}
+                        style={active ? { boxShadow: "0 0 8px 1px #ff8800" } : {}} />
+                  <span className={`font-mono uppercase tracking-[0.2em] text-[9px] ${active ? "text-[#ff8800]" : "text-white/35"} truncate`}>
                     {p.replace("_", " ")}
                   </span>
                 </div>
@@ -474,7 +474,7 @@ function ScarcityConsole({ scarcity }) {
                  style={{
                    fontSize: "clamp(56px, 8vw, 112px)",
                    letterSpacing: "-0.06em", fontWeight: 700,
-                   background: "linear-gradient(180deg, #00ff88 0%, #00d9ff 100%)",
+                   background: "linear-gradient(180deg, #ff8800 0%, #ff3838 100%)",
                    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
                  }}
                  data-testid="scarcity-mega-count">
@@ -484,7 +484,7 @@ function ScarcityConsole({ scarcity }) {
           <div className="space-y-3 text-white/55 text-[13px] leading-relaxed">
             <p>
               Pre-mainnet contribution accumulation is tied to <span className="text-white">real verified network growth</span>,
-              not a calendar. When the count reaches <span className="text-[#00ff88]">1,000,000</span>, the ledger may enter
+              not a calendar. When the count reaches <span className="text-[#ff8800]">1,000,000</span>, the ledger may enter
               Snapshot Readiness review.
             </p>
             <p className="text-amber-300/85 text-[12px] font-mono uppercase tracking-[0.2em]">
@@ -524,8 +524,8 @@ function ScarcityConsole({ scarcity }) {
               transition={{ duration: 2.5, ease: [0.16, 1, 0.3, 1] }}
               className="absolute top-0 bottom-0 left-0"
               style={{
-                background: "linear-gradient(90deg, #00ff88, #00d9ff)",
-                boxShadow: "0 0 40px 4px rgba(0,255,136,0.5)",
+                background: "linear-gradient(90deg, #ff8800, #ff3838)",
+                boxShadow: "0 0 40px 4px rgba(255,136,0,0.5)",
               }}
             />
             <motion.div className="absolute top-0 bottom-0 w-32"
@@ -537,7 +537,7 @@ function ScarcityConsole({ scarcity }) {
             <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-white/35">
               // no fake inflation
             </span>
-            <span className="font-mono font-bold text-[15px] text-[#00ff88] tabular-nums">
+            <span className="font-mono font-bold text-[15px] text-[#ff8800] tabular-nums">
               {pct.toFixed(4)}%
             </span>
           </div>
@@ -548,7 +548,7 @@ function ScarcityConsole({ scarcity }) {
 }
 
 function ScarcityClientCard({ label, subLabel, accent, data, testId }) {
-  const accentColor = accent === "matrix" ? "#00ff88" : "#00d9ff";
+  const accentColor = accent === "matrix" ? "#ff8800" : "#ff3838";
   const fmt = (n) => Number(n || 0).toLocaleString();
   return (
     <div className="border border-white/[0.08] bg-black/60 backdrop-blur-xl" data-testid={testId}>
@@ -616,7 +616,7 @@ function DeploymentModule() {
     const make = (path) => {
       const full = path.startsWith("http") ? path : origin + path;
       return QRCode.toDataURL(full, { width: 320, margin: 0,
-        color: { dark: "#00ff88", light: "#00000000" } });
+        color: { dark: "#ff8800", light: "#00000000" } });
     };
     make(dual.light?.download_url    || "/sanctara-light.apk").then(setQrLight);
     make(dual.node_pro?.download_url || "/sanctara-node-pro.apk").then(setQrNodePro);
@@ -631,17 +631,17 @@ function DeploymentModule() {
       <div className="max-w-[1240px] mx-auto">
         <div className="flex items-end justify-between flex-wrap gap-4 mb-8">
           <div>
-            <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-3">
+            <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#ff8800]/85 mb-3">
               // deploy_node_client.exec
             </div>
             <h2 className="font-display text-white"
                 style={{ fontSize: "clamp(28px, 3.2vw, 48px)", letterSpacing: "-0.04em", fontWeight: 600, lineHeight: 0.96 }}>
-              Two installers. <span className="text-[#00ff88]">Both verified binaries</span>,<br/>
+              Two installers. <span className="text-[#ff8800]">Both verified binaries</span>,<br/>
               not app-store badges.
             </h2>
           </div>
-          <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-[#00ff88]">
-            <span className="inline-block w-2 h-2 rounded-full bg-[#00ff88] mr-2 align-middle motion-telemetry-blink" />
+          <div className="font-mono uppercase tracking-[0.3em] text-[10px] text-[#ff8800]">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#ff8800] mr-2 align-middle motion-telemetry-blink" />
             signed v2 + v3
           </div>
         </div>
@@ -681,14 +681,14 @@ function DeploymentModule() {
 }
 
 function DeploymentInstaller({ data, qr, apkUrl, accent, testId, badge, badgeSub, ctaLabel }) {
-  const accentColor   = accent === "matrix" ? "#00ff88" : "#00d9ff";
-  const ctaBg         = accent === "matrix" ? "bg-[#00ff88]" : "bg-[#00d9ff]";
+  const accentColor   = accent === "matrix" ? "#ff8800" : "#ff3838";
+  const ctaBg         = accent === "matrix" ? "bg-[#ff8800]" : "bg-[#ff3838]";
   const ctaShadow     = accent === "matrix"
-    ? "shadow-[0_0_60px_-12px_rgba(0,255,136,0.7)] hover:shadow-[0_0_80px_-12px_rgba(0,255,136,1)]"
-    : "shadow-[0_0_60px_-12px_rgba(0,217,255,0.7)] hover:shadow-[0_0_80px_-12px_rgba(0,217,255,1)]";
+    ? "shadow-[0_0_60px_-12px_rgba(255,136,0,0.7)] hover:shadow-[0_0_80px_-12px_rgba(255,136,0,1)]"
+    : "shadow-[0_0_60px_-12px_rgba(255,56,56,0.7)] hover:shadow-[0_0_80px_-12px_rgba(255,56,56,1)]";
   const qrShadow      = accent === "matrix"
-    ? "0 0 60px -10px rgba(0,255,136,0.55), inset 0 0 30px -10px rgba(0,255,136,0.3)"
-    : "0 0 60px -10px rgba(0,217,255,0.55), inset 0 0 30px -10px rgba(0,217,255,0.3)";
+    ? "0 0 60px -10px rgba(255,136,0,0.55), inset 0 0 30px -10px rgba(255,136,0,0.3)"
+    : "0 0 60px -10px rgba(255,56,56,0.55), inset 0 0 30px -10px rgba(255,56,56,0.3)";
 
   // Fire-and-forget download counter (matches /api/apk/track-download).
   const onDownloadClick = () => {
@@ -707,8 +707,8 @@ function DeploymentInstaller({ data, qr, apkUrl, accent, testId, badge, badgeSub
     <div className="border border-white/[0.08] bg-black/70 backdrop-blur-xl" data-testid={testId}>
       {/* console top bar */}
       <div className="flex items-center gap-3 px-5 py-3 border-b border-white/[0.08] text-[10px] font-mono uppercase tracking-[0.3em] text-white/55">
-        <span className="w-2.5 h-2.5 rounded-full bg-[#00ff88]/85" />
-        <span className="w-2.5 h-2.5 rounded-full bg-[#00d9ff]/55" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[#ff8800]/85" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[#ff3838]/55" />
         <span className="w-2.5 h-2.5 rounded-full bg-amber-400/55" />
         <span className="ml-3 truncate font-bold" style={{ color: accentColor }}>{data?.label || "—"}</span>
         <span className="ml-auto" style={{ color: accentColor }}>{data?.available ? "OK" : "PENDING"}</span>
@@ -783,8 +783,8 @@ function DeploymentInstaller({ data, qr, apkUrl, accent, testId, badge, badgeSub
 }
 
 function SpecLine({ k, v, tone, mono }) {
-  const color = tone === "matrix" ? "#00ff88"
-              : tone === "cyan"   ? "#00d9ff"
+  const color = tone === "matrix" ? "#ff8800"
+              : tone === "cyan"   ? "#ff3838"
               : tone === "amber"  ? "#fbbf24"
               : "#f5f7fa";
   return (
@@ -805,7 +805,7 @@ function BuybackPolicyPanel() {
         <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true, amount: 0.3 }}
                     transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
-          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#6c7bff] mb-4">
+          <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#ffe000] mb-4">
             // foundation.buyback_program
           </div>
           <h2 className="font-display text-white"
@@ -839,8 +839,8 @@ function BuybackPolicyPanel() {
               <div className="font-mono uppercase tracking-[0.25em] text-[11px] text-white/45">{k}</div>
               <div className={`font-mono uppercase tracking-[0.2em] text-[13px] tabular-nums font-bold ${
                 tone === "amber"  ? "text-amber-300" :
-                tone === "cyan"   ? "text-[#00d9ff]" :
-                tone === "violet" ? "text-[#6c7bff]" : "text-white"
+                tone === "cyan"   ? "text-[#ff3838]" :
+                tone === "violet" ? "text-[#ffe000]" : "text-white"
               }`}>{v}</div>
             </div>
           ))}
@@ -859,7 +859,7 @@ function B2BPreview() {
       <div className="max-w-[1240px] mx-auto">
         <div className="flex items-end justify-between flex-wrap gap-4 mb-8">
           <div>
-            <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00d9ff]/85 mb-3">
+            <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#ff3838]/85 mb-3">
               // enterprise.compute_surface
             </div>
             <h2 className="font-display text-white"
@@ -870,7 +870,7 @@ function B2BPreview() {
           </div>
           <Link to="/customer"
                 data-testid="b2b-cta"
-                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-md border border-[#00d9ff]/40 text-[#00d9ff] hover:bg-[#00d9ff]/10 font-mono text-[11px] uppercase tracking-[0.3em] transition">
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-md border border-[#ff3838]/40 text-[#ff3838] hover:bg-[#ff3838]/10 font-mono text-[11px] uppercase tracking-[0.3em] transition">
             <Briefcase className="w-4 h-4" /> open enterprise portal
           </Link>
         </div>
@@ -878,7 +878,7 @@ function B2BPreview() {
         <div className="relative border border-white/[0.08] bg-black/55 backdrop-blur-xl p-5 lg:p-7">
           {/* simulated dashboard */}
           <div className="flex items-center gap-2 mb-5 font-mono text-[10px] uppercase tracking-[0.3em] text-white/45">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#00ff88]/85" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#ff8800]/85" />
             <span>customer · enterprise · ACME-CORP</span>
             <span className="ml-auto">region · global · routed</span>
           </div>
@@ -907,7 +907,7 @@ function B2BPreview() {
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-baseline justify-between border-b border-white/[0.05] pb-1.5">
                     <span className="text-white/45 uppercase tracking-[0.2em] text-[10px]">{k}</span>
-                    <span className="text-[#00ff88] tabular-nums">{v}</span>
+                    <span className="text-[#ff8800] tabular-nums">{v}</span>
                   </div>
                 ))}
               </div>
@@ -915,7 +915,7 @@ function B2BPreview() {
           </div>
           {/* outer glow */}
           <div className="absolute -inset-px -z-10"
-               style={{ background: "linear-gradient(90deg, rgba(0,217,255,0.18), transparent 50%, rgba(0,255,136,0.12))",
+               style={{ background: "linear-gradient(90deg, rgba(255,56,56,0.18), transparent 50%, rgba(255,136,0,0.12))",
                         filter: "blur(40px)", opacity: 0.45 }} />
         </div>
       </div>
@@ -924,7 +924,7 @@ function B2BPreview() {
 }
 
 function PreviewMetric({ k, v, tone }) {
-  const color = tone === "matrix" ? "#00ff88" : tone === "cyan" ? "#00d9ff" : "#f5f7fa";
+  const color = tone === "matrix" ? "#ff8800" : tone === "cyan" ? "#ff3838" : "#f5f7fa";
   return (
     <div className="border border-white/[0.06] px-4 py-3">
       <div className="font-mono uppercase tracking-[0.22em] text-[9px] text-white/40">{k}</div>
@@ -938,7 +938,7 @@ function SparkBars() {
   return (
     <div className="flex items-end gap-[3px] h-20">
       {data.map((d, i) => (
-        <div key={i} className="flex-1 bg-[#00d9ff]/40 hover:bg-[#00d9ff]" style={{ height: `${d}%` }} />
+        <div key={i} className="flex-1 bg-[#ff3838]/40 hover:bg-[#ff3838]" style={{ height: `${d}%` }} />
       ))}
     </div>
   );
@@ -955,7 +955,7 @@ function FinalCTA({ apk }) {
         <div className="absolute inset-0 bg-black" />
         <motion.div className="absolute inset-0"
                     style={{
-                      background: "radial-gradient(circle at 50% 50%, rgba(0,255,136,0.12) 0%, transparent 55%)",
+                      background: "radial-gradient(circle at 50% 50%, rgba(255,136,0,0.12) 0%, transparent 55%)",
                     }}
                     animate={{ scale: [1, 1.08, 1] }}
                     transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }} />
@@ -965,14 +965,14 @@ function FinalCTA({ apk }) {
                   viewport={{ once: true }}
                   transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
                   className="relative text-center max-w-2xl">
-        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88] mb-6">
+        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#ff8800] mb-6">
           // initialize.computation
         </div>
         <h2 className="font-display text-white break-words"
             style={{ fontSize: "clamp(34px, 5vw, 80px)", letterSpacing: "-0.045em", fontWeight: 600, lineHeight: 0.94 }}>
           Join the<br/>
           <span style={{
-            background: "linear-gradient(96deg, #00ff88, #00d9ff)",
+            background: "linear-gradient(96deg, #ff8800, #ff3838)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           }}>verified&nbsp;compute&nbsp;layer.</span>
         </h2>
@@ -982,8 +982,8 @@ function FinalCTA({ apk }) {
         </p>
         <a href={apk?.download_url || "#deploy"}
            data-testid="final-cta-btn"
-           className="group mt-9 inline-flex items-center gap-3 px-7 py-4 rounded-md bg-[#00ff88] text-black font-mono font-bold text-[11px] uppercase tracking-[0.4em]
-                      shadow-[0_0_60px_-12px_rgba(0,255,136,0.9)] hover:shadow-[0_0_90px_-12px_rgba(0,255,136,1)] transition-all">
+           className="group mt-9 inline-flex items-center gap-3 px-7 py-4 rounded-md bg-[#ff8800] text-black font-mono font-bold text-[11px] uppercase tracking-[0.4em]
+                      shadow-[0_0_60px_-12px_rgba(255,136,0,0.9)] hover:shadow-[0_0_90px_-12px_rgba(255,136,0,1)] transition-all">
           <Download className="w-4 h-4" />
           deploy node client
           <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -1007,8 +1007,8 @@ function FooterStrip({ apk }) {
         <span>// sanctara.network · distributed compute · pre-mainnet</span>
         <span className="hidden lg:inline">v{apk?.version || "—"} · build verified · arm64-v8a</span>
         <div className="flex flex-wrap items-center gap-5">
-          <RRLink to="/privacy" className="hover:text-[#00ff88] transition" data-testid="footer-privacy-link">privacy policy</RRLink>
-          <RRLink to="/terms"   className="hover:text-[#00ff88] transition" data-testid="footer-terms-link">terms of service</RRLink>
+          <RRLink to="/privacy" className="hover:text-[#ff8800] transition" data-testid="footer-privacy-link">privacy policy</RRLink>
+          <RRLink to="/terms"   className="hover:text-[#ff8800] transition" data-testid="footer-terms-link">terms of service</RRLink>
           <span className="text-white/35">sanct · contribution receipt</span>
         </div>
       </div>
@@ -1026,17 +1026,17 @@ function GenesisPhaseBanner({ phase }) {
     ? Math.min(100, Math.round((phase.user_count / phase.max_users) * 100))
     : 0;
   return (
-    <div className="relative w-full bg-gradient-to-r from-[#00ff88]/15 via-[#00b894]/12 to-[#00ff88]/15 border-y border-[#00ff88]/40 backdrop-blur-md py-2.5 px-4 z-40"
+    <div className="relative w-full bg-gradient-to-r from-[#ff8800]/15 via-[#00b894]/12 to-[#ff8800]/15 border-y border-[#ff8800]/40 backdrop-blur-md py-2.5 px-4 z-40"
          data-testid="genesis-phase-banner">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-center sm:text-left">
         <div className="flex items-center gap-2">
           <span className="text-2xl">⚡</span>
           <div>
-            <div className="font-black text-[#00ff88] text-sm tracking-[0.3em] uppercase">
+            <div className="font-black text-[#ff8800] text-sm tracking-[0.3em] uppercase">
               FAZ {phase.id} · {phase.name?.toUpperCase()}
             </div>
             <div className="text-white/70 text-[10px] tracking-wider uppercase">
-              <span className="font-bold text-[#00ff88]">{phase.multiplier}x</span> SANCT KAZIM ÇARPANI AKTİF
+              <span className="font-bold text-[#ff8800]">{phase.multiplier}x</span> SANCT KAZIM ÇARPANI AKTİF
             </div>
           </div>
         </div>
@@ -1049,13 +1049,13 @@ function GenesisPhaseBanner({ phase }) {
               </div>
             </div>
             <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-[#00ff88] to-amber-300 transition-all duration-1000"
+              <div className="h-full bg-gradient-to-r from-[#ff8800] to-amber-300 transition-all duration-1000"
                    style={{ width: `${pct}%` }} />
             </div>
           </div>
         )}
         <RRLink to="/mobile"
-                className="text-[10px] font-black uppercase tracking-widest text-black bg-[#00ff88] hover:bg-[#00ff88]/90 px-3 py-1.5 rounded-md transition"
+                className="text-[10px] font-black uppercase tracking-widest text-black bg-[#ff8800] hover:bg-[#ff8800]/90 px-3 py-1.5 rounded-md transition"
                 data-testid="genesis-banner-cta">
           ŞİMDİ KATIL →
         </RRLink>
@@ -1081,11 +1081,11 @@ function TokenomicsHalvingSection({ tk }) {
     <section className="relative px-6 lg:px-8 py-24 border-t border-white/10" data-testid="tokenomics-section">
       <div className="max-w-7xl mx-auto">
         <div className="mb-12">
-          <div className="text-[11px] tracking-[0.5em] uppercase text-[#00ff88] font-bold mb-3">
+          <div className="text-[11px] tracking-[0.5em] uppercase text-[#ff8800] font-bold mb-3">
             // TOKENOMICS · TRANSPARENT SUPPLY
           </div>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight">
-            200M <span className="text-[#00ff88]">SANCT</span>.<br />
+            200M <span className="text-[#ff8800]">SANCT</span>.<br />
             <span className="text-white/60">Halving over 5 phases.</span>
           </h2>
         </div>
@@ -1095,7 +1095,7 @@ function TokenomicsHalvingSection({ tk }) {
           {Object.entries(tk.allocation || {}).map(([k, v]) => (
             <div key={k} className="border border-white/10 bg-white/[0.02] p-3 rounded-lg"
                  data-testid={`alloc-${k}`}>
-              <div className="text-[#00ff88] font-black text-lg">{v.pct}%</div>
+              <div className="text-[#ff8800] font-black text-lg">{v.pct}%</div>
               <div className="text-white/70 text-[10px] uppercase tracking-wider mt-0.5">{v.label}</div>
               <div className="text-white/40 font-mono text-[10px] mt-1">{(v.amount/1_000_000).toFixed(0)}M</div>
             </div>
@@ -1111,17 +1111,17 @@ function TokenomicsHalvingSection({ tk }) {
                    data-testid={`phase-${p.id}`}
                    className={`p-4 rounded-lg border ${
                      p.is_current
-                       ? "border-[#00ff88]/60 bg-[#00ff88]/10 shadow-[0_0_20px_rgba(0,255,136,0.2)]"
+                       ? "border-[#ff8800]/60 bg-[#ff8800]/10 shadow-[0_0_20px_rgba(255,136,0,0.2)]"
                        : "border-white/10 bg-white/[0.02]"
                    }`}>
-                <div className={`text-[10px] tracking-widest uppercase font-bold ${p.is_current ? "text-[#00ff88]" : "text-white/40"}`}>
+                <div className={`text-[10px] tracking-widest uppercase font-bold ${p.is_current ? "text-[#ff8800]" : "text-white/40"}`}>
                   Faz {p.id} · {p.is_current && "AKTİF"}
                 </div>
                 <div className="font-black text-lg mt-1">{p.name}</div>
                 <div className="text-white/60 text-[11px] mt-2 font-mono">
                   {p.min_users.toLocaleString("tr-TR")}–{p.max_users ? p.max_users.toLocaleString("tr-TR") : "∞"} kullanıcı
                 </div>
-                <div className={`mt-2 text-2xl font-black ${p.is_current ? "text-[#00ff88]" : "text-white/30"}`}>
+                <div className={`mt-2 text-2xl font-black ${p.is_current ? "text-[#ff8800]" : "text-white/30"}`}>
                   {p.multiplier}x
                 </div>
               </div>
@@ -1130,13 +1130,13 @@ function TokenomicsHalvingSection({ tk }) {
         </div>
 
         {/* Pro vs Light comparison */}
-        <div className="border border-[#00ff88]/30 bg-gradient-to-br from-[#00ff88]/5 to-transparent rounded-xl p-6 mb-8">
-          <div className="text-[11px] tracking-[0.4em] uppercase text-[#00ff88] font-bold mb-1">
+        <div className="border border-[#ff8800]/30 bg-gradient-to-br from-[#ff8800]/5 to-transparent rounded-xl p-6 mb-8">
+          <div className="text-[11px] tracking-[0.4em] uppercase text-[#ff8800] font-bold mb-1">
             // CURRENT PHASE EARNINGS · {tk.current_phase?.name?.toUpperCase()}
           </div>
           <div className="text-white/60 text-sm mb-6">
-            Şu anda <span className="text-[#00ff88] font-bold">{tk.current_phase?.multiplier}x</span> çarpanı aktif.
-            Node Pro, Light'tan <span className="text-[#00ff88] font-black">+%{tk.client_rewards?.pro_vs_light_advantage_pct}</span> daha fazla kazıyor.
+            Şu anda <span className="text-[#ff8800] font-bold">{tk.current_phase?.multiplier}x</span> çarpanı aktif.
+            Node Pro, Light'tan <span className="text-[#ff8800] font-black">+%{tk.client_rewards?.pro_vs_light_advantage_pct}</span> daha fazla kazıyor.
           </div>
 
           <div className="overflow-x-auto">
@@ -1146,7 +1146,7 @@ function TokenomicsHalvingSection({ tk }) {
                   <th className="py-2 pr-4">Telefon</th>
                   <th className="py-2 pr-4">Açıklama</th>
                   <th className="py-2 pr-4 text-amber-300">Light · Günlük</th>
-                  <th className="py-2 text-[#00ff88]">Node Pro · Günlük</th>
+                  <th className="py-2 text-[#ff8800]">Node Pro · Günlük</th>
                 </tr>
               </thead>
               <tbody className="font-mono">
@@ -1155,7 +1155,7 @@ function TokenomicsHalvingSection({ tk }) {
                     <td className="py-3 pr-4 font-bold text-white">{t.name}</td>
                     <td className="py-3 pr-4 text-white/50 text-xs">{t.hint}</td>
                     <td className="py-3 pr-4 text-amber-200">{light[t.id]?.toFixed(4) || "0"} SANCT</td>
-                    <td className="py-3 text-[#00ff88] font-bold">{pro[t.id]?.toFixed(4) || "0"} SANCT</td>
+                    <td className="py-3 text-[#ff8800] font-bold">{pro[t.id]?.toFixed(4) || "0"} SANCT</td>
                   </tr>
                 ))}
               </tbody>
@@ -1171,7 +1171,7 @@ function TokenomicsHalvingSection({ tk }) {
           </div>
           <div className="border border-white/10 p-4 rounded-lg">
             <div className="text-[10px] uppercase tracking-widest text-white/40">Mining Pool</div>
-            <div className="text-2xl font-black mt-1 text-[#00ff88]">{(tk.mining_pool / 1_000_000).toFixed(0)}M</div>
+            <div className="text-2xl font-black mt-1 text-[#ff8800]">{(tk.mining_pool / 1_000_000).toFixed(0)}M</div>
             <div className="text-white/40 text-xs">~8 yıl sürdürülebilir</div>
           </div>
           <div className="border border-white/10 p-4 rounded-lg">

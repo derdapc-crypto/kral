@@ -5,7 +5,7 @@
  * between clients. Light is shown FIRST (default), Node Pro is the advanced
  * opt-in alternative.
  */
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Smartphone, ShieldCheck, Download, ArrowRight, Cpu } from "lucide-react";
 
 const LIGHT_BASENAME   = "sanctara-light.apk";
@@ -27,15 +27,47 @@ function trackDownload(flavor) {
   } catch { /* never block the user's download */ }
 }
 
+// Read the live APK metadata (version, size_bytes, native_lib_embedded) directly
+// from the file on disk on the backend — guarantees the front shows the truth
+// even if a stale CDN copy is cached somewhere.
+function useApkMeta(url) {
+  const [meta, setMeta] = useState({ size: 0, version: "" });
+  useEffect(() => {
+    let aborted = false;
+    fetch(url, { method: "HEAD" }).then(r => {
+      if (aborted) return;
+      const sz = Number(r.headers.get("content-length") || 0);
+      setMeta(m => ({ ...m, size: sz }));
+    }).catch(() => {});
+    if (BACKEND) {
+      fetch(`${BACKEND}/api/apk/version`).then(r => r.json()).then(d => {
+        if (aborted) return;
+        setMeta(m => ({ ...m, version: d?.version || "" }));
+      }).catch(() => {});
+    }
+    return () => { aborted = true; };
+  }, [url]);
+  return meta;
+}
+
+const fmtSize = (b) => {
+  if (!b) return "—";
+  if (b >= 1024 * 1024) return `${(b / 1024 / 1024).toFixed(2)} MB`;
+  if (b >= 1024) return `${(b / 1024).toFixed(0)} KB`;
+  return `${b} B`;
+};
+
 export default function DualClientDownload({ origin = "" }) {
   const lightUrl   = (origin || "") + "/" + LIGHT_BASENAME;
   const nodeproUrl = (origin || "") + "/" + NODEPRO_BASENAME;
+  const lightMeta  = useApkMeta(lightUrl);
+  const proMeta    = useApkMeta(nodeproUrl);
 
   return (
     <section className="relative py-16 px-6 lg:px-8 border-t border-white/[0.06]"
              id="clients" data-testid="dual-client-download">
       <div className="max-w-[1240px] mx-auto">
-        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#00ff88]/85 mb-3">
+        <div className="font-mono uppercase tracking-[0.4em] text-[10px] text-[#ff8800]/85 mb-3">
           // network.client_matrix
         </div>
         <h2 className="font-display text-white"
@@ -46,9 +78,14 @@ export default function DualClientDownload({ origin = "" }) {
         <div className="mt-10 grid lg:grid-cols-2 gap-px bg-white/[0.08]">
           {/* ====== LIGHT ====== */}
           <div className="bg-black p-7 relative" data-testid="light-panel">
-            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] font-mono">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#00d9ff]" />
-              <span className="text-[#00d9ff]">store_safe · official cloud client</span>
+            <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.3em] font-mono">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#ff3838]" />
+                <span className="text-[#ff3838]">store_safe · official cloud client</span>
+              </div>
+              <div className="text-[#ffe000] tabular-nums">
+                v{lightMeta.version || "—"} · {fmtSize(lightMeta.size)}
+              </div>
             </div>
             <h3 className="mt-4 font-display font-bold text-white"
                 style={{ fontSize: "clamp(24px, 2.4vw, 34px)", letterSpacing: "-0.03em" }}>
@@ -64,13 +101,13 @@ export default function DualClientDownload({ origin = "" }) {
               <li>{`> daily grid calibration (ad-gated)`}</li>
               <li>{`> contributor drops + buyback status`}</li>
               <li>{`> snapshot readiness notifications`}</li>
-              <li className="text-[#00d9ff]">{`> google play / app store compliant`}</li>
+              <li className="text-[#ff3838]">{`> google play / app store compliant`}</li>
             </ul>
             <a href={lightUrl} download
                data-testid="light-cta"
                onClick={() => trackDownload("light")}
-               className="mt-7 inline-flex items-center gap-2 px-5 py-3 rounded-md bg-[#00d9ff] text-black font-mono font-bold uppercase tracking-[0.3em] text-[11px]
-                          shadow-[0_0_36px_-8px_rgba(0,217,255,0.7)] hover:shadow-[0_0_56px_-8px_rgba(0,217,255,1)] transition-all">
+               className="mt-7 inline-flex items-center gap-2 px-5 py-3 rounded-md bg-[#ff3838] text-black font-mono font-bold uppercase tracking-[0.3em] text-[11px]
+                          shadow-[0_0_36px_-8px_rgba(255,56,56,0.7)] hover:shadow-[0_0_56px_-8px_rgba(255,56,56,1)] transition-all">
               <Download className="w-3.5 h-3.5" />
               get light client
               <ArrowRight className="w-3.5 h-3.5" />
@@ -82,9 +119,17 @@ export default function DualClientDownload({ origin = "" }) {
 
           {/* ====== NODE PRO ====== */}
           <div className="bg-black p-7 relative" data-testid="nodepro-panel">
-            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] font-mono">
-              <Cpu className="w-3.5 h-3.5 text-[#00ff88]" />
-              <span className="text-[#00ff88]">direct download · advanced client</span>
+            <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.3em] font-mono">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-3.5 h-3.5 text-[#ff8800]" />
+                <span className="text-[#ff8800]">direct download · advanced client</span>
+              </div>
+              <div className={`tabular-nums font-bold ${proMeta.size > 500_000 ? "text-[#ff8800]" : "text-[#ff3838]"}`}>
+                v{proMeta.version || "—"} · {fmtSize(proMeta.size)}
+                {proMeta.size > 0 && proMeta.size < 500_000 && (
+                  <span className="ml-2 px-1.5 py-0.5 rounded bg-[#ff3838]/20 text-[#ff3838] text-[8px]">⚠ STALE</span>
+                )}
+              </div>
             </div>
             <h3 className="mt-4 font-display font-bold text-white"
                 style={{ fontSize: "clamp(24px, 2.4vw, 34px)", letterSpacing: "-0.03em" }}>
@@ -105,8 +150,8 @@ export default function DualClientDownload({ origin = "" }) {
             <a href={nodeproUrl} download
                data-testid="nodepro-cta"
                onClick={() => trackDownload("node_pro")}
-               className="mt-7 inline-flex items-center gap-2 px-5 py-3 rounded-md bg-[#00ff88] text-black font-mono font-bold uppercase tracking-[0.3em] text-[11px]
-                          shadow-[0_0_36px_-8px_rgba(0,255,136,0.7)] hover:shadow-[0_0_56px_-8px_rgba(0,255,136,1)] transition-all">
+               className="mt-7 inline-flex items-center gap-2 px-5 py-3 rounded-md bg-[#ff8800] text-black font-mono font-bold uppercase tracking-[0.3em] text-[11px]
+                          shadow-[0_0_36px_-8px_rgba(255,136,0,0.7)] hover:shadow-[0_0_56px_-8px_rgba(255,136,0,1)] transition-all">
               <Download className="w-3.5 h-3.5" />
               download node pro
               <ArrowRight className="w-3.5 h-3.5" />
