@@ -184,30 +184,12 @@ export default function Admin() {
             </h1>
           </div>
           <div className="mt-6 flex gap-2 flex-wrap">
-            <Tab active={tab === "map"} onClick={() => setTab("map")} testId="admin-tab-map">Command Center</Tab>
+            <Tab active={tab === "map"} onClick={() => setTab("map")} testId="admin-tab-map">Dashboard</Tab>
             <Tab active={tab === "android"} onClick={() => setTab("android")} testId="admin-tab-android">
-              <span className="inline-flex items-center gap-1.5"><Cpu className="w-3 h-3" /> Real Android</span>
+              <span className="inline-flex items-center gap-1.5"><Cpu className="w-3 h-3" /> Aktif Telefonlar</span>
             </Tab>
-            <Tab active={tab === "devices"} onClick={() => setTab("devices")} testId="admin-tab-devices">Device Health</Tab>
-            <Tab active={tab === "jobs"} onClick={() => setTab("jobs")} testId="admin-tab-jobs">
-              Jobs {pendingJobs > 0 && <span className="ml-1 inline-block px-1.5 py-0 rounded-full bg-[#39ff14]/30 text-[#39ff14] text-[9px] font-bold">{pendingJobs}</span>}
-            </Tab>
-            <Tab active={tab === "ledger"} onClick={() => setTab("ledger")} testId="admin-tab-ledger">Ledger</Tab>
-            <Tab active={tab === "payouts"} onClick={() => setTab("payouts")} testId="admin-tab-payouts">Payouts</Tab>
-            <Tab active={tab === "fraud"} onClick={() => setTab("fraud")} testId="admin-tab-fraud">Fraud Shield</Tab>
-            <Tab active={tab === "users"} onClick={() => setTab("users")} testId="admin-tab-users">Users</Tab>
-            <Tab active={tab === "buybacks"} onClick={() => setTab("buybacks")} testId="admin-tab-buybacks">
-              <span className="inline-flex items-center gap-1.5"><Gift className="w-3 h-3" /> Buybacks
-                {pendingBuybacks > 0 && <span className="ml-1 inline-block px-1.5 py-0 rounded-full bg-[#39ff14]/30 text-[#39ff14] text-[9px] font-bold">{pendingBuybacks}</span>}
-              </span>
-            </Tab>
-            <Tab active={tab === "mining-config"} onClick={() => setTab("mining-config")} testId="admin-tab-mining-config">
-              <span className="inline-flex items-center gap-1.5"><Cpu className="w-3 h-3" /> Mining Config</span>
-            </Tab>
-            <Tab active={tab === "client-stats"} onClick={() => setTab("client-stats")} testId="admin-tab-client-stats">
-              <span className="inline-flex items-center gap-1.5"><Radio className="w-3 h-3" /> Client Stats</span>
-            </Tab>
-            <Tab active={tab === "drops"} onClick={() => setTab("drops")} testId="admin-tab-drops">Contributor Drops</Tab>
+            <Tab active={tab === "users"} onClick={() => setTab("users")} testId="admin-tab-users">Giriş Yapanlar</Tab>
+            <Tab active={tab === "ledger"} onClick={() => setTab("ledger")} testId="admin-tab-ledger">SANCT Bakiye</Tab>
           </div>
         </div>
 
