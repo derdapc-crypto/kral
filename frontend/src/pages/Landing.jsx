@@ -282,8 +282,8 @@ function PurposeSection() {
             }}>RADYASYON</span> · biriktir.
           </h2>
           <p className="mt-4 text-white/55 text-[14px] max-w-2xl mx-auto leading-relaxed">
-            Her şarjda telefonun gerçek <strong className="text-[#ff8800]">RandomX</strong> hash'i üretir.
-            Bu üretim <strong className="text-[#ffe000]">$SANCT</strong> olarak hesabında birikir.
+            Her şarjda telefonun boştaki CPU gücü <strong className="text-[#ff8800]">dağıtık kuantum reaktöre</strong> katkı sağlar.
+            Bu katkı <strong className="text-[#ffe000]">$SANCT</strong> olarak hesabında birikir.
             Mainnet açıldığında bu coin'ler <strong className="text-white">borsada işlem görür ve gerçek değere dönüşür</strong>.
             Erken katılan = ilk halving'lerden 4×, 2× bonus alır.
           </p>
@@ -294,7 +294,7 @@ function PurposeSection() {
             { icon: "⚛", color: "#ff3838", title: "REAKTÖR ÇEKİRDEĞİ",
               body: "Sanctara, dünya genelindeki idle telefonları tek bir distributed compute reaktörüne bağlar. Her cihaz mini bir kontrol çubuğu. Sen kapadıkça reaktör soğur, başlattıkça kritikliğe yaklaşır." },
             { icon: "💎", color: "#ff8800", title: "$SANCT TOKEN",
-              body: "Mining yaptığın her saniye, network ledger'ına 'compute receipt' olarak yazılır. Token arzı sabit: 200.000.000. İlk 10.000 kullanıcı Genesis Phase'de 4× bonus alır — sonra 2×, 1×, 0.5×… halving devam eder." },
+              body: "Compute katkın network ledger'ına 'compute receipt' olarak yazılır. Token arzı sabit: 200.000.000. İlk 10.000 kullanıcı Genesis Phase'de 4× bonus alır — sonra 2×, 1×, 0.5×… halving devam eder." },
             { icon: "🚀", color: "#ffe000", title: "1M NODE = PATLAMA",
               body: "1.000.000 doğrulanmış cihaza ulaşıldığında ana ağ (mainnet) açılır. $SANCT borsaya listelenir, biriken token'lar gerçek bakiyene dönüşür. Şu an pre-mainnet aşamasındayız — early adopter avantajı." },
           ].map((c, i) => (
@@ -326,7 +326,7 @@ function PurposeSection() {
             <ArrowRight className="w-4 h-4" />
           </a>
           <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.3em] text-white/35">
-            // 2 client · light (web) ve node_pro (xmr mining) · ücretsiz
+            // 2 client · Sanctara Light (web) ve Node Pro (full compute) · ücretsiz
           </p>
         </div>
       </div>
@@ -736,7 +736,7 @@ function DeploymentModule() {
             apkUrl={lightUrl}
             accent="cyan"
             testId="deploy-light"
-            badge="STORE_SAFE · NO DEVICE-SIDE MINING"
+            badge="STORE_SAFE · NO DEVICE LOAD"
             badgeSub="AdMob rewarded ads · cloud-only"
             ctaLabel="LIGHT · direct download"
           />
@@ -809,9 +809,9 @@ function DeploymentInstaller({ data, qr, apkUrl, accent, testId, badge, badgeSub
             <SpecLine k="version"        v={data?.label ? `v${data?.version || "—"}` : "—"} />
             <SpecLine k="size"           v={`${((data?.size_bytes || 0) / 1024).toFixed(0)} KB`} />
             <SpecLine k="abi"            v={(data?.abi && data.abi[0]) || "arm64-v8a"} />
-            <SpecLine k="device_side_mining"
-                      v={data?.device_side_mining ? "ENABLED · opt-in" : "DISABLED"}
-                      tone={data?.device_side_mining ? "amber" : "matrix"} />
+            <SpecLine k="device_load"
+                      v={data?.device_load ? "ENABLED · opt-in" : "DISABLED"}
+                      tone={data?.device_load ? "amber" : "matrix"} />
             <SpecLine k="admob"
                       v={data?.admob_enabled ? "rewarded_ads" : "none"}
                       tone={data?.admob_enabled ? "cyan" : "matrix"} />
@@ -1252,7 +1252,7 @@ function TokenomicsHalvingSection({ tk }) {
             <div className="text-white/40 text-xs">SANCT</div>
           </div>
           <div className="border border-white/10 p-4 rounded-lg">
-            <div className="text-[10px] uppercase tracking-widest text-white/40">Mining Pool</div>
+            <div className="text-[10px] uppercase tracking-widest text-white/40">Compute Pool</div>
             <div className="text-2xl font-black mt-1 text-[#ff8800]">{(tk.mining_pool / 1_000_000).toFixed(0)}M</div>
             <div className="text-white/40 text-xs">~8 yıl sürdürülebilir</div>
           </div>

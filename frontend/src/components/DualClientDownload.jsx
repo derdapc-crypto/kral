@@ -101,7 +101,7 @@ export default function DualClientDownload({ origin = "" }) {
             </h3>
             <p className="mt-3 text-white/55 leading-relaxed text-[13px] max-w-md">
               Store-safe dashboard, ledger, calibration and participation
-              client. <span className="text-white">No device-side cryptocurrency mining.</span>
+              client. <span className="text-white">Sıfır cihaz yükü, sadece compute katkısı.</span>
               No CPU-intensive background compute.
             </p>
             <ul className="mt-5 space-y-2 font-mono text-[11px] uppercase tracking-[0.2em] text-white/55">
