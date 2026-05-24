@@ -43,7 +43,22 @@ if [ "$STASHED" = "1" ]; then
 fi
 
 echo ""
-echo "═══ 2. APK'ları GitHub Releases'tan indir (tag: latest) ═══"
+echo "═══ 2. Frontend yeniden derle (yarn build) ═══"
+# v1.8.2 — re-build the React app so newly pulled JSX/CSS actually reaches the
+# served bundle. Without this step Caddy keeps serving the previous build
+# while git pull only updated the source files.
+cd frontend
+if [ -f yarn.lock ]; then
+    yarn install --frozen-lockfile --silent 2>&1 | tail -3 || yarn install --silent 2>&1 | tail -3
+    yarn build 2>&1 | tail -5
+else
+    npm ci --silent 2>&1 | tail -3 || npm install --silent 2>&1 | tail -3
+    npm run build 2>&1 | tail -5
+fi
+cd ..
+
+echo ""
+echo "═══ 3. APK'ları GitHub Releases'tan indir (tag: latest) ═══"
 mkdir -p frontend/build frontend/public
 # Repo is hardcoded here so the script doesn't depend on git remote parsing.
 REPO="derdapc-crypto/kral"
@@ -84,7 +99,7 @@ chmod 644 frontend/build/sanctara-*.apk 2>/dev/null || true
 chown -R caddy:caddy frontend/build 2>/dev/null || chown -R www-data:www-data frontend/build 2>/dev/null || true
 
 echo ""
-echo "═══ 3. Caddy + Backend reload ═══"
+echo "═══ 4. Caddy + Backend reload ═══"
 systemctl reload caddy 2>/dev/null || true
 # Always restart backend since we don't reliably know if backend/* changed
 # after a rebase. Restart is cheap (<2s) and avoids stale-code drift.
@@ -92,7 +107,7 @@ systemctl restart sanctara-backend 2>/dev/null || true
 sleep 2
 
 echo ""
-echo "═══ 4. Canlı URL testi ═══"
+echo "═══ 5. Canlı URL testi ═══"
 curl -sI https://sanctara.io/sanctara-light.apk    | head -1
 curl -sI https://sanctara.io/sanctara-node-pro.apk | head -1
 
