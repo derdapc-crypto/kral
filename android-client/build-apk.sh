@@ -29,7 +29,7 @@ SDK=/opt/android-sdk
 DEB_BT=/usr/bin
 PLATFORM=$SDK/platforms/android-34/android.jar
 D8_JAR=$SDK/build-tools/34.0.0/lib/d8.jar
-VERSION="${VERSION:-1.7.5}"
+VERSION="${VERSION:-1.8.2}"
 FLAVOR="${FLAVOR:-nodepro}"
 
 case "$FLAVOR" in

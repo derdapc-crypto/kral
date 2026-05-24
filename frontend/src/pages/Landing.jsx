@@ -27,6 +27,7 @@ import QRCode from "qrcode";
 import NetworkTopology from "../components/NetworkTopology";
 import TotalTgcCounter from "../components/TotalTgcCounter";
 import DualClientDownload from "../components/DualClientDownload";
+import ChernobylReactor from "../components/ChernobylReactor";
 import SanctaraLogo from "../components/SanctaraLogo";
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
@@ -198,39 +199,25 @@ function Hero({ scarcity, apk }) {
                 letterSpacing: "-0.045em",
                 fontWeight: 600,
               }}>
-            Idle&nbsp;devices.<br/>
             <span style={{
-              background: "linear-gradient(96deg, #00ff88 0%, #00d9ff 55%, #6c7bff 100%)",
+              background: "linear-gradient(96deg, #ff3838 0%, #ff8800 50%, #ffe000 100%)",
               WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
               backgroundClip: "text",
-            }}>Verified&nbsp;compute.</span><br/>
-            <span className="text-white/65">Sanctara&nbsp;scale.</span>
+              filter: "drop-shadow(0 0 30px rgba(255,56,56,0.45))",
+            }}>SANCTARA<br/>REACTOR</span><br/>
+            <span className="text-white/65 text-[0.55em] font-mono uppercase tracking-[0.25em]">// criticality.imminent</span>
           </h1>
 
-          <p className="mt-7 text-[15px] leading-relaxed text-white/55 max-w-[500px]">
-            Sanctara transforms ordinary phones into a verified distributed compute layer.
-            Every cycle is recorded as a <span className="text-[#00ff88]">compute-time receipt</span> —
-            a pre-mainnet protocol bound to <em className="not-italic text-white">verified network growth</em>,
-            not an arbitrary countdown.
-          </p>
-
-          {/* CTA */}
-          <div className="mt-8 flex flex-wrap gap-3 items-center">
-            <a href={apk?.download_url || "#deploy"}
+          {/* CTA — single download button */}
+          <div className="mt-10 flex flex-wrap gap-3 items-center">
+            <a href="#clients"
                data-testid="hero-cta-primary"
-               className="group inline-flex items-center gap-3 px-5 py-3 rounded-md bg-[#00ff88] text-black font-mono font-bold text-[11px] uppercase tracking-[0.3em]
-                          shadow-[0_0_48px_-12px_rgba(0,255,136,0.7)] hover:shadow-[0_0_64px_-12px_rgba(0,255,136,1)] transition-all">
-              <Download className="w-4 h-4" />
-              deploy node client
+               className="group inline-flex items-center gap-3 px-7 py-4 rounded-md bg-[#ff3838] text-black font-mono font-bold text-[12px] uppercase tracking-[0.3em]
+                          shadow-[0_0_60px_-8px_rgba(255,56,56,0.9)] hover:shadow-[0_0_80px_-4px_rgba(255,136,0,1)] transition-all">
+              <Download className="w-5 h-5" />
+              SANCTARA İNDİR
               <ArrowRight className="w-4 h-4 -mr-1 group-hover:translate-x-1 transition-transform" />
             </a>
-            <Link to="/token"
-                  data-testid="hero-cta-protocol"
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-md border border-white/15 hover:border-white/40 text-white/85 hover:text-white
-                             font-mono text-[11px] uppercase tracking-[0.3em] transition-colors">
-              read protocol
-              <ArrowUpRight className="w-4 h-4" />
-            </Link>
           </div>
 
           {/* tiny telemetry foot */}
@@ -241,19 +228,12 @@ function Hero({ scarcity, apk }) {
           </div>
         </motion.div>
 
-        {/* RIGHT — Topology centerpiece */}
+        {/* RIGHT — Chernobyl reactor core (criticality pulse + halving detonations) */}
         <motion.div initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
                     className="relative aspect-square w-full max-w-[460px] lg:max-w-[520px] mx-auto"
                     style={{ maxHeight: "min(64vh, 520px)" }}>
-          {/* black bordered window */}
-          <div className="absolute inset-0 border border-white/[0.08] rounded-lg bg-black/55 overflow-hidden">
-            <NetworkTopology className="w-full h-full" />
-          </div>
-          {/* corner crosshair marks */}
-          {["top-0 left-0", "top-0 right-0 rotate-90", "bottom-0 left-0 -rotate-90", "bottom-0 right-0 rotate-180"].map((c, i) => (
-            <span key={i} className={`absolute ${c} w-3 h-3 border-l border-t border-[#00ff88]/65 m-2`} />
-          ))}
+          <ChernobylReactor verifiedNodes={scarcity?.verified_active_nodes || 0} />
         </motion.div>
       </div>
     </section>

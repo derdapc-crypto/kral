@@ -384,9 +384,9 @@ class JobCreateIn(BaseModel):
 
 # ---------- Constants ----------
 PRIORITY_MULT = {"economy": 0.7, "standard": 1.0, "instant": 2.5}
-APK_VERSION = "1.8.0"
+APK_VERSION = "1.8.2"
 APK_PATH = "/sanctara-node-pro.apk"
-APK_RELEASE_NOTES = "v1.8.0 NATIVE JIT MINING · RandomX VM artık JIT+SECURE flag'leri ile çalışıyor (interpreter yerine) — per-thread hashrate ~2 H/s → ~100-200 H/s · Sanctara Node Pro paketi · v2+v3 signed"
+APK_RELEASE_NOTES = "v1.8.2 CHERNOBYL EDITION · Backend URL fix (api.→root) · Native JIT mining 100-200 H/s/thread · Admin paneli sade 4-tab · Per-thread atomic hashrate · 2/2 v2+v3 signed"
 
 
 def _compute_apk_meta() -> dict:

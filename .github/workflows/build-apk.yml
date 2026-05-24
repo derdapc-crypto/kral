@@ -11,7 +11,7 @@ on:
       version:
         description: 'APK version (e.g. 1.8.0)'
         required: true
-        default: '1.8.0'
+        default: '1.8.2'
 
 jobs:
   build:
@@ -57,7 +57,7 @@ jobs:
 
       - name: Build Light APK
         env:
-          VERSION: ${{ github.event.inputs.version || '1.8.0' }}
+          VERSION: ${{ github.event.inputs.version || '1.8.2' }}
           FLAVOR: light
         run: |
           cd android-client
@@ -65,7 +65,7 @@ jobs:
 
       - name: Build Node Pro APK
         env:
-          VERSION: ${{ github.event.inputs.version || '1.8.0' }}
+          VERSION: ${{ github.event.inputs.version || '1.8.2' }}
           FLAVOR: nodepro
         run: |
           cd android-client
@@ -79,7 +79,7 @@ jobs:
       - name: Upload APKs as artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: sanctara-apks-v${{ github.event.inputs.version || '1.8.0' }}
+          name: sanctara-apks-v${{ github.event.inputs.version || '1.8.2' }}
           path: |
             android-client/wrapper/build/sanctara-*.apk
             frontend/public/sanctara-*.apk
