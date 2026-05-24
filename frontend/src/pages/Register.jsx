@@ -38,7 +38,7 @@ export default function Register() {
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 mb-8">
           <Hexagon className="w-7 h-7 text-[#D4AF37]" />
-          <div className="font-display font-black text-xl">THE <span className="gold-text">GRID</span></div>
+          <div className="font-display font-black text-xl">SANCT<span className="gold-text" style={{ color: "#ff8800" }}>ARA</span></div>
         </div>
         <div className="glass-strong rounded-3xl p-10">
           <div className="grid grid-cols-2 gap-2 mb-7 p-1 bg-black/40 rounded-full border border-white/5">
@@ -57,7 +57,7 @@ export default function Register() {
           </div>
 
           <h1 className="font-display text-3xl font-black tracking-tighter">
-            {role === "customer" ? "Rent the grid." : "Claim your node."}
+            {role === "customer" ? "Rent the reactor." : "Claim your node."}
           </h1>
           <p className="text-sm text-white/50 mt-2">
             {role === "customer" ? "Upload AI workloads. Pay only for compute solved." : "One minute to start earning USDT from idle compute."}

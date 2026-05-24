@@ -288,14 +288,15 @@ export default function Mobile() {
     <div className="min-h-screen cyber-bg pb-20" data-testid="mobile-screen">
       <div className="px-5 pt-5 pb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Hexagon className="w-6 h-6 cyan-text" />
+          <Hexagon className="w-6 h-6" style={{ color: "#ff3838" }} />
           <div className="font-mono-cyber font-black text-base">
-            THE <span className="cyan-text">GRID</span>
+            SANCT<span style={{ color: "#ff8800" }}>ARA</span>
           </div>
           {isNative && (
             <span data-testid="native-apk-badge"
-              className="ml-2 px-2 py-0.5 rounded-full text-[9px] tracking-widest uppercase border border-[#00ffe1]/40 cyan-text bg-[#00ffe1]/10">
-              Native Node · v{nodeStatus?.version || "1.5.4"}
+              className="ml-2 px-2 py-0.5 rounded-full text-[9px] tracking-widest uppercase"
+              style={{ border: "1px solid rgba(255,136,0,0.4)", color: "#ff8800", background: "rgba(255,136,0,0.1)" }}>
+              REACTOR NODE · v{nodeStatus?.version || "1.8.2"}
             </span>
           )}
         </div>

@@ -66,6 +66,7 @@ export default function Landing() {
       <NavBar apk={apk} />
       {tokenomics?.current_phase && <GenesisPhaseBanner phase={tokenomics.current_phase} />}
       <Hero scarcity={scarcity} apk={apk} />
+      <PurposeSection />
       <DualClientDownload origin={typeof window !== "undefined" ? window.location.origin : ""} />
       {tokenomics && <TokenomicsHalvingSection tk={tokenomics} />}
       <LiveCommandPanel scarcity={scarcity} />
@@ -138,31 +139,33 @@ function BackgroundSystem() {
 /* ============================================================ */
 function NavBar({ apk }) {
   return (
-    <header className="fixed top-0 inset-x-0 z-40 border-b border-white/[0.06] bg-black/55 backdrop-blur-xl"
-            data-testid="nav-bar">
+    <header className="fixed top-0 inset-x-0 z-40 border-b border-[#ff3838]/[0.18] bg-black/70 backdrop-blur-xl"
+            data-testid="nav-bar"
+            style={{ boxShadow: "0 0 40px -10px rgba(255,56,56,0.3)" }}>
       <div className="max-w-[1240px] mx-auto px-6 lg:px-8 h-14 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3" data-testid="nav-home">
           <SanctaraLogo size={26} showWordmark={false} />
-          <div className="font-mono uppercase tracking-[0.3em] text-[11px] text-white">sanctara.network</div>
-          <span className="hidden sm:inline-block text-[9px] uppercase tracking-[0.3em] text-white/35 border-l border-white/10 pl-2.5 ml-1">
-            distributed compute · pre-mainnet
-          </span>
+          <div className="font-mono uppercase tracking-[0.3em] text-[11px] text-white">
+            SANCT<span style={{ color: "#ff8800" }}>ARA</span>
+            <span className="text-[#ff3838] mx-1.5">·</span>
+            <span className="text-[#ffe000] text-[9px]">REACTOR</span>
+          </div>
         </Link>
-        <nav className="hidden md:flex items-center gap-5 text-[11px] uppercase tracking-[0.25em] text-white/65">
-          <a href="#network"  className="hover:text-white transition">network</a>
-          <a href="#protocol" className="hover:text-white transition">protocol</a>
-          <a href="#deploy"   className="hover:text-white transition">deploy</a>
-          <Link to="/token"   className="hover:text-white transition">sanct</Link>
-          <Link to="/customer"className="hover:text-white transition">enterprise</Link>
+        <nav className="hidden md:flex items-center gap-4 text-[10px] uppercase tracking-[0.25em] text-white/70 font-mono">
+          <a href="#reactor"   className="hover:text-[#ff8800] transition" data-testid="nav-platform">⚛ Platform</a>
+          <a href="#purpose"   className="hover:text-[#ff8800] transition" data-testid="nav-purpose">Neden $SANCT?</a>
+          <a href="#how"       className="hover:text-[#ff8800] transition" data-testid="nav-how">Nasıl çalışır</a>
+          <a href="#clients"   className="hover:text-[#ff8800] transition" data-testid="nav-product">Ürün</a>
+          <Link to="/token"    className="hover:text-[#ff8800] transition" data-testid="nav-tokenomics">Tokenomics</Link>
         </nav>
         <div className="flex items-center gap-2">
-          <Link to="/login" className="text-[11px] uppercase tracking-[0.25em] text-white/55 hover:text-white px-2.5 py-1.5"
-                data-testid="nav-signin">sign in</Link>
+          <Link to="/login" className="text-[10px] uppercase tracking-[0.25em] text-white/55 hover:text-[#ff8800] px-2.5 py-1.5 font-mono"
+                data-testid="nav-signin">Kontrol Paneli</Link>
           <a href="#clients"
              data-testid="nav-deploy"
-             className="text-[10px] font-mono uppercase tracking-[0.3em] px-3 py-1.5 rounded-md bg-[#ff8800] text-black font-bold
-                        shadow-[0_0_24px_-4px_rgba(255,136,0,0.55)] hover:shadow-[0_0_36px_-4px_rgba(255,136,0,0.85)] transition">
-            deploy node
+             className="text-[10px] font-mono uppercase tracking-[0.3em] px-3 py-1.5 rounded-md bg-[#ff3838] text-black font-bold
+                        shadow-[0_0_24px_-4px_rgba(255,56,56,0.7)] hover:shadow-[0_0_36px_-4px_rgba(255,136,0,0.95)] transition">
+            ⬇ Sanctara
           </a>
         </div>
       </div>
@@ -253,6 +256,85 @@ function FootMetric({ label, value, tone }) {
 /* ============================================================ */
 /*  2. Live Network Command Panel — full-width ribbon           */
 /* ============================================================ */
+/* ============================================================ */
+/*  PURPOSE — Neden $SANCT toplanıyor?                          */
+/* ============================================================ */
+function PurposeSection() {
+  return (
+    <section id="purpose" className="relative py-24 border-y border-[#ff3838]/15 overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none"
+           style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(255,56,56,0.08), transparent 65%)" }} />
+      <motion.div className="absolute -top-20 right-1/4 w-[500px] h-[500px] rounded-full blur-[140px] opacity-25 pointer-events-none"
+                  style={{ background: "radial-gradient(circle, #ff8800, transparent 60%)" }}
+                  animate={{ scale: [1, 1.15, 1], opacity: [0.2, 0.35, 0.2] }}
+                  transition={{ duration: 5, repeat: Infinity }} />
+
+      <div className="relative max-w-[1100px] mx-auto px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-[#ff3838] mb-3">
+            ⚛ Neden $SANCT topluyorsun?
+          </div>
+          <h2 className="font-mono text-4xl md:text-5xl font-black tracking-tighter">
+            <span style={{
+              background: "linear-gradient(90deg, #ff3838 0%, #ff8800 50%, #ffe000 100%)",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}>RADYASYON</span> · biriktir.
+          </h2>
+          <p className="mt-4 text-white/55 text-[14px] max-w-2xl mx-auto leading-relaxed">
+            Her şarjda telefonun gerçek <strong className="text-[#ff8800]">RandomX</strong> hash'i üretir.
+            Bu üretim <strong className="text-[#ffe000]">$SANCT</strong> olarak hesabında birikir.
+            Mainnet açıldığında bu coin'ler <strong className="text-white">borsada işlem görür ve gerçek değere dönüşür</strong>.
+            Erken katılan = ilk halving'lerden 4×, 2× bonus alır.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-5">
+          {[
+            { icon: "⚛", color: "#ff3838", title: "REAKTÖR ÇEKİRDEĞİ",
+              body: "Sanctara, dünya genelindeki idle telefonları tek bir distributed compute reaktörüne bağlar. Her cihaz mini bir kontrol çubuğu. Sen kapadıkça reaktör soğur, başlattıkça kritikliğe yaklaşır." },
+            { icon: "💎", color: "#ff8800", title: "$SANCT TOKEN",
+              body: "Mining yaptığın her saniye, network ledger'ına 'compute receipt' olarak yazılır. Token arzı sabit: 200.000.000. İlk 10.000 kullanıcı Genesis Phase'de 4× bonus alır — sonra 2×, 1×, 0.5×… halving devam eder." },
+            { icon: "🚀", color: "#ffe000", title: "1M NODE = PATLAMA",
+              body: "1.000.000 doğrulanmış cihaza ulaşıldığında ana ağ (mainnet) açılır. $SANCT borsaya listelenir, biriken token'lar gerçek bakiyene dönüşür. Şu an pre-mainnet aşamasındayız — early adopter avantajı." },
+          ].map((c, i) => (
+            <motion.div key={i}
+                        initial={{ opacity: 0, y: 30 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: i * 0.15, duration: 0.6 }}
+                        className="relative p-7 rounded-md border bg-black/55"
+                        style={{ borderColor: `${c.color}55`, boxShadow: `inset 0 0 60px ${c.color}11, 0 0 30px -10px ${c.color}40` }}>
+              <div className="text-3xl mb-4" style={{ filter: `drop-shadow(0 0 12px ${c.color})` }}>{c.icon}</div>
+              <div className="font-mono font-bold text-[12px] uppercase tracking-[0.3em] mb-3" style={{ color: c.color }}>
+                {c.title}
+              </div>
+              <p className="text-white/65 text-[13px] leading-relaxed">{c.body}</p>
+              <div className="absolute -top-px -left-px w-8 h-px" style={{ background: c.color }} />
+              <div className="absolute -top-px -left-px w-px h-8" style={{ background: c.color }} />
+              <div className="absolute -bottom-px -right-px w-8 h-px" style={{ background: c.color }} />
+              <div className="absolute -bottom-px -right-px w-px h-8" style={{ background: c.color }} />
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="mt-14 text-center">
+          <a href="#clients" data-testid="purpose-cta"
+             className="inline-flex items-center gap-3 px-8 py-4 rounded-md bg-[#ff3838] text-black font-mono font-bold text-[11px] uppercase tracking-[0.3em]
+                        shadow-[0_0_60px_-8px_rgba(255,56,56,0.85)] hover:shadow-[0_0_80px_-4px_rgba(255,224,0,1)] transition-all">
+            <Download className="w-4 h-4" /> SANCTARA İNDİR · MADENCİLİĞE BAŞLA
+            <ArrowRight className="w-4 h-4" />
+          </a>
+          <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.3em] text-white/35">
+            // 2 client · light (web) ve node_pro (xmr mining) · ücretsiz
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
 function LiveCommandPanel({ scarcity }) {
   const verified = scarcity?.verified_active_nodes ?? 0;
   const target   = scarcity?.target_active_nodes ?? 1_000_000;
