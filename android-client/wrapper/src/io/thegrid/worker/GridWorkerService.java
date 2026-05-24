@@ -565,7 +565,7 @@ public class GridWorkerService extends Service {
             "{\"device_id\":\"%s\",\"charging\":%s,\"wifi\":%s,\"permission\":true," +
             "\"battery\":%d,\"battery_percent\":%d,\"temperature_c\":%.1f,\"thermal\":\"%s\"," +
             "\"network_type\":\"%s\"," +
-            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"1.5.6\"," +
+            "\"worker_state\":\"%s\",\"foreground\":false,\"app_version\":\"%s\"," +
             "\"stratum_linked\":%s," +
             "\"native_pow\":%s,\"mining_status\":\"%s\",\"node_state\":\"%s\"," +
             "\"eco_mode\":%s,\"allow_on_battery\":%s,\"active_threads\":%d," +
@@ -576,7 +576,7 @@ public class GridWorkerService extends Service {
             deviceId, charging, onWifi, batteryPct, batteryPct, tempC,
             (tempC > TEMP_LIMIT_C ? "hot" : "nominal"),
             netType,
-            (eligible ? "active" : "paused"),
+            (eligible ? "active" : "paused"), BuildConfig.VERSION_NAME,
             linked,
             nativePow, miningStatus, nodeStateStr,
             (nodeState == NodeState.ENGAGED_ECO),

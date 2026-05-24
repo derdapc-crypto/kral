@@ -20,8 +20,13 @@ import java.nio.charset.StandardCharsets;
  * APK keeps working without configuration.
  */
 public class GridApi {
-    /** Hard-coded fallback if no override has been saved yet. */
-    public static final String DEFAULT_BASE = "https://api.sanctara.io";
+    /** Hard-coded fallback if no override has been saved yet.
+     *  v1.8.2 — fixed: was 'https://api.sanctara.io' (502 Bad Gateway on the
+     *  Contabo VPS — no `api.` vhost is configured in Caddy). The backend is
+     *  served from the root domain at `/api/*`. Using the wrong base meant
+     *  the heartbeat/drip/register loops silently failed with 502 and devices
+     *  never appeared in the admin Mobile Compute ledger. */
+    public static final String DEFAULT_BASE = "https://sanctara.io";
     /** Legacy constant kept for compatibility with old call sites — prefer {@link #base(Context)}. */
     public static final String BASE = DEFAULT_BASE;
     private static final String PREF_KEY = "grid_backend_base";
@@ -32,7 +37,13 @@ public class GridApi {
             String s = ctx.getSharedPreferences("grid_prefs", Context.MODE_PRIVATE)
                           .getString(PREF_KEY, null);
             if (s == null || s.length() < 8) return DEFAULT_BASE;
-            return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
+            String norm = s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
+            // v1.8.2 — auto-heal: discard any cached "api.sanctara.io" override
+            // because that vhost returns 502 on the production VPS. Falling
+            // back to the root domain restores connectivity for users that
+            // upgraded from an APK that persisted the old broken URL.
+            if (norm.contains("//api.sanctara.io")) return DEFAULT_BASE;
+            return norm;
         } catch (Exception ignored) { return DEFAULT_BASE; }
     }
 
